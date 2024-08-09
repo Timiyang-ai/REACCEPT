@@ -1,0 +1,61 @@
+@Override
+    public void train(ClassificationDataSet dataSet, boolean parallel)
+    {
+        double[] deci = new double[dataSet.getSampleSize()];//array of SVM decision values
+        boolean[] label = new boolean[deci.length];//array of booleans: is the example labeled +1?
+        int len = label.length;
+        
+        if (mode == CalibrationMode.CV)
+        {
+            List<ClassificationDataSet> foldList = dataSet.cvSet(folds);
+            int pos = 0;
+            for(int i = 0; i < foldList.size(); i++)
+            {
+                ClassificationDataSet test = foldList.get(i);
+                ClassificationDataSet train = ClassificationDataSet.comineAllBut(foldList, i);
+                base.train(train, parallel);
+                
+                for(int j = 0; j < test.getSampleSize(); j++)
+                {
+                    deci[pos] = base.getScore(test.getDataPoint(j));
+                    label[pos] = test.getDataPointCategory(j) == 1;
+                    pos++;
+                }
+            }
+            
+            base.train(dataSet, parallel);
+        }
+        else if (mode == CalibrationMode.HOLD_OUT)
+        {
+            List<DataPointPair<Integer>> wholeSet = dataSet.getAsDPPList();
+            Collections.shuffle(wholeSet);
+            
+            int splitMark = (int) (wholeSet.size()*(1-holdOut));
+            ClassificationDataSet train = new ClassificationDataSet(wholeSet.subList(0, splitMark), dataSet.getPredicting());
+            ClassificationDataSet test = new ClassificationDataSet(wholeSet.subList(splitMark, wholeSet.size()), dataSet.getPredicting());
+            
+            base.train(train, parallel);
+            for(int i = 0; i < test.getSampleSize(); i++)
+            {
+                deci[i] = base.getScore(test.getDataPoint(i));
+                label[i] = test.getDataPointCategory(i) == 1;
+            }
+            
+            len = test.getSampleSize();
+            
+            base.train(dataSet, parallel);
+        }
+        else
+        {
+            base.train(dataSet, parallel);
+
+            for (int i = 0; i < len; i++)
+            {
+                DataPoint dp = dataSet.getDataPoint(i);
+                deci[i] = base.getScore(dp);
+                label[i] = dataSet.getDataPointCategory(i) == 1;
+            }
+        }
+        
+        calibrate(label, deci, len);
+    }

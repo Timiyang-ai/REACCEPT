@@ -1,0 +1,1 @@
+<T extends Throwable> T throwing(Level level, T t);

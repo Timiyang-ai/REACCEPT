@@ -1,0 +1,1 @@
+public int parseField(byte[] bytes, int startPos, int length, char delim, T field);

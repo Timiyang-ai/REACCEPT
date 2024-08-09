@@ -1,0 +1,1 @@
+void addEnd(Collection<E> collection);

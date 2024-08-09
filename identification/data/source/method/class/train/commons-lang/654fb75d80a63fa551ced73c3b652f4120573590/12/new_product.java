@@ -1,0 +1,30 @@
+private static String getCanonicalName(String className) {
+        className = StringUtils.deleteWhitespace(className);
+        if (className == null) {
+            return null;
+        }
+        int dim = 0;
+        while (className.startsWith("[")) {
+            dim++;
+            className = className.substring(1);
+        }
+        if (dim < 1) {
+            return className;
+        }
+        if (className.startsWith("L")) {
+            className = className.substring(
+                1,
+                className.endsWith(";")
+                    ? className.length() - 1
+                    : className.length());
+        } else {
+            if (!className.isEmpty()) {
+                className = reverseAbbreviationMap.get(className.substring(0, 1));
+            }
+        }
+        final StringBuilder canonicalClassNameBuffer = new StringBuilder(className);
+        for (int i = 0; i < dim; i++) {
+            canonicalClassNameBuffer.append("[]");
+        }
+        return canonicalClassNameBuffer.toString();
+    }

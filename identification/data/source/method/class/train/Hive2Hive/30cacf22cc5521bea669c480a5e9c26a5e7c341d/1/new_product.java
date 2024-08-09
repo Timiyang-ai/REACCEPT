@@ -1,0 +1,1 @@
+boolean changeProtectionKey(String locationKey, String contentKey, int ttl, KeyPair oldKey, KeyPair newKey);

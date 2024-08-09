@@ -1,0 +1,1 @@
+public void remove(String name);

@@ -1,0 +1,1 @@
+Result<List<Account>> createAccount(int count);

@@ -1,0 +1,1 @@
+public abstract Builder annotationQuery(Map<String, String> annotationQuery);

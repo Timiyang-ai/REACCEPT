@@ -1,0 +1,45 @@
+diff --git a/old_product.java b/new_product.java
+index 1cb99d3..56a193b 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,13 +1,12 @@
+ public static CompletedCheckpoint loadAndValidateSavepoint(
+ 			JobID jobId,
+ 			Map<JobVertexID, ExecutionJobVertex> tasks,
+-			SavepointStore savepointStore,
+-			String savepointPath) throws Exception {
++			String savepointPath) throws IOException {
+ 
+ 		// (1) load the savepoint
+-		Savepoint savepoint = savepointStore.loadSavepoint(savepointPath);
++		Savepoint savepoint = SavepointStore.loadSavepoint(savepointPath);
+ 		final Map<JobVertexID, TaskState> taskStates = new HashMap<>(savepoint.getTaskStates().size());
+-		
++
+ 		// (2) validate it (parallelism, etc)
+ 		for (TaskState taskState : savepoint.getTaskStates()) {
+ 			ExecutionJobVertex executionJobVertex = tasks.get(taskState.getJobVertexID());
+@@ -19,12 +18,12 @@ public static CompletedCheckpoint loadAndValidateSavepoint(
+ 				else {
+ 					String msg = String.format("Failed to rollback to savepoint %s. " +
+ 									"Max parallelism mismatch between savepoint state and new program. " +
+-									"Cannot map operator %s with parallelism %d to new program with " +
++									"Cannot map operator %s with max parallelism %d to new program with " +
+ 									"parallelism %d. This indicates that the program has been changed " +
+ 									"in a non-compatible way after the savepoint.",
+ 							savepoint,
+ 							taskState.getJobVertexID(),
+-							taskState.getParallelism(),
++							taskState.getMaxParallelism(),
+ 							executionJobVertex.getParallelism());
+ 
+ 					throw new IllegalStateException(msg);
+@@ -40,5 +39,6 @@ public static CompletedCheckpoint loadAndValidateSavepoint(
+ 		}
+ 
+ 		// (3) convert to checkpoint so the system can fall back to it
+-		return new CompletedCheckpoint(jobId, savepoint.getCheckpointId(), 0L, 0L, taskStates, false);
++		CheckpointProperties props = CheckpointProperties.forStandardSavepoint();
++		return new CompletedCheckpoint(jobId, savepoint.getCheckpointId(), 0L, 0L, taskStates, props, savepointPath);
+ 	}
+\ No newline at end of file

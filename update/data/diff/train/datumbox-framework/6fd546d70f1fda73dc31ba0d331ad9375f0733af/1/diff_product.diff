@@ -1,0 +1,97 @@
+diff --git a/old_product.java b/new_product.java
+index 4e73e54..6b6f2e5 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -6,8 +6,8 @@
+         
+         int numberOfWordsInDoc = buildInternalArrays(text, ID2word, ID2occurrences, position2ID);
+         
+-        Map<String, Double> keywordProximityScores = new HashMap<>();
+-        
++        int maxCombinations = parameters.getMaxCombinations();
++        Map<String, Double> keywordsMap = new HashMap<>();
+         //move the "window" across the document by 1 word at each time
+         for(Map.Entry<Integer, Integer> entry : position2ID.entrySet()) {
+             Integer wordID = entry.getValue();
+@@ -16,60 +16,37 @@
+             }
+             
+             Integer position = entry.getKey();
++            //Build all the combinations of the current word with other words within the window and estimate the scores
++            Map<LinkedList<Integer>, Double> positionCombinationsWithScores = getPositionCombinationsWithinWindow(position, maxCombinations, ID2word, ID2occurrences, position2ID, numberOfWordsInDoc);
+             
+-            Map<String, Integer> wordCombinations = getCombinationsWithinWindow(position, parameters.getMaxCombinations(), ID2word, ID2occurrences, position2ID, numberOfWordsInDoc);
+-            
+-            //translate positions to proximity metrics
+-            for(Map.Entry<String, Integer> entry2 : wordCombinations.entrySet()) {
+-                String IDcombinationReverse = entry2.getKey();
+-                Integer wordsBetween = entry2.getValue();
+-                
+-                int numberOfWords = PHPMethods.substr_count(IDcombinationReverse, SEPARATOR)-1;//starts enumeration from 0. We need to subtract one because at the end each string has an extra SEPARATOR
+-                
+-                int extraWords = wordsBetween - numberOfWords;
++            //Convert the positions into words and aggregate over their scores.
++            for(Map.Entry<LinkedList<Integer>, Double> entry2 : positionCombinationsWithScores.entrySet()) {
++                LinkedList<Integer> positionCombination = entry2.getKey();
+                 
+-                Double proximityScore = keywordProximityScores.get(IDcombinationReverse);
+-                if(proximityScore==null) {
+-                    proximityScore=0.0;
++                StringBuilder sb = new StringBuilder(positionCombination.size()*6);
++                for(Integer pos : positionCombination) {
++                    sb.append(ID2word.get(position2ID.get(pos))).append(" ");
+                 }
+                 
+-                if(extraWords<=0) {
+-                    ++proximityScore;
+-                }
+-                else {
+-                    proximityScore+=0.5*extraWords;
++                if(sb.length()>0) {
++                    String key = sb.toString().trim();
++                    double score = entry2.getValue();
++                    
++                    keywordsMap.put(key, keywordsMap.getOrDefault(key, 0.0)+score);
+                 }
+                 
+-                keywordProximityScores.put(IDcombinationReverse, proximityScore);
+             }
+-            
+-            
+-            //wordCombinations = null;
+         }
+         
+-        //initialize keyword map
+-        Map<String, Double> keywordsMap = new HashMap<>();
+-        for(Map.Entry<String, Double> entry : keywordProximityScores.entrySet()) {
+-            Double proximityScore = entry.getValue();
+-            if(proximityScore>=parameters.getMinWordOccurrence()) {
+-                String IDcombinationReverse = entry.getKey();
+-                
+-                String[] listOfWordIDsReverse = StringUtils.split(IDcombinationReverse, SEPARATOR);
+-                
+-                StringBuilder sb = new StringBuilder(listOfWordIDsReverse.length*6);
+-                for(int i=listOfWordIDsReverse.length-1;i>=0;--i) {
+-                    Integer ID = Integer.valueOf(listOfWordIDsReverse[i]);
+-                    sb.append(ID2word.get(ID)).append(" ");
+-                }
+-                
+-                if(sb.length()>0) {
+-                    keywordsMap.put(sb.toString().trim(), proximityScore);
+-                }
+-                
+-                //sb=null;
++        //remove any word that has score less than the min occurrence
++        double minScore = parameters.getMinWordOccurrence();
++        Iterator<Map.Entry<String, Double>> it = keywordsMap.entrySet().iterator();
++        while(it.hasNext()) {
++            Map.Entry<String, Double> entry = it.next();
++            if(entry.getValue()<minScore) {
++                it.remove();
+             }
+         }
+-        //keywordProximityScores=null;
+         
+         return keywordsMap;
+     }
+\ No newline at end of file

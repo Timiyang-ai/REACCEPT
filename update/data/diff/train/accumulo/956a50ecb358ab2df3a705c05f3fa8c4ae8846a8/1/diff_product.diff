@@ -1,0 +1,124 @@
+diff --git a/old_product.java b/new_product.java
+index f39db43..b30f869 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -12,26 +12,32 @@
+       InputTableConfig tableConfig = tableConfigEntry.getValue();
+ 
+       Instance instance = getInstance(job);
+-      boolean mockInstance;
+       String tableId;
+       // resolve table name to id once, and use id from this point forward
+       if (instance instanceof MockInstance) {
+         tableId = "";
+-        mockInstance = true;
+       } else {
+         try {
+           tableId = Tables.getTableId(instance, tableName);
+         } catch (TableNotFoundException e) {
+           throw new IOException(e);
+         }
+-        mockInstance = false;
+       }
+ 
+       Authorizations auths = getScanAuthorizations(job);
+       String principal = getPrincipal(job);
+       AuthenticationToken token = getAuthenticationToken(job);
+ 
++      boolean batchScan =  InputConfigurator.isBatchScan(CLASS, job);
++      boolean supportBatchScan =
++        !(tableConfig.isOfflineScan() || tableConfig.shouldUseIsolatedScanners() || tableConfig.shouldUseLocalIterators());
++      if (batchScan && !supportBatchScan)
++        throw new IllegalArgumentException("BatchScanner optimization not available for offline scan, isolated, or local iterators");
++
+       boolean autoAdjust = tableConfig.shouldAutoAdjustRanges();
++      if (batchScan && !autoAdjust)
++        throw new IllegalArgumentException("AutoAdjustRanges must be enabled when using BatchScanner optimization");
++
+       List<Range> ranges = autoAdjust ? Range.mergeOverlapping(tableConfig.getRanges()) : tableConfig.getRanges();
+       if (ranges.isEmpty()) {
+         ranges = new ArrayList<Range>(1);
+@@ -89,32 +95,36 @@
+         }
+         for (Map.Entry<KeyExtent,List<Range>> extentRanges : tserverBin.getValue().entrySet()) {
+           Range ke = extentRanges.getKey().toDataRange();
+-          for (Range r : extentRanges.getValue()) {
+-            if (autoAdjust) {
+-              // divide ranges into smaller ranges, based on the tablets
+-              RangeInputSplit split = new RangeInputSplit(tableName, tableId, ke.clip(r), new String[] {location});
+-
+-              split.setOffline(tableConfig.isOfflineScan());
+-              split.setIsolatedScan(tableConfig.shouldUseIsolatedScanners());
+-              split.setUsesLocalIterators(tableConfig.shouldUseLocalIterators());
+-              split.setMockInstance(mockInstance);
+-              split.setFetchedColumns(tableConfig.getFetchedColumns());
+-              split.setPrincipal(principal);
+-              split.setToken(token);
+-              split.setInstanceName(instance.getInstanceName());
+-              split.setZooKeepers(instance.getZooKeepers());
+-              split.setAuths(auths);
+-              split.setIterators(tableConfig.getIterators());
+-              split.setLogLevel(logLevel);
+-
+-              splits.add(split);
+-            } else {
+-              // don't divide ranges
+-              ArrayList<String> locations = splitsToAdd.get(r);
+-              if (locations == null)
+-                locations = new ArrayList<String>(1);
+-              locations.add(location);
+-              splitsToAdd.put(r, locations);
++          if (batchScan) {
++            // group ranges by tablet to be read by a BatchScanner
++            ArrayList<Range> clippedRanges = new ArrayList<Range>();
++            for(Range r: extentRanges.getValue())
++              clippedRanges.add(ke.clip(r));
++
++            BatchInputSplit split = new BatchInputSplit(tableName, tableId, clippedRanges, new String[] {location});
++            AccumuloInputSplit.updateSplit(split, instance, tableConfig, principal, token, auths, logLevel);
++
++            splits.add(split);
++          } else {
++            // not grouping by tablet
++            for (Range r : extentRanges.getValue()) {
++              if (autoAdjust) {
++                // divide ranges into smaller ranges, based on the tablets
++                RangeInputSplit split = new RangeInputSplit(tableName, tableId, ke.clip(r), new String[] {location});
++                AccumuloInputSplit.updateSplit(split, instance, tableConfig, principal, token, auths, logLevel);
++                split.setOffline(tableConfig.isOfflineScan());
++                split.setIsolatedScan(tableConfig.shouldUseIsolatedScanners());
++                split.setUsesLocalIterators(tableConfig.shouldUseLocalIterators());
++
++                splits.add(split);
++              } else {
++                // don't divide ranges
++                ArrayList<String> locations = splitsToAdd.get(r);
++                if (locations == null)
++                  locations = new ArrayList<String>(1);
++                locations.add(location);
++                splitsToAdd.put(r, locations);
++              }
+             }
+           }
+         }
+@@ -123,19 +133,10 @@
+       if (!autoAdjust)
+         for (Map.Entry<Range,ArrayList<String>> entry : splitsToAdd.entrySet()) {
+           RangeInputSplit split = new RangeInputSplit(tableName, tableId, entry.getKey(), entry.getValue().toArray(new String[0]));
+-
++          AccumuloInputSplit.updateSplit(split, instance, tableConfig, principal, token, auths, logLevel);
+           split.setOffline(tableConfig.isOfflineScan());
+           split.setIsolatedScan(tableConfig.shouldUseIsolatedScanners());
+           split.setUsesLocalIterators(tableConfig.shouldUseLocalIterators());
+-          split.setMockInstance(mockInstance);
+-          split.setFetchedColumns(tableConfig.getFetchedColumns());
+-          split.setPrincipal(principal);
+-          split.setToken(token);
+-          split.setInstanceName(instance.getInstanceName());
+-          split.setZooKeepers(instance.getZooKeepers());
+-          split.setAuths(auths);
+-          split.setIterators(tableConfig.getIterators());
+-          split.setLogLevel(logLevel);
+ 
+           splits.add(split);
+         }

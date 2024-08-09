@@ -1,0 +1,48 @@
+diff --git a/old_product.java b/new_product.java
+index 9f1eeaa..32fda6f 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,21 +1,31 @@
+ @SuppressWarnings("unchecked")
+-	public void triggerStackTraceSample(ExecutionJobVertex vertex) {
++	public boolean triggerStackTraceSample(ExecutionJobVertex vertex) {
+ 		synchronized (lock) {
+ 			if (shutDown) {
+-				return;
++				return false;
+ 			}
+ 
+-			if (!pendingStats.contains(vertex)) {
+-				pendingStats.add(vertex);
++			if (!pendingStats.contains(vertex) &&
++					!vertex.getGraph().getState().isTerminalState()) {
+ 
+-				Future<StackTraceSample> sample = coordinator.triggerStackTraceSample(
+-						vertex.getTaskVertices(),
+-						numSamples,
+-						delayBetweenSamples,
+-						MAX_STACK_TRACE_DEPTH);
++				ExecutionContext executionContext = vertex.getGraph().getExecutionContext();
+ 
+-				sample.onComplete(new StackTraceSampleCompletionCallback(
+-						vertex), vertex.getGraph().getExecutionContext());
++				// Only trigger if still active job
++				if (executionContext != null) {
++					pendingStats.add(vertex);
++
++					Future<StackTraceSample> sample = coordinator.triggerStackTraceSample(
++							vertex.getTaskVertices(),
++							numSamples,
++							delayBetweenSamples,
++							MAX_STACK_TRACE_DEPTH);
++
++					sample.onComplete(new StackTraceSampleCompletionCallback(vertex), executionContext);
++
++					return true;
++				}
+ 			}
++
++			return false;
+ 		}
+ 	}
+\ No newline at end of file

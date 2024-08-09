@@ -1,0 +1,1 @@
+abstract long newBlockMetadata(int nextFreeBlockId, int length, int predecessorAddress);

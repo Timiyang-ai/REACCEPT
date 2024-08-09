@@ -1,0 +1,47 @@
+diff --git a/old_product.java b/new_product.java
+index 2c8fd47..4777ea3 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -2,7 +2,8 @@
+ 	public Future<RegistrationResponse> registerTaskExecutor(
+ 		final UUID resourceManagerLeaderId,
+ 		final String taskExecutorAddress,
+-		final ResourceID resourceID) {
++		final ResourceID resourceID,
++		final SlotReport slotReport) {
+ 
+ 		return getRpcService().execute(new Callable<TaskExecutorGateway>() {
+ 			@Override
+@@ -13,7 +14,8 @@
+ 						resourceID, taskExecutorAddress, leaderSessionID, resourceManagerLeaderId);
+ 					throw new Exception("Invalid leader session id");
+ 				}
+-				return getRpcService().connect(taskExecutorAddress, TaskExecutorGateway.class).get(5, TimeUnit.SECONDS);
++				return getRpcService().connect(taskExecutorAddress, TaskExecutorGateway.class)
++					.get(timeout.toMilliseconds(), timeout.getUnit());
+ 			}
+ 		}).handleAsync(new BiFunction<TaskExecutorGateway, Throwable, RegistrationResponse>() {
+ 			@Override
+@@ -21,14 +23,17 @@
+ 				if (throwable != null) {
+ 					return new RegistrationResponse.Decline(throwable.getMessage());
+ 				} else {
+-					WorkerType oldWorker = taskExecutorGateways.remove(resourceID);
+-					if (oldWorker != null) {
++					WorkerRegistration oldRegistration = taskExecutors.remove(resourceID);
++					if (oldRegistration != null) {
+ 						// TODO :: suggest old taskExecutor to stop itself
+-						slotManager.notifyTaskManagerFailure(resourceID);
++						log.info("Replacing old instance of worker for ResourceID {}", resourceID);
+ 					}
+ 					WorkerType newWorker = workerStarted(resourceID);
+-					taskExecutorGateways.put(resourceID, newWorker);
+-					return new TaskExecutorRegistrationSuccess(new InstanceID(), 5000);
++					WorkerRegistration<WorkerType> registration =
++						new WorkerRegistration<>(taskExecutorGateway, newWorker);
++					taskExecutors.put(resourceID, registration);
++					slotManager.registerTaskExecutor(resourceID, registration, slotReport);
++					return new TaskExecutorRegistrationSuccess(registration.getInstanceID(), 5000);
+ 				}
+ 			}
+ 		}, getMainThreadExecutor());

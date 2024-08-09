@@ -1,0 +1,1 @@
+public List<Locale> getSearchLocales(User user) throws APIException;

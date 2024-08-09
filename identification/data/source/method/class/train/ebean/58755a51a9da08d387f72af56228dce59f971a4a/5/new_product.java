@@ -1,0 +1,1 @@
+Object toObject(Type genericType, Reader json) throws JsonIOException;

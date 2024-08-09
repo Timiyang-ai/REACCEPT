@@ -1,0 +1,1 @@
+void read( long pageId, Page page ) throws IOException;

@@ -1,0 +1,1 @@
+public List<PointSegment> addCommand(String command) throws GcodeParserException;

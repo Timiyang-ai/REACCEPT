@@ -1,0 +1,1 @@
+public abstract void setCurrentSchema(Schema schema) throws SQLException;

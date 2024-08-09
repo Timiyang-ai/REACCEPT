@@ -1,0 +1,1 @@
+public abstract void addView(TextAnnotation ta) throws AnnotatorException;

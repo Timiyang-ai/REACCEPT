@@ -1,0 +1,1 @@
+void updatePinList(Set<Long> pinnedInodes);

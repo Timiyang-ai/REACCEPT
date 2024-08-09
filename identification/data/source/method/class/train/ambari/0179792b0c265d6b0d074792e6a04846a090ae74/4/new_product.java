@@ -1,0 +1,1 @@
+public TrackActionResponse updateHostComponent(ServiceComponentHostRequest request) throws AmbariException;

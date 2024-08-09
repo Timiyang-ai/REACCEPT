@@ -1,0 +1,75 @@
+diff --git a/old_product.java b/new_product.java
+index f5bcc97..20bd1f0 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -2,12 +2,18 @@ void scorePath(int x0 , int y0 , int dx , int dy ) {
+ 		// there is no previous disparity score so simply fill the cost for d=0
+ 
+ 		{
++			int minCost = Integer.MAX_VALUE;
+ 			final GrayU16 costXD = costYXD.getBand(y0);
+ 			final int idxCost = costXD.getIndex(0,x0);   // C(0,0)
+ 			final int localLengthD = helper.localDisparityRangeLeft(x0);
+ 			for (int d = 0; d < localLengthD; d++) {
+-				workCostLr[d] = costXD.data[idxCost + d]; // Lr(0,d) = C(0,d)
+-				// no & 0xFFFF needed, short copy to short
++				int v = costXD.data[idxCost + d]&0xFFFF; // Lr(0,d) = C(0,d)
++				workCostLr[d] = costXD.data[idxCost + d];
++				minCost = Math.min(minCost,v);
++			}
++			// The modified equation 13. Cost Equation 12 - min[k] Lr(p,k)
++			for (int d = 0; d < localLengthD; d++) {
++				workCostLr[d] = (short)((workCostLr[d]&0xFFFF)-minCost);
+ 			}
+ 		}
+ 
+@@ -17,31 +23,32 @@ void scorePath(int x0 , int y0 , int dx , int dy ) {
+ 		int y = y0 + dy;
+ 
+ 		for (int i = 1; i < lengthPath; i++, x += dx, y += dy) {
+-			// Read results from the previous location along the path
+-			int idxLrPrev = (i-1)*lengthD;
+-
+-			// Don't consider disparity values that go outside the right image
+-			final int prevLengthD = helper.localDisparityRangeLeft(x-dx);
+-
+-			// find the minimum path cost for all D in the previous point in path
+-			int minLrPrev = Integer.MAX_VALUE;
+-			for (int d = 0; d < prevLengthD; d++) {
+-				int cost = workCostLr[idxLrPrev+d] & 0xFFFF; // Lr(i,d)
+-				if( cost < minLrPrev )
+-					minLrPrev = cost;
+-			}
+ 
+ 			// Index of cost for C(y,p0+i,0)
+ 			final GrayU16 costXD = costYXD.getBand(y);
+ 			final int idxCost = costXD.getIndex(0,x);
+-			final int localLengthD = helper.localDisparityRangeLeft(x);
++			final int lengthLocalD = helper.localDisparityRangeLeft(x);
++
++			// Index for the previous cost in this path
++			int idxLrPrev = (i-1)*lengthD;
+ 
+ 			// Score the inner portion of disparity first to avoid bounds checks
+-			computeCostInnerD(costXD, idxCost, idxLrPrev, minLrPrev, localLengthD);
++			computeCostInnerD(costXD, idxCost, idxLrPrev, lengthLocalD);
+ 
+ 			// Now handle the borders at d=0 and d=N-1
+-			computeCostBorderD(idxCost,idxLrPrev,0,costXD,minLrPrev, localLengthD);
+-			computeCostBorderD(idxCost,idxLrPrev,localLengthD-1,costXD,minLrPrev, localLengthD);
++			computeCostBorderD(idxCost,idxLrPrev,0,costXD, lengthLocalD);
++			computeCostBorderD(idxCost,idxLrPrev,lengthLocalD-1,costXD, lengthLocalD);
++
++			// The modified equation 13. Cost Equation 12 - min[k] Lr(p,k)
++			int minCost = Integer.MAX_VALUE;
++			int idxLr = i*lengthD;
++			for (int d = 0; d < lengthLocalD; d++) {
++				minCost = Math.min(minCost,workCostLr[idxLr+d]&0xFFFF);
++			}
++			for (int d = 0; d < lengthLocalD; d++) {
++				workCostLr[idxLr+d] = (short)((workCostLr[idxLr+d]&0xFFFF)- minCost);
++			}
++
+ 		}
+ 
+ 		saveWorkToAggregated(x0,y0,dx,dy,lengthPath);

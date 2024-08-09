@@ -1,0 +1,1 @@
+SecureStoreData getSecureData(String namespace, String name) throws IOException;

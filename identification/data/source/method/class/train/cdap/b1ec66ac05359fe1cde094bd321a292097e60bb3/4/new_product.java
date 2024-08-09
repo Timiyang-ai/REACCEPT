@@ -1,0 +1,1 @@
+List<SecureStoreMetadata> listSecureData(String namespace) throws IOException;

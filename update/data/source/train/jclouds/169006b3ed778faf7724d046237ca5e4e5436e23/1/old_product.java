@@ -1,0 +1,1 @@
+VApp getVApp(URI vAppURI);

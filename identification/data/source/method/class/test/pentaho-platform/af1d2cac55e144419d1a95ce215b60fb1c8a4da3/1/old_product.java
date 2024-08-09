@@ -1,0 +1,1 @@
+void addBlockout(BlockoutTrigger blockout) throws SchedulerException;

@@ -1,0 +1,1 @@
+Map<Long, String> deleteStreamSegment(String streamSegmentName);

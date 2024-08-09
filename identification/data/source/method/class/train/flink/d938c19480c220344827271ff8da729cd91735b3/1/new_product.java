@@ -1,0 +1,1 @@
+CompletableFuture<String> cancelWithSavepoint(JobID jobId, @Nullable String savepointDirectory);

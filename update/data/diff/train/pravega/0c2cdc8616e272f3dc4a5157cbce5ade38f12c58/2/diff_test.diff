@@ -1,0 +1,57 @@
+diff --git a/old_test.java b/new_test.java
+index e3cb81d..c4f7c4b 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -10,7 +10,8 @@
+             val w = new Write(new ByteArraySegment(new byte[i]), new TestWriteLedger(i), new CompletableFuture<>());
+             if (i % 2 == 0) {
+                 // Complete 1 out of two writes.
+-                w.complete(new TestLogAddress(i));
++                w.setEntryId(i);
++                w.complete();
+             }
+ 
+             q.add(w);
+@@ -20,13 +21,15 @@
+         while (!writes.isEmpty()) {
+             val write = writes.pollFirst();
+             if (!write.isDone()) {
+-                boolean result1 = q.removeFinishedWrites();
+-                Assert.assertTrue("Unexpected value from removeFinishedWrites when there were writes left in the queue.", result1);
++                val result1 = q.removeFinishedWrites();
++                AssertExtensions.assertContainsSameElements("Unexpected value from removeFinishedWrites when there were writes left in the queue.",
++                        EnumSet.of(WriteQueue.CleanupStatus.QueueNotEmpty), result1);
+                 val stats1 = q.getStatistics();
+                 Assert.assertEquals("Unexpected size after removeFinishedWrites with no effect.", writes.size() + 1, stats1.getSize());
+ 
+                 // Complete this write.
+-                write.complete(new TestLogAddress(time.get()));
++                write.setEntryId(time.get());
++                write.complete();
+             }
+ 
+             // Estimate the Expected elapsed time based on the removals.
+@@ -38,10 +41,20 @@
+             }
+             expectedElapsed = (time.get() * removed - expectedElapsed) / AbstractTimer.NANOS_TO_MILLIS / removed;
+ 
+-            boolean result2 = q.removeFinishedWrites();
+-            Assert.assertEquals("Unexpected result from removeFinishedWrites.", !writes.isEmpty(), result2);
++            val result2 = q.removeFinishedWrites();
++            val expectedResult = EnumSet.of(writes.isEmpty() ? WriteQueue.CleanupStatus.QueueEmpty : WriteQueue.CleanupStatus.QueueNotEmpty);
++            AssertExtensions.assertContainsSameElements("Unexpected result from removeFinishedWrites.", expectedResult, result2);
+             val stats2 = q.getStatistics();
+             Assert.assertEquals("Unexpected size after removeFinishedWrites.", writes.size(), stats2.getSize());
+             Assert.assertEquals("Unexpected getExpectedProcessingTimeMillis after clear.", expectedElapsed, stats2.getExpectedProcessingTimeMillis());
+         }
++
++        // Verify that it does report failed writes when encountered.
++        val w3 = new Write(new ByteArraySegment(new byte[1]), new TestWriteLedger(0), new CompletableFuture<>());
++        q.add(w3);
++        w3.fail(new IntentionalException(), true);
++        val result3 = q.removeFinishedWrites();
++        AssertExtensions.assertContainsSameElements("Unexpected value from removeFinishedWrites when there were failed writes.",
++                EnumSet.of(WriteQueue.CleanupStatus.QueueEmpty, WriteQueue.CleanupStatus.WriteFailed), result3);
++
+     }
+\ No newline at end of file

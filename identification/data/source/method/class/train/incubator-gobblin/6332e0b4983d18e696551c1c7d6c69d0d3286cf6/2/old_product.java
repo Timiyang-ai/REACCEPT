@@ -1,0 +1,23 @@
+public static Properties loadGenericJobConfig(Properties properties, Path jobConfigPath, Path jobConfigPathDir)
+      throws ConfigurationException, IOException {
+    System.err.println("[loadGenericJobConfig]" +jobConfigPath.toString());
+    List<Properties> commonPropsList = Lists.newArrayList();
+    getCommonProperties(commonPropsList, jobConfigPathDir, jobConfigPath.getParent());
+    // Add the framework configuration properties to the end
+    commonPropsList.add(properties);
+    System.err.println("Common properties size : " + commonPropsList.size());
+
+    Properties jobProps = new Properties();
+    // Include common properties in reverse order
+    for (Properties commonProps : Lists.reverse(commonPropsList)) {
+      jobProps.putAll(commonProps);
+    }
+
+    // Then load the job configuration properties defined in the job configuration file
+    System.err.println("the path is : " + jobConfigPath);
+    jobProps.putAll(ConfigurationConverter.getProperties(
+        new PropertiesConfiguration(new Path("file://", jobConfigPath).toUri().toURL())));
+
+    jobProps.setProperty(ConfigurationKeys.JOB_CONFIG_FILE_PATH_KEY, jobConfigPath.toString());
+    return jobProps;
+  }

@@ -1,0 +1,1 @@
+Iterable<MappingEntry> getMappingEntriesByAppId(Type type, ApplicationId appId);

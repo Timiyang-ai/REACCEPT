@@ -1,0 +1,2 @@
+protected abstract Header.Entry entry( String sourceDescription, int index, String name, String typeSpec, Group group,
+                Extractors extractors, Extractor<?> idExtractor, Monitor monitor );

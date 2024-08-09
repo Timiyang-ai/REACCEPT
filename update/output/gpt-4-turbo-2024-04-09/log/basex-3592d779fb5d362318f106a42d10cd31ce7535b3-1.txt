@@ -1,0 +1,697 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.0
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 3
+----------------------------------------------------------------
+old description: 测试通过，覆盖率：0.0
+----------------------------------------------------------------
+old message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+private static void create(final int... db) throws BaseXException {
+    for(final int d : db) {
+      final String[] doc = DOCS[d - 1];
+      new CreateDB(doc[0], doc[1]).execute(context);
+    }
+  }
+----------------------------------------------------------------
+old test
+@Test
+  public void create() throws BaseXException {
+    new Close().execute(context);
+
+    // create DB without initial content
+    query(_DB_CREATE.args(NAME));
+    query(_DB_EXISTS.args(NAME), true);
+
+    // create DB w/ initial content
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content via document constructor
+    query(_DB_CREATE.args(NAME, " document { <dummy/> }", "t2.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content given as string
+    query(_DB_CREATE.args(NAME, "\"<dummy/>\"", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content multiple times
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // try to create DB twice during same query
+    error(_DB_CREATE.args(NAME) + ',' + _DB_CREATE.args(NAME), BXDB_ONCE_X_X);
+
+    // create DB from file
+    query(_DB_CREATE.args(NAME, FILE, "in/"));
+    query(COUNT.args(COLLECTION.args(NAME + "/in/input.xml") + "/html"), "1");
+
+    // create DB from folder
+    query(_DB_CREATE.args(NAME, FLDR, "test/dir"));
+    query(COUNT.args(COLLECTION.args(NAME + "/test/dir")), NFLDR);
+
+    // create DB w/ more than one input
+    query(_DB_CREATE.args(NAME, "(<a/>,<b/>)", "('1.xml','2.xml')"));
+    query(_DB_CREATE.args(NAME, "(<a/>,'" + FILE + "')", "('1.xml','2.xml')"));
+
+    error(_DB_CREATE.args(NAME, "()", "1.xml"), BXDB_CREATEARGS_X_X);
+    error(_DB_CREATE.args(NAME, "(<a/>,<b/>)", "1.xml"), BXDB_CREATEARGS_X_X);
+
+    // create and drop more than one database
+    query("for $i in 1 to 5 return " + _DB_CREATE.args(" '" + NAME + "' || $i"));
+    query("for $i in 1 to 5 return " + _DB_DROP.args(" '" + NAME + "' || $i"));
+
+    // create DB with initial EMPTY content
+    error(_DB_CREATE.args(""), BXDB_NAME_X);
+
+    // try to access non-existing DB
+    query(_DB_DROP.args(NAME));
+    error(_DB_CREATE.args(NAME) + ',' + _DB_DROP.args(NAME), BXDB_WHICH_X);
+
+    // run update on existing DB then drop it and create a new one
+    query(_DB_CREATE.args(NAME, "<a/>", "a.xml"));
+    query("insert node <dummy/> into " + _DB_OPEN.args(NAME));
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml") +
+        ", insert node <dummy/> into " + _DB_OPEN.args(NAME) + ',' +
+        _DB_DROP.args(NAME));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // eventually drop database
+    query(_DB_DROP.args(NAME));
+
+    // specify index options
+    for(final boolean b : new boolean[] { false, true }) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { 'updindex':" + b + "() }"));
+      query(_DB_INFO.args(NAME) + "//updindex/text()", b);
+    }
+    assertEquals(context.options.get(MainOptions.UPDINDEX), false);
+
+    final String[] nopt = { "maxcats", "maxlen", "indexsplitsize", "ftindexsplitsize" };
+    for(final String k : nopt) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':1 }"));
+    }
+    final String[] bopt = { "textindex", "attrindex", "ftindex", "stemming",
+        "casesens", "diacritics" };
+    for(final String k : bopt) {
+      for(final boolean v : new boolean[] { true, false }) {
+        query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':" + v + "() }"));
+      }
+    }
+    final String[] sopt = { "language", "stopwords" };
+    for(final String k : sopt) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':'' }"));
+    }
+
+    // specify parsing options
+    query(_DB_CREATE.args(NAME, " '<a> </a>'", "a.xml", " map { 'chop':true() }"));
+    query(_DB_OPEN.args(NAME), "<a/>");
+    query(_DB_CREATE.args(NAME, " '<a> </a>'", "a.xml", " map { 'chop':false() }"));
+    query(_DB_OPEN.args(NAME), "<a> </a>");
+
+    // specify unknown or invalid options
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'xyz':'abc' }"), BASX_OPTIONS_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':-1 }"), BASX_VALUE_X_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':'a' }"), BASX_VALUE_X_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'textindex':'nope' }"), BASX_VALUE_X_X);
+  }
+----------------------------------------------------------------
+new product
+private static void create(final int... db) {
+    for(final int d : db) {
+      final String[] doc = DOCS[d - 1];
+      execute(new CreateDB(doc[0], doc[1]));
+    }
+  }
+----------------------------------------------------------------
+new test
+@Test
+  public void create() {
+    execute(new Close());
+
+    // create DB without initial content
+    query(_DB_CREATE.args(NAME));
+    query(_DB_EXISTS.args(NAME), true);
+
+    // create DB w/ initial content
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content via document constructor
+    query(_DB_CREATE.args(NAME, " document { <dummy/> }", "t2.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content given as string
+    query(_DB_CREATE.args(NAME, "\"<dummy/>\"", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content multiple times
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // try to create DB twice during same query
+    error(_DB_CREATE.args(NAME) + ',' + _DB_CREATE.args(NAME), BXDB_ONCE_X_X);
+
+    // create DB from file
+    query(_DB_CREATE.args(NAME, FILE, "in/"));
+    query(COUNT.args(COLLECTION.args(NAME + "/in/input.xml") + "/html"), "1");
+
+    // create DB from folder
+    query(_DB_CREATE.args(NAME, FLDR, "test/dir"));
+    query(COUNT.args(COLLECTION.args(NAME + "/test/dir")), NFLDR);
+
+    // create DB w/ more than one input
+    query(_DB_CREATE.args(NAME, "(<a/>,<b/>)", "('1.xml','2.xml')"));
+    query(_DB_CREATE.args(NAME, "(<a/>,'" + FILE + "')", "('1.xml','2.xml')"));
+
+    error(_DB_CREATE.args(NAME, "()", "1.xml"), BXDB_CREATEARGS_X_X);
+    error(_DB_CREATE.args(NAME, "(<a/>,<b/>)", "1.xml"), BXDB_CREATEARGS_X_X);
+
+    // create and drop more than one database
+    query("for $i in 1 to 5 return " + _DB_CREATE.args(" '" + NAME + "' || $i"));
+    query("for $i in 1 to 5 return " + _DB_DROP.args(" '" + NAME + "' || $i"));
+
+    // create DB with initial EMPTY content
+    error(_DB_CREATE.args(""), BXDB_NAME_X);
+
+    // try to access non-existing DB
+    query(_DB_DROP.args(NAME));
+    error(_DB_CREATE.args(NAME) + ',' + _DB_DROP.args(NAME), BXDB_WHICH_X);
+
+    // run update on existing DB then drop it and create a new one
+    query(_DB_CREATE.args(NAME, "<a/>", "a.xml"));
+    query("insert node <dummy/> into " + _DB_OPEN.args(NAME));
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml") +
+        ", insert node <dummy/> into " + _DB_OPEN.args(NAME) + ',' +
+        _DB_DROP.args(NAME));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // eventually drop database
+    query(_DB_DROP.args(NAME));
+
+    // specify index options
+    for(final boolean b : new boolean[] { false, true }) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { 'updindex':" + b + "() }"));
+      query(_DB_INFO.args(NAME) + "//updindex/text()", b);
+    }
+    assertEquals(context.options.get(MainOptions.UPDINDEX), false);
+
+    final String[] nopt = { "maxcats", "maxlen", "indexsplitsize", "ftindexsplitsize" };
+    for(final String k : nopt) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':1 }"));
+    }
+    final String[] bopt = { "textindex", "attrindex", "ftindex", "stemming",
+        "casesens", "diacritics" };
+    for(final String k : bopt) {
+      for(final boolean v : new boolean[] { true, false }) {
+        query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':" + v + "() }"));
+      }
+    }
+    final String[] sopt = { "language", "stopwords" };
+    for(final String k : sopt) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':'' }"));
+    }
+
+    // specify parsing options
+    query(_DB_CREATE.args(NAME, " '<a> </a>'", "a.xml", " map { 'chop':true() }"));
+    query(_DB_OPEN.args(NAME), "<a/>");
+    query(_DB_CREATE.args(NAME, " '<a> </a>'", "a.xml", " map { 'chop':false() }"));
+    query(_DB_OPEN.args(NAME), "<a> </a>");
+
+    // specify unknown or invalid options
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'xyz':'abc' }"), BASX_OPTIONS_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':-1 }"), BASX_VALUE_X_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':'a' }"), BASX_VALUE_X_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'textindex':'nope' }"), BASX_VALUE_X_X);
+  }
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index 59ce02c..a542372 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,6 +1,6 @@
+-private static void create(final int... db) throws BaseXException {
++private static void create(final int... db) {
+     for(final int d : db) {
+       final String[] doc = DOCS[d - 1];
+-      new CreateDB(doc[0], doc[1]).execute(context);
++      execute(new CreateDB(doc[0], doc[1]));
+     }
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index 0514619..26f790a 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,6 +1,6 @@
+ @Test
+-  public void create() throws BaseXException {
+-    new Close().execute(context);
++  public void create() {
++    execute(new Close());
+ 
+     // create DB without initial content
+     query(_DB_CREATE.args(NAME));
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index 91d9047..7b9fd28 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,6 +1,6 @@
+ static void create(final int... db) throws BaseXException {
+     for(final int d : db) {
+       final String[] doc = DOCS[d - 1];
+-      new CreateDB(doc[0], doc[1]).execute(CONTEXT);
++      new CreateDB(doc[0], doc[1]).execute(context);
+     }
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index c384af6..212f1c9 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,7 +1,7 @@
+ @Test
+   public final void create() throws IOException {
+-    session.create(DB, new ArrayInput(""));
+-    check("", session.query("doc('" + DB + "')").execute());
+-    session.create(DB, new ArrayInput("<X/>"));
+-    check("<X/>", session.query("doc('" + DB + "')").execute());
++    session.create(NAME, new ArrayInput(""));
++    check("", session.query("doc('" + NAME + "')").execute());
++    session.create(NAME, new ArrayInput("<X/>"));
++    check("<X/>", session.query("doc('" + NAME + "')").execute());
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+coverage: 0.0
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void create() throws BaseXException {
+    new Close().execute(context);
+
+    // create DB without initial content
+    query(_DB_CREATE.args(NAME));
+    query(_DB_EXISTS.args(NAME), true);
+
+    // create DB w/ initial content
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content via document constructor
+    query(_DB_CREATE.args(NAME, " document { <dummy/> }", "t2.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content given as string
+    query(_DB_CREATE.args(NAME, "\"<dummy/>\"", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content multiple times
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // try to create DB twice during same query
+    error(_DB_CREATE.args(NAME) + ',' + _DB_CREATE.args(NAME), BXDB_ONCE_X_X);
+
+    // create DB from file
+    query(_DB_CREATE.args(NAME, FILE, "in/"));
+    query(COUNT.args(COLLECTION.args(NAME + "/in/input.xml") + "/html"), "1");
+
+    // create DB from folder
+    query(_DB_CREATE.args(NAME, FLDR, "test/dir"));
+    query(COUNT.args(COLLECTION.args(NAME + "/test/dir")), NFLDR);
+
+    // create DB w/ more than one input
+    query(_DB_CREATE.args(NAME, "(<a/>,<b/>)", "('1.xml','2.xml')"));
+    query(_DB_CREATE.args(NAME, "(<a/>,'" + FILE + "')", "('1.xml','2.xml')"));
+
+    error(_DB_CREATE.args(NAME, "()", "1.xml"), BXDB_CREATEARGS_X_X);
+    error(_DB_CREATE.args(NAME, "(<a/>,<b/>)", "1.xml"), BXDB_CREATEARGS_X_X);
+
+    // create and drop more than one database
+    query("for $i in 1 to 5 return " + _DB_CREATE.args(" '" + NAME + "' || $i"));
+    query("for $i in 1 to 5 return " + _DB_DROP.args(" '" + NAME + "' || $i"));
+
+    // create DB with initial EMPTY content
+    error(_DB_CREATE.args(""), BXDB_NAME_X);
+
+    // try to access non-existing DB
+    query(_DB_DROP.args(NAME));
+    error(_DB_CREATE.args(NAME) + ',' + _DB_DROP.args(NAME), BXDB_WHICH_X);
+
+    // run update on existing DB then drop it and create a new one
+    query(_DB_CREATE.args(NAME, "<a/>", "a.xml"));
+    query("insert node <dummy/> into " + _DB_OPEN.args(NAME));
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml") +
+        ", insert node <dummy/> into " + _DB_OPEN.args(NAME) + ',' +
+        _DB_DROP.args(NAME));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // eventually drop database
+    query(_DB_DROP.args(NAME));
+
+    // specify index options
+    for(final boolean b : new boolean[] { false, true }) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { 'updindex':" + b + "() }"));
+      query(_DB_INFO.args(NAME) + "//updindex/text()", b);
+    }
+    assertEquals(context.options.get(MainOptions.UPDINDEX), false);
+
+    final String[] nopt = { "maxcats", "maxlen", "indexsplitsize", "ftindexsplitsize" };
+    for(final String k : nopt) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':1 }"));
+    }
+    final String[] bopt = { "textindex", "attrindex", "ftindex", "stemming",
+        "casesens", "diacritics" };
+    for(final String k : bopt) {
+      for(final boolean v : new boolean[] { true, false }) {
+        query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':" + v + "() }"));
+      }
+    }
+    final String[] sopt = { "language", "stopwords" };
+    for(final String k : sopt) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':'' }"));
+    }
+
+    // specify parsing options
+    query(_DB_CREATE.args(NAME, " '<a> </a>'", "a.xml", " map { 'chop':true() }"));
+    query(_DB_OPEN.args(NAME), "<a/>");
+    query(_DB_CREATE.args(NAME, " '<a> </a>'", "a.xml", " map { 'chop':false() }"));
+    query(_DB_OPEN.args(NAME), "<a> </a>");
+
+    // specify unknown or invalid options
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'xyz':'abc' }"), BASX_OPTIONS_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':-1 }"), BASX_VALUE_X_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':'a' }"), BASX_VALUE_X_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'textindex':'nope' }"), BASX_VALUE_X_X);
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void create() throws BaseXException {
+    new Close().execute(context);
+
+    // create DB without initial content
+    query(_DB_CREATE.args(NAME));
+    query(_DB_EXISTS.args(NAME), true);
+
+    // create DB w/ initial content
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content via document constructor
+    query(_DB_CREATE.args(NAME, " document { <dummy/> }", "t2.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content given as string
+    query(_DB_CREATE.args(NAME, "\"<dummy/>\"", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content multiple times
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // try to create DB twice during same query
+    error(_DB_CREATE.args(NAME) + ',' + _DB_CREATE.args(NAME), BXDB_ONCE_X_X);
+
+    // create DB from file
+    query(_DB_CREATE.args(NAME, FILE, "in/"));
+    query(COUNT.args(COLLECTION.args(NAME + "/in/input.xml") + "/html"), "1");
+
+    // create DB from folder
+    query(_DB_CREATE.args(NAME, FLDR, "test/dir"));
+    query(COUNT.args(COLLECTION.args(NAME + "/test/dir")), NFLDR);
+
+    // create DB w/ more than one input
+    query(_DB_CREATE.args(NAME, "(<a/>,<b/>)", "('1.xml','2.xml')"));
+    query(_DB_CREATE.args(NAME, "(<a/>,'" + FILE + "')", "('1.xml','2.xml')"));
+
+    error(_DB_CREATE.args(NAME, "()", "1.xml"), BXDB_CREATEARGS_X_X);
+    error(_DB_CREATE.args(NAME, "(<a/>,<b/>)", "1.xml"), BXDB_CREATEARGS_X_X);
+
+    // create and drop more than one database
+    query("for $i in 1 to 5 return " + _DB_CREATE.args(" '" + NAME + "' || $i"));
+    query("for $i in 1 to 5 return " + _DB_DROP.args(" '" + NAME + "' || $i"));
+
+    // create DB with initial EMPTY content
+    error(_DB_CREATE.args(""), BXDB_NAME_X);
+
+    // try to access non-existing DB
+    query(_DB_DROP.args(NAME));
+    error(_DB_CREATE.args(NAME) + ',' + _DB_DROP.args(NAME), BXDB_WHICH_X);
+
+    // run update on existing DB then drop it and create a new one
+    query(_DB_CREATE.args(NAME, "<a/>", "a.xml"));
+    query("insert node <dummy/> into " + _DB_OPEN.args(NAME));
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml") +
+        ", insert node <dummy/> into " + _DB_OPEN.args(NAME) + ',' +
+        _DB_DROP.args(NAME));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // eventually drop database
+    query(_DB_DROP.args(NAME));
+
+    // specify index options
+    for(final boolean b : new boolean[] { false, true }) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { 'updindex':" + b + "() }"));
+      query(_DB_INFO.args(NAME) + "//updindex/text()", b);
+    }
+    assertEquals(context.options.get(MainOptions.UPDINDEX), false);
+
+    final String[] nopt = { "maxcats", "maxlen", "indexsplitsize", "ftindexsplitsize" };
+    for(final String k : nopt) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':1 }"));
+    }
+    final String[] bopt = { "textindex", "attrindex", "ftindex", "stemming",
+        "casesens", "diacritics" };
+    for(final String k : bopt) {
+      for(final boolean v : new boolean[] { true, false }) {
+        query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':" + v + "() }"));
+      }
+    }
+    final String[] sopt = { "language", "stopwords" };
+    for(final String k : sopt) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':'' }"));
+    }
+
+    // specify parsing options
+    query(_DB_CREATE.args(NAME, " '<a> </a>'", "a.xml", " map { 'chop':true() }"));
+    query(_DB_OPEN.args(NAME), "<a/>");
+    query(_DB_CREATE.args(NAME, " '<a> </a>'", "a.xml", " map { 'chop':false() }"));
+    query(_DB_OPEN.args(NAME), "<a> </a>");
+
+    // specify unknown or invalid options
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'xyz':'abc' }"), BASX_OPTIONS_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':-1 }"), BASX_VALUE_X_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':'a' }"), BASX_VALUE_X_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'textindex':'nope' }"), BASX_VALUE_X_X);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,5 +1,5 @@
+
+ @Test
+-  public void create() throws BaseXException {
++public void create() throws BaseXException {
+     new Close().execute(context);
+ 
+     // create DB without initial content
+@@ -97,4 +97,4 @@
+
+     error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':-1 }"), BASX_VALUE_X_X);
+     error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':'a' }"), BASX_VALUE_X_X);
+     error(_DB_CREATE.args(NAME, "()", "()", " map { 'textindex':'nope' }"), BASX_VALUE_X_X);
+-  }
++}
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.0
+----------------------------------------------------------------
+message
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 1
+----------------------------------------------------------------
+generated test
+@Test
+public void create() throws BaseXException {
+    new Close().execute(context);
+
+    // create DB without initial content
+    query(_DB_CREATE.args(NAME));
+    query(_DB_EXISTS.args(NAME), true);
+
+    // create DB w/ initial content
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content via document constructor
+    query(_DB_CREATE.args(NAME, " document { <dummy/> }", "t2.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content given as string
+    query(_DB_CREATE.args(NAME, "\"<dummy/>\"", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // create DB w/ initial content multiple times
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml"));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // try to create DB twice during same query
+    error(_DB_CREATE.args(NAME) + ',' + _DB_CREATE.args(NAME), BXDB_ONCE_X_X);
+
+    // create DB from file
+    query(_DB_CREATE.args(NAME, FILE, "in/"));
+    query(COUNT.args(COLLECTION.args(NAME + "/in/input.xml") + "/html"), "1");
+
+    // create DB from folder
+    query(_DB_CREATE.args(NAME, FLDR, "test/dir"));
+    query(COUNT.args(COLLECTION.args(NAME + "/test/dir")), NFLDR);
+
+    // create DB w/ more than one input
+    query(_DB_CREATE.args(NAME, "(<a/>,<b/>)", "('1.xml','2.xml')"));
+    query(_DB_CREATE.args(NAME, "(<a/>,'" + FILE + "')", "('1.xml','2.xml')"));
+
+    error(_DB_CREATE.args(NAME, "()", "1.xml"), BXDB_CREATEARGS_X_X);
+    error(_DB_CREATE.args(NAME, "(<a/>,<b/>)", "1.xml"), BXDB_CREATEARGS_X_X);
+
+    // create and drop more than one database
+    query("for $i in 1 to 5 return " + _DB_CREATE.args(" '" + NAME + "' || $i"));
+    query("for $i in 1 to 5 return " + _DB_DROP.args(" '" + NAME + "' || $i"));
+
+    // create DB with initial EMPTY content
+    error(_DB_CREATE.args(""), BXDB_NAME_X);
+
+    // try to access non-existing DB
+    query(_DB_DROP.args(NAME));
+    error(_DB_CREATE.args(NAME) + ',' + _DB_DROP.args(NAME), BXDB_WHICH_X);
+
+    // run update on existing DB then drop it and create a new one
+    query(_DB_CREATE.args(NAME, "<a/>", "a.xml"));
+    query("insert node <dummy/> into " + _DB_OPEN.args(NAME));
+    query(_DB_CREATE.args(NAME, "<dummy/>", "t1.xml") +
+        ", insert node <dummy/> into " + _DB_OPEN.args(NAME) + ',' +
+        _DB_DROP.args(NAME));
+    query(_DB_OPEN.args(NAME) + "/root()", "<dummy/>");
+
+    // eventually drop database
+    query(_DB_DROP.args(NAME));
+
+    // specify index options
+    for(final boolean b : new boolean[] { false, true }) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { 'updindex':" + b + "() }"));
+      query(_DB_INFO.args(NAME) + "//updindex/text()", b);
+    }
+    assertEquals(context.options.get(MainOptions.UPDINDEX), false);
+
+    final String[] nopt = { "maxcats", "maxlen", "indexsplitsize", "ftindexsplitsize" };
+    for(final String k : nopt) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':1 }"));
+    }
+    final String[] bopt = { "textindex", "attrindex", "ftindex", "stemming",
+        "casesens", "diacritics" };
+    for(final String k : bopt) {
+      for(final boolean v : new boolean[] { true, false }) {
+        query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':" + v + "() }"));
+      }
+    }
+    final String[] sopt = { "language", "stopwords" };
+    for(final String k : sopt) {
+      query(_DB_CREATE.args(NAME, "()", "()", " map { '" + k + "':'' }"));
+    }
+
+    // specify parsing options
+    query(_DB_CREATE.args(NAME, " '<a> </a>'", "a.xml", " map { 'chop':true() }"));
+    query(_DB_OPEN.args(NAME), "<a/>");
+    query(_DB_CREATE.args(NAME, " '<a> </a>'", "a.xml", " map { 'chop':false() }"));
+    query(_DB_OPEN.args(NAME), "<a> </a>");
+
+    // specify unknown or invalid options
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'xyz':'abc' }"), BASX_OPTIONS_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':-1 }"), BASX_VALUE_X_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':'a' }"), BASX_VALUE_X_X);
+    error(_DB_CREATE.args(NAME, "()", "()", " map { 'textindex':'nope' }"), BASX_VALUE_X_X);
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,5 +1,5 @@
+
+ @Test
+-  public void create() throws BaseXException {
++public void create() throws BaseXException {
+     new Close().execute(context);
+ 
+     // create DB without initial content
+@@ -97,4 +97,4 @@
+
+     error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':-1 }"), BASX_VALUE_X_X);
+     error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':'a' }"), BASX_VALUE_X_X);
+     error(_DB_CREATE.args(NAME, "()", "()", " map { 'textindex':'nope' }"), BASX_VALUE_X_X);
+-  }
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,6 +1,6 @@
+
+ @Test
+-public void create() throws BaseXException {
+-    new Close().execute(context);
++  public void create() {
++    execute(new Close());
+ 
+     // create DB without initial content
+     query(_DB_CREATE.args(NAME));
+@@ -97,4 +97,4 @@
+
+     error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':-1 }"), BASX_VALUE_X_X);
+     error(_DB_CREATE.args(NAME, "()", "()", " map { 'maxlen':'a' }"), BASX_VALUE_X_X);
+     error(_DB_CREATE.args(NAME, "()", "()", " map { 'textindex':'nope' }"), BASX_VALUE_X_X);
+-}
++  }
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.0
+--------------------------------------------------------------------------------------------------------------------------------

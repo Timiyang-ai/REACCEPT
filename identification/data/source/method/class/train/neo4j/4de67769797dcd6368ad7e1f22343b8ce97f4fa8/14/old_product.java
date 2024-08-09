@@ -1,0 +1,1 @@
+void write( long pageId, Page page ) throws IOException;

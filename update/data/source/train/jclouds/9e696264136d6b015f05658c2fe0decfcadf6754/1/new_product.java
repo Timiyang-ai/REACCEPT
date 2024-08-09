@@ -1,0 +1,1 @@
+void deleteItem(String catalogItemUrn);

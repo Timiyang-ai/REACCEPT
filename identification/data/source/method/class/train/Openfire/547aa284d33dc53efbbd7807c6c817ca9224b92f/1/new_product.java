@@ -1,0 +1,32 @@
+protected String hashPassword(String password, PasswordType type) {
+        switch (type) {
+            case md5:
+                return StringUtils.hash(password, "MD5");
+            case sha1:
+                return StringUtils.hash(password, "SHA-1");
+            case sha256:
+                return StringUtils.hash(password, "SHA-256");
+            case sha512:
+                return StringUtils.hash(password, "SHA-512");
+            case bcrypt:
+                byte[] salt = new byte[16];
+                new SecureRandom().nextBytes(salt);
+                int cost = (bcryptCost < 4 || bcryptCost > 31) ? DEFAULT_BCRYPT_COST : bcryptCost;
+                return OpenBSDBCrypt.generate(password.toCharArray(), salt, cost);
+            case nt:
+                byte[] digestBytes;
+                byte[] utf16leBytes = null;
+                try {
+                  MessageDigest md = MessageDigest.getInstance("MD4");
+                  utf16leBytes = password.getBytes("UTF-16LE");
+                  digestBytes = md.digest(utf16leBytes);
+                  return new String(new String(Hex.encode(digestBytes)));
+                }
+                catch (Exception e) {
+                  return null;
+                }
+            case plain:
+            default:
+                return password;
+        }
+    }

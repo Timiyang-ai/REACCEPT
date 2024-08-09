@@ -1,0 +1,1 @@
+void render(Cell cell, T data);

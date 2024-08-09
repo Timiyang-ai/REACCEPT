@@ -1,0 +1,1 @@
+void analyze(Dependency dependency, Engine engine) throws AnalysisException;

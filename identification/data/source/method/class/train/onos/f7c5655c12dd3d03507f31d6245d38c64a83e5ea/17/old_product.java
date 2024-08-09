@@ -1,0 +1,1 @@
+void setTransmitDelay(int transmitDelay);

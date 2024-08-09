@@ -1,0 +1,1 @@
+public void deleteVisit(Visit visit) throws DAOException;

@@ -1,0 +1,1 @@
+ICompletableFuture<Long> addAsync(@Nonnull E item, @Nonnull OverflowPolicy overflowPolicy);

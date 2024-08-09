@@ -1,0 +1,1 @@
+public abstract ReferenceData combinedWith(ReferenceData other);

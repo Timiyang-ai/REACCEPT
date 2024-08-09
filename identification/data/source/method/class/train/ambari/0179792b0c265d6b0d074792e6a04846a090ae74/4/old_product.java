@@ -1,0 +1,1 @@
+public TrackActionResponse updateHostComponents(ServiceComponentHostRequest request, Predicate predicate);

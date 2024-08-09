@@ -1,0 +1,1 @@
+protected abstract boolean isSymbolicLink(Path path);

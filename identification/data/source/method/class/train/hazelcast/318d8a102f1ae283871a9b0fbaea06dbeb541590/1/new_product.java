@@ -1,0 +1,1 @@
+void addFirst(Collection<E> collection);

@@ -1,0 +1,339 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state
+3
+----------------------------------------------------------------
+new description
+测试通过，覆盖率：0.14065180102915953
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state
+3
+----------------------------------------------------------------
+old description
+测试通过，覆盖率：0.14065180102915953
+----------------------------------------------------------------
+old message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+@SuppressWarnings("unchecked")
+	public List<Concept> getConcepts(String name, Locale loc, boolean searchOnPhrase, List<ConceptClass> classes,
+	        List<ConceptDatatype> datatypes) throws DAOException {
+		
+		Criteria criteria = sessionFactory.getCurrentSession().createCriteria(Concept.class);
+		
+		criteria.add(Restrictions.eq("retired", false));
+		
+		if (!StringUtils.isBlank(name)) {
+			if (loc == null)
+				// TRUNK-2730 replaces this behavior with use of the default locale
+				// throw new DAOException("Locale must be not null");
+				loc = Context.getLocale();
+			
+			String caseSensitiveNamesInConceptNameTable = Context.getAdministrationService().getGlobalProperty(
+			    OpenmrsConstants.GP_CASE_SENSITIVE_NAMES_IN_CONCEPT_NAME_TABLE, "true");
+			
+			criteria.createAlias("names", "names");
+			MatchMode matchmode = MatchMode.EXACT;
+			if (searchOnPhrase)
+				matchmode = MatchMode.ANYWHERE;
+			
+			if (Boolean.valueOf(caseSensitiveNamesInConceptNameTable)) {
+				criteria.add(Restrictions.ilike("names.name", name, matchmode));
+			} else {
+				if (searchOnPhrase) {
+					criteria.add(Restrictions.like("names.name", name, matchmode));
+				} else {
+					criteria.add(Restrictions.eq("names.name", name));
+				}
+			}
+			
+			criteria.add(Restrictions.eq("names.voided", false));
+			
+			String language = loc.getLanguage();
+			if (language.length() > 2) {
+				// if searching in specific locale like en_US
+				criteria.add(Restrictions.or(Restrictions.eq("names.locale", loc), Restrictions.eq("names.locale",
+				    new Locale(loc.getLanguage().substring(0, 2)))));
+			} else {
+				// if searching in general locale like just "en"
+				//	criteria.add(Restrictions.like("names.locale", loc.getLanguage(), MatchMode.START));
+			}
+		}
+		
+		if (classes.size() > 0)
+			criteria.add(Restrictions.in("conceptClass", classes));
+		
+		if (datatypes.size() > 0)
+			criteria.add(Restrictions.in("datatype", datatypes));
+		
+		return criteria.list();
+	}
+----------------------------------------------------------------
+old test
+@Test
+	@Verifies(value = "should not return concepts with matching names that are voided", method = "getConcepts(String,Locale,null,List<QConceptClass;>,List<QConceptDatatype;>)")
+	public void getConcepts_shouldNotReturnConceptsWithMatchingNamesThatAreVoided() throws Exception {
+		Concept concept = dao.getConcept(7);
+		Context.getConceptService().updateConceptIndex(concept);
+		Assert.assertEquals(0, dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
+		    new ArrayList<ConceptDatatype>()).size());
+	}
+----------------------------------------------------------------
+new product
+@SuppressWarnings("unchecked")
+	public List<Concept> getConcepts(String name, Locale loc, boolean searchOnPhrase, List<ConceptClass> classes,
+	        List<ConceptDatatype> datatypes) throws DAOException {
+		
+		Criteria criteria = sessionFactory.getCurrentSession().createCriteria(Concept.class);
+		
+		criteria.add(Restrictions.eq("retired", false));
+		
+		if (!StringUtils.isBlank(name)) {
+			if (loc == null)
+				// TRUNK-2730 replaces this behavior with use of the default locale
+				// throw new DAOException("Locale must be not null");
+				loc = Context.getLocale();
+			
+			criteria.createAlias("names", "names");
+			MatchMode matchmode = MatchMode.EXACT;
+			if (searchOnPhrase)
+				matchmode = MatchMode.ANYWHERE;
+			
+			if (Context.getAdministrationService().isDatabaseStringComparisonCaseSensitive()) {
+				criteria.add(Restrictions.ilike("names.name", name, matchmode));
+			} else {
+				if (searchOnPhrase) {
+					criteria.add(Restrictions.like("names.name", name, matchmode));
+				} else {
+					criteria.add(Restrictions.eq("names.name", name));
+				}
+			}
+			
+			criteria.add(Restrictions.eq("names.voided", false));
+			
+			String language = loc.getLanguage();
+			if (language.length() > 2) {
+				// if searching in specific locale like en_US
+				criteria.add(Restrictions.or(Restrictions.eq("names.locale", loc), Restrictions.eq("names.locale",
+				    new Locale(loc.getLanguage().substring(0, 2)))));
+			} else {
+				// if searching in general locale like just "en"
+				//	criteria.add(Restrictions.like("names.locale", loc.getLanguage(), MatchMode.START));
+			}
+		}
+		
+		if (classes.size() > 0)
+			criteria.add(Restrictions.in("conceptClass", classes));
+		
+		if (datatypes.size() > 0)
+			criteria.add(Restrictions.in("datatype", datatypes));
+		
+		return criteria.list();
+	}
+----------------------------------------------------------------
+new test
+@Test
+	@Verifies(value = "should not return concepts with matching names that are voided", method = "getConcepts(String,Locale,null,List<QConceptClass;>,List<QConceptDatatype;>)")
+	public void getConcepts_shouldNotReturnConceptsWithMatchingNamesThatAreVoided() throws Exception {
+		Concept concept = dao.getConcept(7);
+		Context.getConceptService().updateConceptIndex(concept);
+		List<Concept> concepts = dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
+		    new ArrayList<ConceptDatatype>());
+		Assert.assertEquals(0, concepts.size());
+	}
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index ae5833d..9ed9ded 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -12,15 +12,12 @@
+ 				// throw new DAOException("Locale must be not null");
+ 				loc = Context.getLocale();
+ 			
+-			String caseSensitiveNamesInConceptNameTable = Context.getAdministrationService().getGlobalProperty(
+-			    OpenmrsConstants.GP_CASE_SENSITIVE_NAMES_IN_CONCEPT_NAME_TABLE, "true");
+-			
+ 			criteria.createAlias("names", "names");
+ 			MatchMode matchmode = MatchMode.EXACT;
+ 			if (searchOnPhrase)
+ 				matchmode = MatchMode.ANYWHERE;
+ 			
+-			if (Boolean.valueOf(caseSensitiveNamesInConceptNameTable)) {
++			if (Context.getAdministrationService().isDatabaseStringComparisonCaseSensitive()) {
+ 				criteria.add(Restrictions.ilike("names.name", name, matchmode));
+ 			} else {
+ 				if (searchOnPhrase) {
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index ef095d0..a34c5fe 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -3,6 +3,7 @@
+ 	public void getConcepts_shouldNotReturnConceptsWithMatchingNamesThatAreVoided() throws Exception {
+ 		Concept concept = dao.getConcept(7);
+ 		Context.getConceptService().updateConceptIndex(concept);
+-		Assert.assertEquals(0, dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
+-		    new ArrayList<ConceptDatatype>()).size());
++		List<Concept> concepts = dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
++		    new ArrayList<ConceptDatatype>());
++		Assert.assertEquals(0, concepts.size());
+ 	}
+\ No newline at end of file
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index d03feee..af7dd71 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -37,7 +37,7 @@ public List<Object> findBatchOfConcepts(String phrase, boolean includeRetired, L
+ 		
+ 		try {
+ 			ConceptService cs = Context.getConceptService();
+-			List<ConceptSearchResult> searchResults = new Vector<ConceptSearchResult>();
++			Set<ConceptSearchResult> searchResults = new HashSet<ConceptSearchResult>();
+ 			
+ 			if (phrase.matches("\\d+")) {
+ 				// user searched on a number. Insert concept with
+
+----------------------------------------------------------------
+sample diff test
+
+----------------------------------------------------------------
+coverage
+0.14065180102915953
+--------------------------------------------------------------------------------------------------------------------------------
+当前次数：1
+----------------------------------------------------------------
+LLM输出
+<new_test>
+@Test
+@Verifies(value = "should not return concepts with matching names that are voided", method = "getConcepts(String,Locale,null,List<QConceptClass;>,List<QConceptDatatype;>)")
+public void getConcepts_shouldNotReturnConceptsWithMatchingNamesThatAreVoided() throws Exception {
+    Concept concept = dao.getConcept(7);
+    Context.getConceptService().updateConceptIndex(concept);
+    Assert.assertEquals(0, dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
+        new ArrayList<ConceptDatatype>()).size());
+}
+</new_test>
+----------------------------------------------------------------
+测试代码
+
+@Test
+@Verifies(value = "should not return concepts with matching names that are voided", method = "getConcepts(String,Locale,null,List<QConceptClass;>,List<QConceptDatatype;>)")
+public void getConcepts_shouldNotReturnConceptsWithMatchingNamesThatAreVoided() throws Exception {
+    Concept concept = dao.getConcept(7);
+    Context.getConceptService().updateConceptIndex(concept);
+    Assert.assertEquals(0, dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
+        new ArrayList<ConceptDatatype>()).size());
+}
+
+----------------------------------------------------------------
+改动
+--- 
+
++++ 
+
+@@ -1,8 +1,10 @@
+
++
+ @Test
+-	@Verifies(value = "should not return concepts with matching names that are voided", method = "getConcepts(String,Locale,null,List<QConceptClass;>,List<QConceptDatatype;>)")
+-	public void getConcepts_shouldNotReturnConceptsWithMatchingNamesThatAreVoided() throws Exception {
+-		Concept concept = dao.getConcept(7);
+-		Context.getConceptService().updateConceptIndex(concept);
+-		Assert.assertEquals(0, dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
+-		    new ArrayList<ConceptDatatype>()).size());
+-	}
++@Verifies(value = "should not return concepts with matching names that are voided", method = "getConcepts(String,Locale,null,List<QConceptClass;>,List<QConceptDatatype;>)")
++public void getConcepts_shouldNotReturnConceptsWithMatchingNamesThatAreVoided() throws Exception {
++    Concept concept = dao.getConcept(7);
++    Context.getConceptService().updateConceptIndex(concept);
++    Assert.assertEquals(0, dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
++        new ArrayList<ConceptDatatype>()).size());
++}
++
+
+----------------------------------------------------------------
+state
+3
+----------------------------------------------------------------
+description
+测试通过，覆盖率：0.14065180102915953
+----------------------------------------------------------------
+message
+
+--------------------------------------------------------------------------------------------------------------------------------
+总次数：1
+----------------------------------------------------------------
+generated test
+
+@Test
+@Verifies(value = "should not return concepts with matching names that are voided", method = "getConcepts(String,Locale,null,List<QConceptClass;>,List<QConceptDatatype;>)")
+public void getConcepts_shouldNotReturnConceptsWithMatchingNamesThatAreVoided() throws Exception {
+    Concept concept = dao.getConcept(7);
+    Context.getConceptService().updateConceptIndex(concept);
+    Assert.assertEquals(0, dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
+        new ArrayList<ConceptDatatype>()).size());
+}
+
+----------------------------------------------------------------
+diff old generated test
+--- 
+
++++ 
+
+@@ -1,8 +1,10 @@
+
++
+ @Test
+-	@Verifies(value = "should not return concepts with matching names that are voided", method = "getConcepts(String,Locale,null,List<QConceptClass;>,List<QConceptDatatype;>)")
+-	public void getConcepts_shouldNotReturnConceptsWithMatchingNamesThatAreVoided() throws Exception {
+-		Concept concept = dao.getConcept(7);
+-		Context.getConceptService().updateConceptIndex(concept);
+-		Assert.assertEquals(0, dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
+-		    new ArrayList<ConceptDatatype>()).size());
+-	}
++@Verifies(value = "should not return concepts with matching names that are voided", method = "getConcepts(String,Locale,null,List<QConceptClass;>,List<QConceptDatatype;>)")
++public void getConcepts_shouldNotReturnConceptsWithMatchingNamesThatAreVoided() throws Exception {
++    Concept concept = dao.getConcept(7);
++    Context.getConceptService().updateConceptIndex(concept);
++    Assert.assertEquals(0, dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
++        new ArrayList<ConceptDatatype>()).size());
++}
++
+
+----------------------------------------------------------------
+diff generated new test
+--- 
+
++++ 
+
+@@ -1,10 +1,9 @@
+
+-
+ @Test
+-@Verifies(value = "should not return concepts with matching names that are voided", method = "getConcepts(String,Locale,null,List<QConceptClass;>,List<QConceptDatatype;>)")
+-public void getConcepts_shouldNotReturnConceptsWithMatchingNamesThatAreVoided() throws Exception {
+-    Concept concept = dao.getConcept(7);
+-    Context.getConceptService().updateConceptIndex(concept);
+-    Assert.assertEquals(0, dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
+-        new ArrayList<ConceptDatatype>()).size());
+-}
+-
++	@Verifies(value = "should not return concepts with matching names that are voided", method = "getConcepts(String,Locale,null,List<QConceptClass;>,List<QConceptDatatype;>)")
++	public void getConcepts_shouldNotReturnConceptsWithMatchingNamesThatAreVoided() throws Exception {
++		Concept concept = dao.getConcept(7);
++		Context.getConceptService().updateConceptIndex(concept);
++		List<Concept> concepts = dao.getConcepts("VOIDED", null, false, new ArrayList<ConceptClass>(),
++		    new ArrayList<ConceptDatatype>());
++		Assert.assertEquals(0, concepts.size());
++	}
+
+--------------------------------------------------------------------------------------------------------------------------------

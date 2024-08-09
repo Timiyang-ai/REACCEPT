@@ -1,0 +1,1 @@
+void close() throws BackendException;

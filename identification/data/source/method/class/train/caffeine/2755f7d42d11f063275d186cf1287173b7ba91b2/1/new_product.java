@@ -1,0 +1,1 @@
+void drainTo(@Nonnull Consumer<E> consumer);

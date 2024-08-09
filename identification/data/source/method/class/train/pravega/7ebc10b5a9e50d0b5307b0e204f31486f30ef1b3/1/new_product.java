@@ -1,0 +1,1 @@
+CompletableFuture<Void> seal(SegmentHandle handle, Duration timeout);

@@ -1,0 +1,1 @@
+SegmentOutputStream createOutputStreamForSegment(Segment segment);

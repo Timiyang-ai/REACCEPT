@@ -1,0 +1,1 @@
+public abstract FingerTree<N, E> concat(Node<N, E>[] mid, long size, FingerTree<N, E> other);

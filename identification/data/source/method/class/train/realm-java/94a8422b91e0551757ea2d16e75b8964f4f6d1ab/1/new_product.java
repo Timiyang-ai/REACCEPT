@@ -1,0 +1,3 @@
+void invalidate() {
+            iteratorCollection = null;
+        }

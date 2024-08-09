@@ -1,0 +1,1 @@
+public abstract @RepeatMode int getRepeatMode();

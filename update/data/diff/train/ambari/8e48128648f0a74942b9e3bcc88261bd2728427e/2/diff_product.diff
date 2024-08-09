@@ -1,0 +1,71 @@
+diff --git a/old_product.java b/new_product.java
+index d038ffa..29c9fb2 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,52 +1,17 @@
+ public Set<AlertDefinition> getAlertDefinitions(String stackName, String stackVersion,
+       String serviceName) throws AmbariException {
+-    
++
+     ServiceInfo svc = getService(stackName, stackVersion, serviceName);
++    File alertsFile = svc.getAlertsFile();
+ 
+-    if (null == svc.getAlertsFile() || !svc.getAlertsFile().exists()) {
++    if (null == alertsFile || !alertsFile.exists()) {
+       LOG.debug("Alerts file for " + stackName + "/" + stackVersion + "/" + serviceName + " not found.");
+       return null;
+     }
+-    
+-    Map<String, List<AlertDefinition>> map = null;
+-
+-    GsonBuilder builder = new GsonBuilder().registerTypeAdapter(Source.class,
+-        new JsonDeserializer<Source>() {
+-          @Override
+-          public Source deserialize(JsonElement json, Type typeOfT,
+-              JsonDeserializationContext context) throws JsonParseException {
+-            JsonObject jsonObj = (JsonObject) json;
+-
+-            SourceType type = SourceType.valueOf(jsonObj.get("type").getAsString());
+-            Class<? extends Source> cls = null;
+-            
+-            switch (type) {
+-              case METRIC:
+-                cls = MetricSource.class;
+-                break;
+-              default:
+-                break;
+-            }
+-
+-            if (null != cls)
+-              return context.deserialize(json, cls);
+-            else
+-              return null;
+-          }
+-        });
+-    
+-    Gson gson = builder.create();
+-
+-    try {
+-      Type type = new TypeToken<Map<String, List<AlertDefinition>>>(){}.getType();
+-      map = gson.fromJson(new FileReader(svc.getAlertsFile()), type);
+-    } catch (Exception e) {
+-      LOG.error ("Could not read the alert definition file", e);
+-      throw new AmbariException("Could not read alert definition file", e);
+-    }
+ 
+     Set<AlertDefinition> defs = new HashSet<AlertDefinition>();
+-    
++    Map<String, List<AlertDefinition>> map = alertDefinitionFactory.getAlertDefinitions(alertsFile);
++
+     for (Entry<String, List<AlertDefinition>> entry : map.entrySet()) {
+       for (AlertDefinition ad : entry.getValue()) {
+         ad.setServiceName(serviceName);
+@@ -56,6 +21,6 @@ public Set<AlertDefinition> getAlertDefinitions(String stackName, String stackVe
+       }
+       defs.addAll(entry.getValue());
+     }
+-    
++
+     return defs;
+   }
+\ No newline at end of file

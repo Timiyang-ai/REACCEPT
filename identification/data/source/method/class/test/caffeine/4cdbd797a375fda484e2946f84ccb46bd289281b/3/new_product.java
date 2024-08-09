@@ -1,0 +1,2 @@
+@Nonnull
+  CacheStats stats();

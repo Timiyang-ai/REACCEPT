@@ -1,0 +1,1 @@
+public abstract TriggerResult onElement(OnElementContext c) throws Exception;

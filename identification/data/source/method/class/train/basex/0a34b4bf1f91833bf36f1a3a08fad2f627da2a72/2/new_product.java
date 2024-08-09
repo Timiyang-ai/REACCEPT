@@ -1,0 +1,1 @@
+public abstract Query query(final String query) throws IOException;

@@ -1,0 +1,1 @@
+public void trainC(ClassificationDataSet dataSet);

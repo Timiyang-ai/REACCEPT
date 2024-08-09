@@ -1,0 +1,39 @@
+public void getMacroDescriptor(final String macroId, final String syntaxId,
+        final AsyncCallback<MacroDescriptor> async)
+    {
+        // First let's look in the cache.
+        Map<String, MacroDescriptor> macroDescriptorMapForSyntax = macroDescriptorMap.get(syntaxId);
+        if (macroDescriptorMapForSyntax != null) {
+            MacroDescriptor descriptor = macroDescriptorMapForSyntax.get(macroId);
+            if (descriptor != null) {
+                async.onSuccess(descriptor);
+                return;
+            }
+        }
+        List<MacroDescriptor> macroDescriptorListForSyntax = macroDescriptorList.get(syntaxId);
+        if (macroDescriptorListForSyntax != null) {
+            for (MacroDescriptor descriptor : macroDescriptorListForSyntax) {
+                if (macroId.equals(descriptor.getId())) {
+                    cacheMacroDescriptor(descriptor, syntaxId);
+                    async.onSuccess(descriptor);
+                    return;
+                }
+            }
+        }
+        // The macro descriptor wasn't found in the cache. We have to make the request to the server.
+        service.getMacroDescriptor(macroId, syntaxId, new AsyncCallback<MacroDescriptor>()
+        {
+            public void onFailure(Throwable caught)
+            {
+                async.onFailure(caught);
+            }
+
+            public void onSuccess(MacroDescriptor result)
+            {
+                if (result != null) {
+                    cacheMacroDescriptor(result, syntaxId);
+                }
+                async.onSuccess(result);
+            }
+        });
+    }

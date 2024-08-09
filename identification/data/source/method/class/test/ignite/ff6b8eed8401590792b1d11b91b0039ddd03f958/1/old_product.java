@@ -1,0 +1,1 @@
+public C build(Iterator<UpstreamEntry<K, V>> upstreamData, long upstreamDataSize);

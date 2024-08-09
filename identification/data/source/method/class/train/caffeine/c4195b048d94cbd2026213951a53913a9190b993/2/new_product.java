@@ -1,0 +1,2 @@
+@NonNegative
+  long estimatedSize();

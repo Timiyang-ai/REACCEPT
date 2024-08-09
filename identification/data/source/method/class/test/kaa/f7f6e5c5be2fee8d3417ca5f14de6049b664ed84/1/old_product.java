@@ -1,0 +1,1 @@
+List<SchemaDto> getLogSchemaVersionsByApplicationId(String applicationId) throws ControlServiceException;

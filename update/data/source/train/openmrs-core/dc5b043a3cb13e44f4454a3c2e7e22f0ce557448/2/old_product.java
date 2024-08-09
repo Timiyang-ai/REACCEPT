@@ -1,0 +1,2 @@
+@Authorized(PrivilegeConstants.VIEW_PATIENTS)
+	public boolean isIdentifierInUseByAnotherPatient(PatientIdentifier patientIdentifier);

@@ -1,0 +1,1 @@
+void createClientSession(UserSessionModel userSession, ClientLoginSessionModel clientSession, boolean offline);

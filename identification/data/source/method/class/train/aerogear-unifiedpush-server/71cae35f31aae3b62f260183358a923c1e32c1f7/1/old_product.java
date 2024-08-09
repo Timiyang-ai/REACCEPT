@@ -1,0 +1,1 @@
+PushApplication addPushApplication(PushApplication pushApp);

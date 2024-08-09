@@ -1,0 +1,1 @@
+V edgeValue(Object nodeU, Object nodeV);

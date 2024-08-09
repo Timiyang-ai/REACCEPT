@@ -1,0 +1,1 @@
+void updateConfig(JsonNode processesNode);

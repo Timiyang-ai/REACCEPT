@@ -1,0 +1,1 @@
+void cancelWatch(Watcher watcher);

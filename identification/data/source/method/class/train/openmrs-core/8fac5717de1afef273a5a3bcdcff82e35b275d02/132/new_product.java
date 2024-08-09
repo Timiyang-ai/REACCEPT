@@ -1,0 +1,1 @@
+public User removeUserProperty(User user, String key) throws APIException;

@@ -1,0 +1,41 @@
+diff --git a/old_product.java b/new_product.java
+index 28ff2de..a0d7fca 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -2,21 +2,21 @@ synchronized DeleteResult delete(int blockId) {
+         validateBlockId(blockId, false);
+         ByteBuf metadataBuf = getBlockBuffer(0);
+         int deletedLength = 0;
+-        int successorAddress = CacheLayout.NO_ADDRESS;
+-        ArrayList<Integer> freedBlocks = new ArrayList<>();
++        int predecessorAddress = CacheLayout.NO_ADDRESS;
++        Stack<Integer> freedBlocks = new Stack<>(); // We're traversing backwards, but need these later in ascending order.
+         while (blockId != CacheLayout.NO_BLOCK_ID) {
+             long blockMetadata = metadataBuf.getLong(blockId * this.layout.blockMetadataSize());
+             if (this.layout.isUsedBlock(blockMetadata)) {
+                 // Clear metadata.
+-                freedBlocks.add(blockId);
++                freedBlocks.push(blockId);
+ 
+-                // Find successor, if any.
+-                successorAddress = this.layout.getSuccessorAddress(blockMetadata);
++                // Find predecessor, if any.
++                predecessorAddress = this.layout.getPredecessorAddress(blockMetadata);
+                 deletedLength += this.layout.getLength(blockMetadata);
+-                if (successorAddress == CacheLayout.NO_ADDRESS || this.layout.getBufferId(successorAddress) != this.id) {
++                if (predecessorAddress == CacheLayout.NO_ADDRESS || this.layout.getBufferId(predecessorAddress) != this.id) {
+                     break;
+                 } else {
+-                    blockId = this.layout.getBlockId(successorAddress);
++                    blockId = this.layout.getBlockId(predecessorAddress);
+                     assert blockId >= 1 && blockId < this.layout.blocksPerBuffer();
+                 }
+             } else {
+@@ -25,5 +25,5 @@ synchronized DeleteResult delete(int blockId) {
+         }
+ 
+         deallocateBlocks(freedBlocks, metadataBuf);
+-        return new DeleteResult(deletedLength, successorAddress);
++        return new DeleteResult(deletedLength, predecessorAddress);
+     }
+\ No newline at end of file

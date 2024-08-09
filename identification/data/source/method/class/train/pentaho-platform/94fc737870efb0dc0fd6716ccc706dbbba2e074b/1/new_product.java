@@ -1,0 +1,1 @@
+List<Trigger> willBlockSchedules(IBlockoutTrigger testBlockout) throws SchedulerException;

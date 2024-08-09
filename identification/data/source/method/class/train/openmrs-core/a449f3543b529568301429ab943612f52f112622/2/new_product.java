@@ -1,0 +1,2 @@
+@Deprecated
+	public void setHandlers(Map<String, ComplexObsHandler> handlers) throws APIException;

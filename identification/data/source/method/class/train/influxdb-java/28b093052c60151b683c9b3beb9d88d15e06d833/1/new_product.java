@@ -1,0 +1,1 @@
+public List<Serie> query(final String database, final String query, final TimeUnit precision);

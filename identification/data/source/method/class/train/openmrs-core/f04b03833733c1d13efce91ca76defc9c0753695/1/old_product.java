@@ -1,0 +1,1 @@
+public void setGlobalProperty(GlobalProperty gp);

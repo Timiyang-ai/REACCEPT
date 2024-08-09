@@ -1,0 +1,1 @@
+void statusStringListener(String state, Position machineCoord, Position workCoord);

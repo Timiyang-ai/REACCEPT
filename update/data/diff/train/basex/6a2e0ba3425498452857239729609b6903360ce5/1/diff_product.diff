@@ -1,0 +1,52 @@
+diff --git a/old_product.java b/new_product.java
+index 8eb0620..51571b6 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,22 +1,19 @@
+ protected final FElem parse(final QueryContext qc, final byte[] query, final String path)
+       throws QueryException {
+ 
+-    boolean compile = false, plan = true, pass = false;
+-    if(exprs.length > 1) {
+-      final Options opts = toOptions(1, new XQueryOptions(), qc);
+-      compile = opts.get(XQueryOptions.COMPILE);
+-      plan = opts.get(XQueryOptions.PLAN);
+-      pass = opts.get(XQueryOptions.PASS);
+-    }
++    XQueryOptions opts = new XQueryOptions();
++    if(exprs.length > 1) toOptions(1, opts, qc);
+ 
+-    try(QueryContext qctx = new QueryContext(qc.context)) {
+-      final Module mod = qctx.parse(string(query), path, null);
+-      final boolean library = mod instanceof LibraryModule;
++    // base-uri: adopt specified uri, passed on uri, or uri from parent query
++    final String bu = opts.get(XQueryOptions.BASE_URI);
++    final String uri = bu != null ? bu : path != null ? path : string(sc.baseURI().string());
+ 
++    try(QueryContext qctx = new QueryContext(qc.context)) {
++      final Module mod = qctx.parse(string(query), uri, null);
+       final FElem root;
+-      if(library) {
+-        root = new FElem(LIBRARY_MODULE);
++      if(mod instanceof LibraryModule) {
+         final LibraryModule lib = (LibraryModule) mod;
++        root = new FElem(LIBRARY_MODULE);
+         root.add(PREFIX, lib.name.string());
+         root.add(URI, lib.name.uri());
+       } else {
+@@ -24,11 +21,11 @@ protected final FElem parse(final QueryContext qc, final byte[] query, final Str
+         root.add(UPDATING, token(qctx.updating));
+       }
+ 
+-      if(compile) qctx.compile();
+-      if(plan) root.add(qctx.plan());
++      if(opts.get(XQueryOptions.COMPILE)) qctx.compile();
++      if(opts.get(XQueryOptions.PLAN)) root.add(qctx.plan());
+       return root;
+     } catch(final QueryException ex) {
+-      if(!pass) ex.info(info);
++      if(!opts.get(XQueryOptions.PASS)) ex.info(info);
+       throw ex;
+     }
+   }
+\ No newline at end of file

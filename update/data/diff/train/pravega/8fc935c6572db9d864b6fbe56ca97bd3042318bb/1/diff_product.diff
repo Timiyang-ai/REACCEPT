@@ -1,0 +1,51 @@
+diff --git a/old_product.java b/new_product.java
+index 42fa51f..175cadf 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,7 +1,8 @@
+-public void append(T logItem) throws IOException {
+-        Exceptions.checkNotClosed(this.closed, this);
++void append(T logItem) throws IOException {
++        Exceptions.checkNotClosed(this.closed.get(), this);
+         long seqNo = logItem.getSequenceNumber();
+-        Exceptions.checkArgument(this.lastSerializedSequenceNumber < seqNo, "logItem", "Invalid sequence number. Expected: greater than %d, given: %d.", this.lastSerializedSequenceNumber, seqNo);
++        Exceptions.checkArgument(this.lastSerializedSequenceNumber < seqNo, "logItem",
++                "Invalid sequence number. Expected: greater than %d, given: %d.", this.lastSerializedSequenceNumber, seqNo);
+ 
+         // Remember the last Started SeqNo, in case of failure.
+         long previousLastStartedSequenceNumber = this.lastStartedSequenceNumber;
+@@ -12,15 +13,26 @@ public void append(T logItem) throws IOException {
+             // Completely serialize the entry. Note that this may span more than one Data Frame.
+             this.lastStartedSequenceNumber = seqNo;
+             logItem.serialize(this.outputStream);
++
++            // Indicate to the output stream that have finished writing the record.
++            this.outputStream.endRecord();
+             this.lastSerializedSequenceNumber = seqNo;
+         } catch (Exception ex) {
+-            // Discard any information that we have about this record (pretty much revert back to where startNewEntry() would have begun writing).
+-            // The try-catch inside handleDataFrameComplete() deals with the DataFrame-level handling; here we just deal with this LogItem.
+-            this.outputStream.discardRecord();
+-            this.lastStartedSequenceNumber = previousLastStartedSequenceNumber;
++            if (this.closed.get()) {
++                // It's possible that an async callback resulted in an error and this object got closed after the check
++                // at the beginning of this method (which could result in all sorts of errors. If that's the case, we need
++                // to indicate that we are closed by throwing ObjectClosedException.
++                throw new ObjectClosedException(this, ex);
++            } else if (ex instanceof ObjectClosedException) {
++                // TargetLog has closed. We need to close too.
++                close();
++            } else {
++                // Discard any information that we have about this record (pretty much revert back to where startNewEntry()
++                // would have begun writing).
++                this.outputStream.discardRecord();
++                this.lastStartedSequenceNumber = previousLastStartedSequenceNumber;
++            }
++
+             throw ex;
+         }
+-
+-        // Indicate to the output stream that have finished writing the record.
+-        this.outputStream.endRecord();
+     }
+\ No newline at end of file

@@ -1,0 +1,1 @@
+public String getNewOrderNumber(OrderContext orderContext);

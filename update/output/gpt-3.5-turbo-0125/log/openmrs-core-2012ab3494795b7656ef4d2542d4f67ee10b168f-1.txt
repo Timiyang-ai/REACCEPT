@@ -1,0 +1,735 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.3575757575757576
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 3
+----------------------------------------------------------------
+old description: 测试通过，覆盖率：0.3575757575757576
+----------------------------------------------------------------
+old message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+public Concept saveConcept(Concept concept) throws APIException {
+		ConceptMapType defaultConceptMapType = null;
+		for (ConceptMap map : concept.getConceptMappings()) {
+			if (map.getConceptMapType() == null) {
+				if (defaultConceptMapType == null) {
+					defaultConceptMapType = Context.getConceptService().getDefaultConceptMapType();
+				}
+				map.setConceptMapType(defaultConceptMapType);
+			}
+		}
+		
+		// make sure the administrator hasn't turned off concept editing
+		checkIfLocked();
+		checkIfDatatypeCanBeChanged(concept);
+		
+		List<ConceptName> changedConceptNames = null;
+		Map<String, ConceptName> uuidClonedConceptNameMap = null;
+		
+		if (concept.getConceptId() != null) {
+			uuidClonedConceptNameMap = new HashMap<String, ConceptName>();
+			for (ConceptName conceptName : concept.getNames()) {
+				// ignore newly added names
+				if (conceptName.getConceptNameId() != null) {
+					ConceptName clone = cloneConceptName(conceptName);
+					clone.setConceptNameId(null);
+					uuidClonedConceptNameMap.put(conceptName.getUuid(), clone);
+					
+					if (hasNameChanged(conceptName)) {
+						if (changedConceptNames == null) {
+							changedConceptNames = new ArrayList<ConceptName>();
+						}
+						changedConceptNames.add(conceptName);
+					} else {
+						// put back the concept name id
+						clone.setConceptNameId(conceptName.getConceptNameId());
+						// Use the cloned version
+						try {
+							BeanUtils.copyProperties(conceptName, clone);
+						}
+						catch (IllegalAccessException e) {
+							log.error("Error generated", e);
+						}
+						catch (InvocationTargetException e) {
+							log.error("Error generated", e);
+						}
+					}
+				}
+			}
+		}
+		
+		if (CollectionUtils.isNotEmpty(changedConceptNames)) {
+			for (ConceptName changedName : changedConceptNames) {
+				// void old concept name
+				ConceptName nameInDB = changedName;
+				nameInDB.setVoided(true);
+				nameInDB.setDateVoided(new Date());
+				nameInDB.setVoidedBy(Context.getAuthenticatedUser());
+				nameInDB.setVoidReason(Context.getMessageSourceService().getMessage("Concept.name.voidReason.nameChanged"));
+				
+				// Make the voided name a synonym, this would help to avoid
+				// having multiple fully specified or preferred
+				// names in a locale incase the name is unvoided
+				if (!nameInDB.isSynonym()) {
+					nameInDB.setConceptNameType(null);
+				}
+				if (nameInDB.isLocalePreferred()) {
+					nameInDB.setLocalePreferred(false);
+				}
+				
+				// create a new concept name from the matching cloned
+				// conceptName
+				ConceptName clone = uuidClonedConceptNameMap.get(nameInDB.getUuid());
+				clone.setUuid(UUID.randomUUID().toString());
+				clone.setDateCreated(null);
+				clone.setCreator(null);
+				concept.addName(clone);
+			}
+		}
+		
+		//Ensure if there's a name for a locale that at least one suitable name is marked preferred in that locale
+		//Order of preference is:
+		// 1) any name that concept.getPreferredName returns
+		// 2) fully specified name
+		// 3) any synonym
+		// short name and index terms are never preferred.
+		
+		Set<Locale> checkedLocales = new HashSet<Locale>();
+		for (ConceptName n : concept.getNames()) {
+			Locale locale = n.getLocale();
+			if (checkedLocales.contains(locale)) {
+				continue; //we've already checked this locale
+			}
+			
+			//getPreferredName(locale) returns any name marked preferred,
+			//or the fullySpecifiedName even if not marked preferred
+			ConceptName possiblePreferredName = concept.getPreferredName(locale);
+			
+			if (possiblePreferredName != null) {
+				//do nothing yet, but stick around to setLocalePreferred(true)
+			} else if (concept.getFullySpecifiedName(locale) != null) {
+				possiblePreferredName = concept.getFullySpecifiedName(locale);
+			} else if (!CollectionUtils.isEmpty(concept.getSynonyms(locale))) {
+				concept.getSynonyms(locale).iterator().next().setLocalePreferred(true);
+			}
+			//index terms are never used as preferred name
+			
+			if (possiblePreferredName != null) { //there may have been none
+				possiblePreferredName.setLocalePreferred(true);
+			}
+			checkedLocales.add(locale);
+		}
+		
+		//See TRUNK-3337 for why we set changed by and date changed every time we save a concept.
+		concept.setDateChanged(new Date());
+		concept.setChangedBy(Context.getAuthenticatedUser());
+		
+		Concept conceptToReturn = dao.saveConcept(concept);
+		
+		return conceptToReturn;
+	}
+----------------------------------------------------------------
+old test
+@Test
+	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() throws Exception {
+		Locale loc = new Locale("fr", "CA");
+		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+		ConceptName shortName = new ConceptName("short name", loc);
+		shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
+		ConceptName synonym = new ConceptName("synonym", loc);
+		synonym.setConceptNameType(null); //synonyms are id'd by a null type
+		ConceptName indexTerm = new ConceptName("indexTerm", loc);
+		indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
+		
+		//saveConcept never picks an index term for default, so we'll use it for the test
+		indexTerm.setLocalePreferred(true);
+		
+		Concept c = new Concept();
+		c.addName(fullySpecifiedName);
+		c.addName(synonym);
+		c.addName(indexTerm);
+		c.addName(shortName);
+		
+		//ignore it so we can test the set default preferred name  functionality
+		try {
+			Context.getConceptService().saveConcept(c);
+		}
+		catch (org.openmrs.api.APIException e) {
+			//ignore it
+		}
+		assertNotNull("there's a preferred name", c.getPreferredName(loc));
+		assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
+		assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
+	}
+----------------------------------------------------------------
+new product
+public Concept saveConcept(Concept concept) throws APIException {
+		ConceptMapType defaultConceptMapType = null;
+		for (ConceptMap map : concept.getConceptMappings()) {
+			if (map.getConceptMapType() == null) {
+				if (defaultConceptMapType == null) {
+					defaultConceptMapType = Context.getConceptService().getDefaultConceptMapType();
+				}
+				map.setConceptMapType(defaultConceptMapType);
+			}
+		}
+		
+		// make sure the administrator hasn't turned off concept editing
+		checkIfLocked();
+		checkIfDatatypeCanBeChanged(concept);
+		
+		List<ConceptName> changedConceptNames = null;
+		Map<String, ConceptName> uuidClonedConceptNameMap = null;
+		
+		if (concept.getConceptId() != null) {
+			uuidClonedConceptNameMap = new HashMap<String, ConceptName>();
+			for (ConceptName conceptName : concept.getNames()) {
+				// ignore newly added names
+				if (conceptName.getConceptNameId() != null) {
+					ConceptName clone = cloneConceptName(conceptName);
+					clone.setConceptNameId(null);
+					uuidClonedConceptNameMap.put(conceptName.getUuid(), clone);
+					
+					if (hasNameChanged(conceptName)) {
+						if (changedConceptNames == null) {
+							changedConceptNames = new ArrayList<ConceptName>();
+						}
+						changedConceptNames.add(conceptName);
+					} else {
+						// put back the concept name id
+						clone.setConceptNameId(conceptName.getConceptNameId());
+						// Use the cloned version
+						try {
+							BeanUtils.copyProperties(conceptName, clone);
+						}
+						catch (IllegalAccessException e) {
+							log.error("Error generated", e);
+						}
+						catch (InvocationTargetException e) {
+							log.error("Error generated", e);
+						}
+					}
+				}
+			}
+		}
+		
+		if (CollectionUtils.isNotEmpty(changedConceptNames)) {
+			for (ConceptName changedName : changedConceptNames) {
+				// void old concept name
+				ConceptName nameInDB = changedName;
+				nameInDB.setVoided(true);
+				nameInDB.setDateVoided(new Date());
+				nameInDB.setVoidedBy(Context.getAuthenticatedUser());
+				nameInDB.setVoidReason(Context.getMessageSourceService().getMessage("Concept.name.voidReason.nameChanged"));
+				
+				// Make the voided name a synonym, this would help to avoid
+				// having multiple fully specified or preferred
+				// names in a locale incase the name is unvoided
+				if (!nameInDB.isSynonym()) {
+					nameInDB.setConceptNameType(null);
+				}
+				if (nameInDB.isLocalePreferred()) {
+					nameInDB.setLocalePreferred(false);
+				}
+				
+				// create a new concept name from the matching cloned
+				// conceptName
+				ConceptName clone = uuidClonedConceptNameMap.get(nameInDB.getUuid());
+				clone.setUuid(UUID.randomUUID().toString());
+				clone.setDateCreated(null);
+				clone.setCreator(null);
+				concept.addName(clone);
+			}
+		}
+		
+		//Ensure if there's a name for a locale that at least one suitable name is marked preferred in that locale
+		//Order of preference is:
+		// 1) any name that concept.getPreferredName returns
+		// 2) fully specified name
+		// 3) any synonym
+		// short name and index terms are never preferred.
+		
+		Set<Locale> checkedLocales = new HashSet<Locale>();
+		for (ConceptName n : concept.getNames()) {
+			Locale locale = n.getLocale();
+			if (checkedLocales.contains(locale)) {
+				continue; //we've already checked this locale
+			}
+			
+			//getPreferredName(locale) returns any name marked preferred,
+			//or the fullySpecifiedName even if not marked preferred
+			ConceptName possiblePreferredName = concept.getPreferredName(locale);
+			
+			if (possiblePreferredName != null) {
+				//do nothing yet, but stick around to setLocalePreferred(true)
+			} else if (concept.getFullySpecifiedName(locale) != null) {
+				possiblePreferredName = concept.getFullySpecifiedName(locale);
+			} else if (!CollectionUtils.isEmpty(concept.getSynonyms(locale))) {
+				concept.getSynonyms(locale).iterator().next().setLocalePreferred(true);
+			}
+			//index terms are never used as preferred name
+			
+			if (possiblePreferredName != null) { //there may have been none
+				possiblePreferredName.setLocalePreferred(true);
+			}
+			checkedLocales.add(locale);
+		}
+		
+		//See TRUNK-3337 for why we set changed by and date changed every time we save a concept.
+		concept.setDateChanged(new Date());
+		concept.setChangedBy(Context.getAuthenticatedUser());
+		
+		// force isSet when concept has members
+		if (!concept.isSet() && (concept.getSetMembers().size() > 0)) {
+                    concept.setSet(true);
+		}
+
+		Concept conceptToReturn = dao.saveConcept(concept);
+		
+		return conceptToReturn;
+	}
+----------------------------------------------------------------
+new test
+@Test
+	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
+		Locale loc = new Locale("fr", "CA");
+		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+		ConceptName shortName = new ConceptName("short name", loc);
+		shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
+		ConceptName synonym = new ConceptName("synonym", loc);
+		synonym.setConceptNameType(null); //synonyms are id'd by a null type
+		ConceptName indexTerm = new ConceptName("indexTerm", loc);
+		indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
+		
+		//saveConcept never picks an index term for default, so we'll use it for the test
+		indexTerm.setLocalePreferred(true);
+		
+		Concept c = new Concept();
+		c.addName(fullySpecifiedName);
+		c.addName(synonym);
+		c.addName(indexTerm);
+		c.addName(shortName);
+		
+		//ignore it so we can test the set default preferred name  functionality
+		try {
+			Context.getConceptService().saveConcept(c);
+		}
+		catch (org.openmrs.api.APIException e) {
+			//ignore it
+		}
+		assertNotNull("there's a preferred name", c.getPreferredName(loc));
+		assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
+		assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
+	}
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index 5d0e560..2b25348 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -114,6 +114,11 @@ public Concept saveConcept(Concept concept) throws APIException {
+ 		concept.setDateChanged(new Date());
+ 		concept.setChangedBy(Context.getAuthenticatedUser());
+ 		
++		// force isSet when concept has members
++		if (!concept.isSet() && (concept.getSetMembers().size() > 0)) {
++                    concept.setSet(true);
++		}
++
+ 		Concept conceptToReturn = dao.saveConcept(concept);
+ 		
+ 		return conceptToReturn;
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index 6b0f421..4d644c1 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,5 +1,5 @@
+ @Test
+-	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() throws Exception {
++	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
+ 		Locale loc = new Locale("fr", "CA");
+ 		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+ 		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index 7de06ea..3ab52d3 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -114,6 +114,11 @@ public Concept saveConcept(Concept concept) throws APIException {
+ 		concept.setDateChanged(new Date());
+ 		concept.setChangedBy(Context.getAuthenticatedUser());
+ 		
++		// force isSet when concept has members
++		if (!concept.isSet() && (concept.getSetMembers().size() > 0)) {
++                    concept.setSet(true);
++		}
++
+ 		Concept conceptToReturn = dao.saveConcept(concept);
+ 		
+ 		// add/remove entries in the concept_word table (used for searching)
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index 6b0f421..4d644c1 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,5 +1,5 @@
+ @Test
+-	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() throws Exception {
++	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
+ 		Locale loc = new Locale("fr", "CA");
+ 		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+ 		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+
+----------------------------------------------------------------
+coverage: 0.3575757575757576
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
+    Locale loc = new Locale("fr", "CA");
+    ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+    fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+    ConceptName shortName = new ConceptName("short name", loc);
+    shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
+    ConceptName synonym = new ConceptName("synonym", loc);
+    synonym.setConceptNameType(null); //synonyms are id'd by a null type
+    ConceptName indexTerm = new ConceptName("indexTerm", loc);
+    indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
+    
+    //saveConcept never picks an index term for default, so we'll use it for the test
+    indexTerm.setLocalePreferred(true);
+    
+    Concept c = new Concept();
+    c.addName(fullySpecifiedName);
+    c.addName(synonym);
+    c.addName(indexTerm);
+    c.addName(shortName);
+    
+    //ignore it so we can test the set default preferred name  functionality
+    try {
+        Context.getConceptService().saveConcept(c);
+    }
+    catch (org.openmrs.api.APIException e) {
+        //ignore it
+    }
+    assertNotNull("there's a preferred name", c.getPreferredName(loc));
+    assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
+    assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
+    Locale loc = new Locale("fr", "CA");
+    ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+    fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+    ConceptName shortName = new ConceptName("short name", loc);
+    shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
+    ConceptName synonym = new ConceptName("synonym", loc);
+    synonym.setConceptNameType(null); //synonyms are id'd by a null type
+    ConceptName indexTerm = new ConceptName("indexTerm", loc);
+    indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
+    
+    //saveConcept never picks an index term for default, so we'll use it for the test
+    indexTerm.setLocalePreferred(true);
+    
+    Concept c = new Concept();
+    c.addName(fullySpecifiedName);
+    c.addName(synonym);
+    c.addName(indexTerm);
+    c.addName(shortName);
+    
+    //ignore it so we can test the set default preferred name  functionality
+    try {
+        Context.getConceptService().saveConcept(c);
+    }
+    catch (org.openmrs.api.APIException e) {
+        //ignore it
+    }
+    assertNotNull("there's a preferred name", c.getPreferredName(loc));
+    assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
+    assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,32 +1,32 @@
+
+ @Test
+-	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() throws Exception {
+-		Locale loc = new Locale("fr", "CA");
+-		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+-		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+-		ConceptName shortName = new ConceptName("short name", loc);
+-		shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
+-		ConceptName synonym = new ConceptName("synonym", loc);
+-		synonym.setConceptNameType(null); //synonyms are id'd by a null type
+-		ConceptName indexTerm = new ConceptName("indexTerm", loc);
+-		indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
+-		
+-		//saveConcept never picks an index term for default, so we'll use it for the test
+-		indexTerm.setLocalePreferred(true);
+-		
+-		Concept c = new Concept();
+-		c.addName(fullySpecifiedName);
+-		c.addName(synonym);
+-		c.addName(indexTerm);
+-		c.addName(shortName);
+-		
+-		//ignore it so we can test the set default preferred name  functionality
+-		try {
+-			Context.getConceptService().saveConcept(c);
+-		}
+-		catch (org.openmrs.api.APIException e) {
+-			//ignore it
+-		}
+-		assertNotNull("there's a preferred name", c.getPreferredName(loc));
+-		assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
+-		assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
+-	}
++public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
++    Locale loc = new Locale("fr", "CA");
++    ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
++    fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
++    ConceptName shortName = new ConceptName("short name", loc);
++    shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
++    ConceptName synonym = new ConceptName("synonym", loc);
++    synonym.setConceptNameType(null); //synonyms are id'd by a null type
++    ConceptName indexTerm = new ConceptName("indexTerm", loc);
++    indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
++    
++    //saveConcept never picks an index term for default, so we'll use it for the test
++    indexTerm.setLocalePreferred(true);
++    
++    Concept c = new Concept();
++    c.addName(fullySpecifiedName);
++    c.addName(synonym);
++    c.addName(indexTerm);
++    c.addName(shortName);
++    
++    //ignore it so we can test the set default preferred name  functionality
++    try {
++        Context.getConceptService().saveConcept(c);
++    }
++    catch (org.openmrs.api.APIException e) {
++        //ignore it
++    }
++    assertNotNull("there's a preferred name", c.getPreferredName(loc));
++    assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
++    assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
++}
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.3575757575757576
+----------------------------------------------------------------
+message
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 1
+----------------------------------------------------------------
+generated test
+@Test
+public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
+    Locale loc = new Locale("fr", "CA");
+    ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+    fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+    ConceptName shortName = new ConceptName("short name", loc);
+    shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
+    ConceptName synonym = new ConceptName("synonym", loc);
+    synonym.setConceptNameType(null); //synonyms are id'd by a null type
+    ConceptName indexTerm = new ConceptName("indexTerm", loc);
+    indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
+    
+    //saveConcept never picks an index term for default, so we'll use it for the test
+    indexTerm.setLocalePreferred(true);
+    
+    Concept c = new Concept();
+    c.addName(fullySpecifiedName);
+    c.addName(synonym);
+    c.addName(indexTerm);
+    c.addName(shortName);
+    
+    //ignore it so we can test the set default preferred name  functionality
+    try {
+        Context.getConceptService().saveConcept(c);
+    }
+    catch (org.openmrs.api.APIException e) {
+        //ignore it
+    }
+    assertNotNull("there's a preferred name", c.getPreferredName(loc));
+    assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
+    assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,32 +1,32 @@
+
+ @Test
+-	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() throws Exception {
+-		Locale loc = new Locale("fr", "CA");
+-		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+-		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+-		ConceptName shortName = new ConceptName("short name", loc);
+-		shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
+-		ConceptName synonym = new ConceptName("synonym", loc);
+-		synonym.setConceptNameType(null); //synonyms are id'd by a null type
+-		ConceptName indexTerm = new ConceptName("indexTerm", loc);
+-		indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
+-		
+-		//saveConcept never picks an index term for default, so we'll use it for the test
+-		indexTerm.setLocalePreferred(true);
+-		
+-		Concept c = new Concept();
+-		c.addName(fullySpecifiedName);
+-		c.addName(synonym);
+-		c.addName(indexTerm);
+-		c.addName(shortName);
+-		
+-		//ignore it so we can test the set default preferred name  functionality
+-		try {
+-			Context.getConceptService().saveConcept(c);
+-		}
+-		catch (org.openmrs.api.APIException e) {
+-			//ignore it
+-		}
+-		assertNotNull("there's a preferred name", c.getPreferredName(loc));
+-		assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
+-		assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
+-	}
++public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
++    Locale loc = new Locale("fr", "CA");
++    ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
++    fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
++    ConceptName shortName = new ConceptName("short name", loc);
++    shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
++    ConceptName synonym = new ConceptName("synonym", loc);
++    synonym.setConceptNameType(null); //synonyms are id'd by a null type
++    ConceptName indexTerm = new ConceptName("indexTerm", loc);
++    indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
++    
++    //saveConcept never picks an index term for default, so we'll use it for the test
++    indexTerm.setLocalePreferred(true);
++    
++    Concept c = new Concept();
++    c.addName(fullySpecifiedName);
++    c.addName(synonym);
++    c.addName(indexTerm);
++    c.addName(shortName);
++    
++    //ignore it so we can test the set default preferred name  functionality
++    try {
++        Context.getConceptService().saveConcept(c);
++    }
++    catch (org.openmrs.api.APIException e) {
++        //ignore it
++    }
++    assertNotNull("there's a preferred name", c.getPreferredName(loc));
++    assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
++    assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,32 +1,32 @@
+
+ @Test
+-public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
+-    Locale loc = new Locale("fr", "CA");
+-    ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+-    fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+-    ConceptName shortName = new ConceptName("short name", loc);
+-    shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
+-    ConceptName synonym = new ConceptName("synonym", loc);
+-    synonym.setConceptNameType(null); //synonyms are id'd by a null type
+-    ConceptName indexTerm = new ConceptName("indexTerm", loc);
+-    indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
+-    
+-    //saveConcept never picks an index term for default, so we'll use it for the test
+-    indexTerm.setLocalePreferred(true);
+-    
+-    Concept c = new Concept();
+-    c.addName(fullySpecifiedName);
+-    c.addName(synonym);
+-    c.addName(indexTerm);
+-    c.addName(shortName);
+-    
+-    //ignore it so we can test the set default preferred name  functionality
+-    try {
+-        Context.getConceptService().saveConcept(c);
+-    }
+-    catch (org.openmrs.api.APIException e) {
+-        //ignore it
+-    }
+-    assertNotNull("there's a preferred name", c.getPreferredName(loc));
+-    assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
+-    assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
+-}
++	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
++		Locale loc = new Locale("fr", "CA");
++		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
++		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
++		ConceptName shortName = new ConceptName("short name", loc);
++		shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
++		ConceptName synonym = new ConceptName("synonym", loc);
++		synonym.setConceptNameType(null); //synonyms are id'd by a null type
++		ConceptName indexTerm = new ConceptName("indexTerm", loc);
++		indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
++		
++		//saveConcept never picks an index term for default, so we'll use it for the test
++		indexTerm.setLocalePreferred(true);
++		
++		Concept c = new Concept();
++		c.addName(fullySpecifiedName);
++		c.addName(synonym);
++		c.addName(indexTerm);
++		c.addName(shortName);
++		
++		//ignore it so we can test the set default preferred name  functionality
++		try {
++			Context.getConceptService().saveConcept(c);
++		}
++		catch (org.openmrs.api.APIException e) {
++			//ignore it
++		}
++		assertNotNull("there's a preferred name", c.getPreferredName(loc));
++		assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
++		assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
++	}
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.3575757575757576
+--------------------------------------------------------------------------------------------------------------------------------

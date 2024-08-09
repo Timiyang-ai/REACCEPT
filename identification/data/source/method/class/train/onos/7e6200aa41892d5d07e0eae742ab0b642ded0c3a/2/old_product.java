@@ -1,0 +1,1 @@
+void disconnectDevice(NetconfDeviceInfo deviceInfo);

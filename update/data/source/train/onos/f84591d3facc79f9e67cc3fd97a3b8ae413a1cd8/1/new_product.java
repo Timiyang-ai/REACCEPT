@@ -1,0 +1,1 @@
+boolean isKnown(Ip4Address addr);

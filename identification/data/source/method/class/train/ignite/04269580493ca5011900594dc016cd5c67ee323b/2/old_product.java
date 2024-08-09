@@ -1,0 +1,1 @@
+public void register(String name, DoubleSupplier supplier, @Nullable String description);

@@ -1,0 +1,1 @@
+void mount(TachyonURI tachyonPath, TachyonURI ufsPath) throws IOException, TachyonException;

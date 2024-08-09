@@ -1,0 +1,1 @@
+void waitForTimeoutOrFail(long timeout);

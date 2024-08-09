@@ -1,0 +1,1 @@
+void messageForConsole(String msg, Boolean verbose);

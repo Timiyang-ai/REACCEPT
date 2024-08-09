@@ -1,0 +1,1 @@
+ClassesShouldConjunction resideInAnyPackage(String... packageIdentifiers);

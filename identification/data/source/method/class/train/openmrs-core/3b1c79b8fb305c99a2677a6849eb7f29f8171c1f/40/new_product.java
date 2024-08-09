@@ -1,0 +1,1 @@
+public List<Role> getAllRoles() throws APIException;

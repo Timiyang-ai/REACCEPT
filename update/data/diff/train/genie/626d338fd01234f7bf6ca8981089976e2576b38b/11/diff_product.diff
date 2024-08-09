@@ -1,0 +1,44 @@
+diff --git a/old_product.java b/new_product.java
+index 5957480..8dad860 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -14,9 +14,13 @@
+         @Min(value = 1, message = "Memory can't be less than 1 MB") final int memory
+     ) throws GenieException {
+         final long start = System.nanoTime();
++        final Map<String, String> tags = MetricsUtils.newSuccessTagsMap();
+ 
+         try {
+             log.info("Beginning local job submission for {}", jobRequest);
++
++            MetricsUtils.addCommonJobWorkflowMetricTags(cluster, command, tags, NO_ID_FOUND);
++
+             final String id = jobRequest.getId().orElseThrow(() -> new GenieServerException("No job id found."));
+ 
+             try {
+@@ -67,6 +71,7 @@
+                 }
+             } catch (final GeniePreconditionException gpe) {
+                 log.error(gpe.getMessage(), gpe);
++                MetricsUtils.addFailureTagsWithException(tags, gpe);
+                 this.createInitFailureDetailsFile(id, gpe);
+                 this.genieEventBus.publishAsynchronousEvent(
+                     new JobFinishedEvent(
+@@ -76,6 +81,7 @@
+                 throw gpe;
+             } catch (final Exception e) {
+                 log.error(e.getMessage(), e);
++                MetricsUtils.addFailureTagsWithException(tags, e);
+                 this.createInitFailureDetailsFile(id, e);
+                 this.genieEventBus.publishAsynchronousEvent(
+                     new JobFinishedEvent(
+@@ -85,6 +91,7 @@
+                 throw e;
+             }
+         } finally {
+-            this.overallSubmitTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
++            registry.timer(overallSubmitTimerId.withTags(tags)).
++                record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
+         }
+     }
+\ No newline at end of file

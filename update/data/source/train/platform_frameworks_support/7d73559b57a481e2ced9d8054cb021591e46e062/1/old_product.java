@@ -1,0 +1,1 @@
+public abstract void setInterpolator(@Nullable TimeInterpolator value);

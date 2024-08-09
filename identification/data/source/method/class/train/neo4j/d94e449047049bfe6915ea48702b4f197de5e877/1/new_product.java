@@ -1,0 +1,1 @@
+Node createNode( Label... labels );

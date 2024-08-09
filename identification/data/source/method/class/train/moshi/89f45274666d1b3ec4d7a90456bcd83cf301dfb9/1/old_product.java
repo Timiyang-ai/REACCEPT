@@ -1,0 +1,1 @@
+abstract int selectString(Selection selection) throws IOException;

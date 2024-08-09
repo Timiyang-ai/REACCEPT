@@ -1,0 +1,1 @@
+Result rollback(Transaction tx);

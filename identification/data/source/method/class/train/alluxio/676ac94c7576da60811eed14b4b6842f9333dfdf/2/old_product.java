@@ -1,0 +1,1 @@
+public abstract boolean fileExists(String path) throws IOException;

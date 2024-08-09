@@ -1,0 +1,1 @@
+<T extends Entity> T getByBusinessKeys(Class<T> clazz, NamedParameters keyValues);

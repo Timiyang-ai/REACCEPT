@@ -1,0 +1,1 @@
+public abstract long size() throws IOException;

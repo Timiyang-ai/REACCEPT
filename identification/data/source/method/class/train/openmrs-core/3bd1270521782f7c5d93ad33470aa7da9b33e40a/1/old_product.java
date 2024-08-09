@@ -1,0 +1,1 @@
+public Visit getNextVisitToClose(Visit previousVisit, Collection<VisitType> visitTypesToStop);

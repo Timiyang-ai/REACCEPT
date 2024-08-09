@@ -1,0 +1,13 @@
+@Test
+	@Verifies(value = "should return the concept name explicitly marked as locale preferred", method = "getPreferredName(Locale)")
+	public void getPreferredName_shouldReturnTheConceptNameExplicitlyMarkedAsLocalePreferred() throws Exception {
+		Concept testConcept = createMockConcept(1, Locale.US);
+		//preferred name in en_US
+		ConceptName preferredNameEN_US = ConceptNameTest.createMockConceptName(3, Locale.US, null, true);
+		testConcept.addName(preferredNameEN_US);
+		//preferred name in en
+		ConceptName preferredNameEN = ConceptNameTest.createMockConceptName(4, new Locale("en"), null, true);
+		testConcept.addName(preferredNameEN);
+		Assert.assertEquals(preferredNameEN_US, testConcept.getPreferredName(Locale.US));
+		Assert.assertEquals(preferredNameEN, testConcept.getPreferredName(new Locale("en")));
+	}

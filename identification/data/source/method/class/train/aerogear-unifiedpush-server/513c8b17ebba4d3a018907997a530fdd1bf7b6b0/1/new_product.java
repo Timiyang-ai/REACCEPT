@@ -1,0 +1,1 @@
+PageResult<PushApplication> findAllPushApplicationsForDeveloper(String loginName, Integer page, Integer pageSize);

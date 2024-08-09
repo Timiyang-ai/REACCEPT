@@ -1,0 +1,70 @@
+diff --git a/old_product.java b/new_product.java
+index f3e0bb0..1219804 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -3,54 +3,43 @@ public Connection getConnection() throws SQLException {
+ 			throw new SQLException(this.shutdownStackTrace);
+ 		}
+ 		int partition = (int) (Thread.currentThread().getId() % this.partitionCount);
+-
+ 		ConnectionPartition connectionPartition = this.partitions[partition];
+-		if (!connectionPartition.isUnableToCreateMoreTransactions()){
+-			maybeSignalForMoreConnections(connectionPartition);
+-		}
+-
++	
+ 		ConnectionHandle result;
+-		if (this.connectionStarvationTriggered) {
+-			try{
+-				result = connectionPartition.getFreeConnections().take();
+-			}
+-			catch (InterruptedException e) {
+-				throw new SQLException(e);
+-			}
+-		} else { 
+-			result = connectionPartition.getFreeConnections().poll();
+-		}
+ 
++		result = connectionPartition.getFreeConnections().poll();
+ 
+ 		if (result == null) { 
+-
+ 			// we ran out of space on this partition, pick another free one
+ 			for (int i=0; i < this.partitionCount ; i++){
+ 				if (i == partition) {
+ 					continue; // we already determined it's not here
+ 				}
+-				result = this.partitions[i].getFreeConnections().poll();
++				result = this.partitions[i].getFreeConnections().poll(); // try our luck with this partition
+ 				connectionPartition = this.partitions[i];
+ 				if (result != null) {
+-					break;
++					break;  // we found a connection
+ 				}
+ 			}
+ 		}
++		
++		if (!connectionPartition.isUnableToCreateMoreTransactions()){ // unless we can't create any more connections...   
++			maybeSignalForMoreConnections(connectionPartition);  // see if we need to create more
++		}
+ 
+ 		// we still didn't find an empty one, wait forever until our partition is free
+ 		if (result == null) {
+ 			try {
+-				this.connectionStarvationTriggered   = true; 
+ 				result = connectionPartition.getFreeConnections().take();
+ 			}
+ 			catch (InterruptedException e) {
+ 				throw new SQLException(e);
+ 			}
+ 		}
+-		result.setOriginatingPartition(connectionPartition);
+-		result.renewConnection();
++		result.setOriginatingPartition(connectionPartition); // track the winning partition to keep partitions balanced
++		result.renewConnection(); // mark it as being logically "open"
+ 
+-		// Give an application the chance to do something with it.
++		// Give an application a chance to do something with it.
+ 		if (result.getConnectionHook() != null){
+ 			result.getConnectionHook().onCheckOut(result);
+ 		}

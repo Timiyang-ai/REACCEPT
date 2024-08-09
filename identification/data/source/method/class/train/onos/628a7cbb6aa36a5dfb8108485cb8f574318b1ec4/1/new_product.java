@@ -1,0 +1,1 @@
+void unsubscribePreCommit(T subject, E eventType, S service, String className);

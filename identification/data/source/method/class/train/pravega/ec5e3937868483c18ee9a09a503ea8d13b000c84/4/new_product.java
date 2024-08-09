@@ -1,0 +1,1 @@
+List<Segment> scale(String name, List<Integer> sealedSegments, List<Segment> newSegments, long scaleTimestamp);

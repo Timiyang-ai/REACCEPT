@@ -1,0 +1,1 @@
+E getPrevious(E e);

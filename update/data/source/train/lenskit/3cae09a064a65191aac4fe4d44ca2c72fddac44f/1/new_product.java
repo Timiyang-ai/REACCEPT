@@ -1,0 +1,1 @@
+List<ScoredId> recommend(long user);

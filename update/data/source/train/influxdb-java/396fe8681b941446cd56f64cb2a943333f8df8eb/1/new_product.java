@@ -1,0 +1,1 @@
+public void write(final String database, final TimeUnit precision, final Serie... series);

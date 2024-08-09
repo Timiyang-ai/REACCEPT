@@ -1,0 +1,57 @@
+diff --git a/old_product.java b/new_product.java
+index d25c7dd..7f52c5e 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,12 +1,12 @@
+-public static Pair<InetSocketAddress, Process> establishSSHTunnelIfNeeded(
++private static Pair<InetSocketAddress, Process> establishSSHTunnelIfNeeded(
+       InetSocketAddress endpoint,
+       String tunnelHost,
+-      int timeout,
++      TunnelType tunnelType,
++      int timeoutMs,
+       int retryCount,
+       int retryIntervalMs,
+-      int verifyCount,
+-      boolean isVerbose) {
+-    if (NetworkUtils.isLocationReachable(endpoint, timeout, retryCount, retryIntervalMs)) {
++      int verifyCount) {
++    if (NetworkUtils.isLocationReachable(endpoint, timeoutMs, retryCount, retryIntervalMs)) {
+ 
+       // Already reachable, return original endpoint directly
+       return new Pair<InetSocketAddress, Process>(endpoint, null);
+@@ -19,13 +19,30 @@ public static Pair<InetSocketAddress, Process> establishSSHTunnelIfNeeded(
+           new Object[]{endpoint.toString(), newEndpoint.toString()});
+ 
+       // Set up the tunnel process
+-      Process tunnelProcess = ShellUtils.establishSSHTunnelProcess(
+-          tunnelHost, localFreePort, endpoint.getHostString(), endpoint.getPort(), isVerbose);
++      final Process tunnelProcess;
++      switch (tunnelType) {
++        case PORT_FORWARD:
++          tunnelProcess = ShellUtils.establishSSHTunnelProcess(
++              tunnelHost, localFreePort, endpoint.getHostString(), endpoint.getPort());
++          break;
++        case SOCKS_PROXY:
++          tunnelProcess = ShellUtils.establishSocksProxyProcess(tunnelHost, localFreePort);
++          break;
++        default:
++          throw new IllegalArgumentException("Unrecognized TunnelType passed: " + tunnelType);
++      }
+ 
+       // Tunnel can take time to setup.
+       // Verify whether the tunnel process is working fine.
+-      if (tunnelProcess != null && tunnelProcess.isAlive()
+-          && NetworkUtils.isLocationReachable(newEndpoint, timeout, verifyCount, retryIntervalMs)) {
++      if (tunnelProcess != null && tunnelProcess.isAlive() && NetworkUtils.isLocationReachable(
++          newEndpoint, timeoutMs, verifyCount, retryIntervalMs)) {
++
++        java.lang.Runtime.getRuntime().addShutdownHook(new Thread() {
++          @Override
++          public void run() {
++            tunnelProcess.destroy();
++          }
++        });
+ 
+         // Can reach the destination via ssh tunnel
+         return new Pair<InetSocketAddress, Process>(newEndpoint, tunnelProcess);

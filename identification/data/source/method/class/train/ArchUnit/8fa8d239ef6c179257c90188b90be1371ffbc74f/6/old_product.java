@@ -1,0 +1,1 @@
+ClassesShouldConjunction callMethodWhere(DescribedPredicate<? super JavaMethodCall> predicate);

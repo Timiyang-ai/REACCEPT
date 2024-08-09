@@ -1,0 +1,1 @@
+public void setOspfArea(OspfArea ospfArea);

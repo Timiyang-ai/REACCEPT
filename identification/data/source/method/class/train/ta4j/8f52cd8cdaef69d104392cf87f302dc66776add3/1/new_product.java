@@ -1,0 +1,1 @@
+void operate(int index, Decimal price, Decimal amount);

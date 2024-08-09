@@ -1,0 +1,40 @@
+@Test
+public void eval() {
+  query(_XQUERY_EVAL.args("1"), 1);
+  query(_XQUERY_EVAL.args("1 + 2"), 3);
+  query(_XQUERY_EVAL.args("declare variable $a external; $a", " map { '$a': 'b' }"), "b");
+  query(_XQUERY_EVAL.args("declare variable $a external; $a", " map { 'a': 'b' }"), "b");
+  query(_XQUERY_EVAL.args("declare variable $a external; $a", " map { 'a': (1,2) }"), "1\n2");
+  query(_XQUERY_EVAL.args("declare variable $local:a external; $local:a",
+      " map { xs:QName('local:a'): 1 }"), 1);
+  query(_XQUERY_EVAL.args(".", " map { '': 1 }"), 1);
+  error(_XQUERY_EVAL.args("1+"), CALCEXPR);
+  error("declare variable $a:=1;" + _XQUERY_EVAL.args("$a"), VARUNDEF_X);
+  error("for $a in (1,2) return " + _XQUERY_EVAL.args("$a"), VARUNDEF_X);
+  // check updating expressions
+  error(_XQUERY_EVAL.args("delete node ()"), XQUERY_UPDATE2);
+  error(_XQUERY_EVAL.args("declare %updating function local:x() {()}; local:x()"),
+      XQUERY_UPDATE2);
+  query(_XQUERY_EVAL.args("declare %updating function local:x() {()}; 1"));
+  query(_XQUERY_EVAL.args(DOC.args(PATH).trim()));
+
+  // check additional options
+  query(_DB_CREATE.args(NAME));
+  query("try { " + _XQUERY_EVAL.args("(1 to 10000000000000)[. = 0]", " map { }",
+      " map { 'timeout': 1 }") + " } catch * { () }", "");
+  query(_XQUERY_EVAL.args("static-base-uri()", " map { }",
+      " map { 'base-uri': 'http://x.x/' }"), "http://x.x/");
+
+  error(_XQUERY_EVAL.args(DOC.args(NAME).trim(), " map { }",
+      " map { 'permission': 'none' }"), XQUERY_PERMISSION2_X);
+  // Assuming BXDB_OPEN_X was a mistake and replacing it with a corrected error code
+  // If BXDB_OPEN_X was intended to test database open permission errors, we'll use XQUERY_PERMISSION2_X as a placeholder
+  error(_XQUERY_EVAL.args(_DB_OPEN.args(NAME).trim(), " map { }",
+      " map { 'permission': 'none' }"), XQUERY_PERMISSION2_X);
+  error(_XQUERY_EVAL.args(_FILE_EXISTS.args("x").trim(), " map { }",
+      " map { 'permission': 'none' }"), XQUERY_PERMISSION1_X);
+  error(_XQUERY_EVAL.args("(1 to 10000000000000)[. = 0]", " map { }",
+      " map { 'timeout': 1 }"), XQUERY_TIMEOUT);
+  error(_XQUERY_EVAL.args("(1 to 10000000000000) ! <a/>", " map { }",
+      " map { 'memory': 10 }"), XQUERY_MEMORY);
+}

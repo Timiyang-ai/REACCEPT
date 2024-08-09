@@ -1,0 +1,1 @@
+public Integer getCountOfPatients(String query);

@@ -1,0 +1,42 @@
+diff --git a/old_test.java b/new_test.java
+index 807ae84..378c915 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,17 +1,26 @@
+ @Test
+-  public void getViewTest() throws IOException {
++  public void getFileSpanForMessageBadArgsTest() throws IOException {
+     Log log = new Log(tempDir.getAbsolutePath(), LOG_CAPACITY, SEGMENT_CAPACITY, metrics);
+     try {
+-      long writeStartOffset = log.getEndOffset().getOffset();
+-      long writeSize = (int) (SEGMENT_CAPACITY - writeStartOffset);
+-      byte[] buf = TestUtils.getRandomBytes((int) (writeSize));
+-      log.appendFrom(ByteBuffer.wrap(buf));
+-      List<BlobReadOptions> list = new ArrayList<>();
+-      list.add(new BlobReadOptions(writeStartOffset, writeSize, -1, null));
+-      StoreMessageReadSet readSet = log.getView(list);
+-      ByteBufferChannel channel = new ByteBufferChannel(ByteBuffer.allocate(buf.length));
+-      readSet.writeTo(0, channel, 0, buf.length);
+-      assertArrayEquals("Data read does not match data written", buf, channel.getBuffer().array());
++      LogSegment firstSegment = log.getFirstSegment();
++      log.setActiveSegment(firstSegment.getName());
++      Offset endOffsetOfPrevMessage = new Offset(firstSegment.getName(), firstSegment.getEndOffset() + 1);
++      try {
++        log.getFileSpanForMessage(endOffsetOfPrevMessage, 1);
++        fail("Should have failed because endOffsetOfPrevMessage > endOffset of log segment");
++      } catch (IllegalArgumentException e) {
++        // expected. Nothing to do.
++      }
++      // write a single byte into the log
++      endOffsetOfPrevMessage = log.getStartOffset();
++      CHANNEL_APPENDER.append(log, ByteBuffer.allocate(1));
++      try {
++        // provide the wrong size
++        log.getFileSpanForMessage(endOffsetOfPrevMessage, 2);
++        fail("Should have failed because endOffsetOfPrevMessage + size > endOffset of log segment");
++      } catch (IllegalStateException e) {
++        // expected. Nothing to do.
++      }
+     } finally {
+       log.close();
+       cleanDirectory(tempDir);

@@ -1,0 +1,1 @@
+void and(Selection otherSelection);

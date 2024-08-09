@@ -1,0 +1,1 @@
+abstract void calculateIndexUpdates(List<SepEvent> events, SolrUpdateCollector updateCollector) throws IOException;

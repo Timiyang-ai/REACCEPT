@@ -1,0 +1,1 @@
+void release(ConnectionEndpoint endpoint, Object newState, long validDuration, TimeUnit timeUnit);

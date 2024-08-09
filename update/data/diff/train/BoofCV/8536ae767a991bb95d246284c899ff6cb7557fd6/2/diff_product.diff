@@ -1,0 +1,83 @@
+diff --git a/old_product.java b/new_product.java
+index 9e3cd4a..1479792 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,54 +1,62 @@
+ void scorePath(int x0 , int y0 , int dx , int dy , short[] workCostLr) {
+-		// there is no previous disparity score so simply fill the cost for d=0
+ 
++		// there is no previous disparity score so simply fill the cost for d=0
+ 		{
+ 			int minCost = Integer.MAX_VALUE;
+ 			final GrayU16 costXD = costYXD.getBand(y0);
+ 			final int idxCost = costXD.getIndex(0,x0);   // C(0,0)
+-			final int localLengthD = helper.localDisparityRangeLeft(x0);
+-			for (int d = 0; d < localLengthD; d++) {
++			final int localRangeD = helper.localDisparityRangeLeft(x0+disparityMin);
++			for (int d = 0; d < localRangeD; d++) {
+ 				int v = costXD.data[idxCost + d]&0xFFFF; // Lr(0,d) = C(0,d)
+ 				workCostLr[d] = (short)v;
+ 				minCost = Math.min(minCost,v);
+ 			}
+ 			// The modified equation 13. Cost Equation 12 - min[k] Lr(p,k)
+-			for (int d = 0; d < localLengthD; d++) {
++			for (int d = 0; d < localRangeD; d++) {
+ 				workCostLr[d] = (short)((workCostLr[d]&0xFFFF)-minCost);
+ 			}
++			// In the for loop below it needs the previous cost at index localRangeD[i]-1.
++			// If we are on the left side of the image then localRangeD[i] < localRangeD[i+1]!
++			// That's a problem because if we read localRangeD[i+1]-1 it will be unassigned and have
++			// an unknown value! We get around that by just copying the cost at the end.
++			if( localRangeD != helper.disparityRange) {
++				workCostLr[localRangeD] = workCostLr[localRangeD-1];
++			}
+ 		}
+ 
+ 		// Compute the cost of rest of the path recursively
+ 		int lengthPath = computePathLength(x0, y0, dx, dy);
+-		int x = x0 + dx;
+-		int y = y0 + dy;
+-
+-		for (int i = 1; i < lengthPath; i++, x += dx, y += dy) {
+-
++		for (int i = 1, x = x0 + dx, y = y0 + dy; i < lengthPath; i++, x += dx, y += dy) {
+ 			// Index of cost for C(y,p0+i,0)
+ 			final GrayU16 costXD = costYXD.getBand(y);
+ 			final int idxCost = costXD.getIndex(0,x);
+-			final int lengthLocalD = helper.localDisparityRangeLeft(x);
++			// remember x=0 is really x+disparityMin because the first elements are skipped
++			final int localRangeD = helper.localDisparityRangeLeft(x+disparityMin);
+ 
+ 			// Index for the previous cost in this path
+ 			int idxLrPrev = (i-1)*lengthD;
+ 
+ 			// Score the inner portion of disparity first to avoid bounds checks
+-			computeCostInnerD(costXD, idxCost, idxLrPrev, lengthLocalD, workCostLr);
++			computeCostInnerD(costXD, idxCost, idxLrPrev, localRangeD, workCostLr);
+ 
+ 			// Now handle the borders at d=0 and d=N-1
+-			computeCostBorderD(idxCost,idxLrPrev,0,costXD, lengthLocalD, workCostLr);
+-			computeCostBorderD(idxCost,idxLrPrev,lengthLocalD-1,costXD, lengthLocalD, workCostLr);
++			computeCostBorderD(idxCost,idxLrPrev,0,costXD, localRangeD, workCostLr);
++			computeCostBorderD(idxCost,idxLrPrev,localRangeD-1,costXD, localRangeD, workCostLr);
++
++			// see comments above for what's going on here
++			if( localRangeD != helper.disparityRange) {
++				workCostLr[idxLrPrev+lengthD+localRangeD] = workCostLr[idxLrPrev+lengthD+localRangeD-1];
++			}
+ 
+ 			// The modified equation 13. Cost Equation 12 - min[k] Lr(p,k)
+ 			int minCost = Integer.MAX_VALUE;
+ 			int idxLr = i*lengthD;
+-			for (int d = 0; d < lengthLocalD; d++) {
++			for (int d = 0; d < localRangeD; d++) {
+ 				minCost = Math.min(minCost,workCostLr[idxLr+d]&0xFFFF);
+ 			}
+-			for (int d = 0; d < lengthLocalD; d++) {
++			for (int d = 0; d < localRangeD; d++) {
+ 				workCostLr[idxLr+d] = (short)((workCostLr[idxLr+d]&0xFFFF)- minCost);
+ 			}
+-
+ 		}
+ 
+ 		saveWorkToAggregated(x0,y0,dx,dy,lengthPath, workCostLr);

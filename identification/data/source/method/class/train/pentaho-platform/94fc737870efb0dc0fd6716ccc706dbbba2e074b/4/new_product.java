@@ -1,0 +1,1 @@
+boolean shouldFireNow() throws SchedulerException;

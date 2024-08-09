@@ -1,0 +1,1 @@
+public static native void setDisplayMode(DisplayMode mode) throws Exception;

@@ -1,0 +1,1 @@
+public void purgeVisit(Visit visit) throws DAOException;

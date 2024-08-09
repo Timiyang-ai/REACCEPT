@@ -1,0 +1,1 @@
+boolean canPutKeyValue(byte[] key, byte[] value);

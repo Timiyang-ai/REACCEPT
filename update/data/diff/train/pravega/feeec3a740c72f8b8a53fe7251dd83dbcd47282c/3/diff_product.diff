@@ -1,0 +1,95 @@
+diff --git a/old_product.java b/new_product.java
+index 077a069..8e877a5 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,12 +1,11 @@
+-synchronized WriteResult write(InputStream data, int length, boolean first) throws IOException {
++synchronized WriteResult write(InputStream data, int remainingLength, int predecessorAddress) throws IOException {
+         if (this.usedBlockCount >= this.layout.blocksPerBuffer()) {
+             // Full
+             return null;
+         }
+ 
+-        ArrayList<Integer> writtenBlocks = new ArrayList<>();
+-        int lastBlockLength = length % this.layout.blockSize();
+-        if (lastBlockLength == 0 && length > 0) {
++        int lastBlockLength = remainingLength % this.layout.blockSize();
++        if (lastBlockLength == 0 && remainingLength > 0) {
+             lastBlockLength = this.layout.blockSize();
+         }
+ 
+@@ -14,39 +13,46 @@ synchronized WriteResult write(InputStream data, int length, boolean first) thro
+         long blockMetadata = metadataBuf.getLong(0);
+         int blockId = this.layout.getNextFreeBlockId(blockMetadata);
+         assert blockId != CacheLayout.NO_BLOCK_ID;
+-        while (blockId != CacheLayout.NO_BLOCK_ID) {
+-            blockMetadata = metadataBuf.getLong(blockId * this.layout.blockMetadataSize());
+-            assert !this.layout.isUsedBlock(blockMetadata);
+-            writtenBlocks.add(blockId);
+-            if (length > 0) {
+-                length -= writeBlock(getBlockBuffer(blockId), 0, data, Math.min(length, this.layout.blockSize()));
+-            }
++        final int firstBlockId = blockId;
++        try {
++            while (blockId != CacheLayout.NO_BLOCK_ID) {
++                int bufIndex = blockId * this.layout.blockMetadataSize();
++                blockMetadata = metadataBuf.getLong(bufIndex);
++                assert !this.layout.isUsedBlock(blockMetadata);
++                int blockLength = Math.min(remainingLength, this.layout.blockSize());
++                if (blockLength > 0) {
++                    blockLength = writeBlock(getBlockBuffer(blockId), 0, data, blockLength);
++                }
++
++                // Update block metadata.
++                long metadata = this.layout.newBlockMetadata(CacheLayout.NO_BLOCK_ID, blockLength, predecessorAddress);
++                metadataBuf.setLong(bufIndex, metadata);
++                this.usedBlockCount++;
+ 
+-            blockId = this.layout.getNextFreeBlockId(blockMetadata);
+-            if (length <= 0) {
+-                // We are done.
+-                break;
++                // Move on to the next block to write.
++                predecessorAddress = this.layout.calculateAddress(this.id, blockId);
++                blockId = this.layout.getNextFreeBlockId(blockMetadata);
++                remainingLength -= blockLength;
++
++                if (remainingLength <= 0) {
++                    // We are done.
++                    break;
++                }
++            }
++        } catch (Throwable ex) {
++            if (!Exceptions.mustRethrow(ex)) {
++                // We wrote something, but got interrupted. We need to clean up whatever we wrote so we don't leave
++                // unreferenced data in the buffer.
++                rollbackWrite(this.layout.getBlockId(predecessorAddress), blockId);
+             }
++
++            throw ex;
+         }
+ 
+-        // Update the metadata into the buffer, now that we know the successors as well.
++        // Update the root metadata.
+         blockMetadata = metadataBuf.getLong(0);
+         blockMetadata = this.layout.setNextFreeBlockId(blockMetadata, blockId);
+         metadataBuf.setLong(0, blockMetadata);
+ 
+-        // Each modified metadata.
+-        for (int i = 0; i < writtenBlocks.size(); i++) {
+-            blockId = writtenBlocks.get(i);
+-            boolean firstBlock = first && i == 0;
+-            boolean last = i == writtenBlocks.size() - 1;
+-            int successorAddress = last ? CacheLayout.NO_ADDRESS : this.layout.calculateAddress(this.id, writtenBlocks.get(i + 1));
+-            int blockLength = last && length == 0 ? lastBlockLength : this.layout.blockSize();
+-            long metadata = this.layout.newBlockMetadata(firstBlock, CacheLayout.NO_BLOCK_ID, blockLength, successorAddress);
+-            metadataBuf.setLong(blockId * this.layout.blockMetadataSize(), metadata);
+-        }
+-
+-        this.usedBlockCount += writtenBlocks.size();
+-        return new WriteResult(length,
+-                this.layout.calculateAddress(this.id, writtenBlocks.get(0)),
+-                this.layout.calculateAddress(this.id, writtenBlocks.get(writtenBlocks.size() - 1)));
++        return new WriteResult(remainingLength, predecessorAddress, firstBlockId);
+     }
+\ No newline at end of file

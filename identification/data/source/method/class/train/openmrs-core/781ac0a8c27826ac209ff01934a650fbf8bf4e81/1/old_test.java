@@ -1,0 +1,15 @@
+@Test
+	public void saveOrder_shouldFailIfConceptInPreviousOrderDoesNotMatchThatOfTheRevisedOrder() throws Exception {
+		Order previousOrder = orderService.getOrder(7);
+		Order order = previousOrder.cloneForRevision();
+		order.setDateActivated(new Date());
+		order.setOrderer(providerService.getProvider(1));
+		order.setEncounter(encounterService.getEncounter(6));
+		Concept newConcept = conceptService.getConcept(5089);
+		assertFalse(previousOrder.getConcept().equals(newConcept));
+		order.setConcept(newConcept);
+		
+		expectedException.expect(APIException.class);
+		expectedException.expectMessage("Order.previous.concept");
+		orderService.saveOrder(order, null);
+	}

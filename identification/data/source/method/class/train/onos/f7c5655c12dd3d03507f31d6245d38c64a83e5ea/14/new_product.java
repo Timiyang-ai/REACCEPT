@@ -1,0 +1,1 @@
+public void setInterfaceIndex(int interfaceIndex);

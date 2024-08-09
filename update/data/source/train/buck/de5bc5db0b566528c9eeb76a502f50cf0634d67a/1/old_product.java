@@ -1,0 +1,59 @@
+public static ImmutableList<HasAndroidResourceDeps> getAndroidResourceDeps(
+      Collection<BuildRule> rules) {
+    // This visitor finds all AndroidResourceRules that are reachable from the specified rules via
+    // rules with types in the TRAVERSABLE_TYPES collection. It also builds up the dependency graph
+    // that was traversed to find the AndroidResourceRules.
+    final MutableDirectedGraph<BuildRule> mutableGraph = new MutableDirectedGraph<>();
+
+    final ImmutableSet.Builder<HasAndroidResourceDeps> androidResources = ImmutableSet.builder();
+    AbstractDependencyVisitor visitor = new AbstractDependencyVisitor(rules) {
+
+      @Override
+      public ImmutableSet<BuildRule> visit(BuildRule rule) {
+        HasAndroidResourceDeps androidResourceRule = null;
+        if (rule instanceof HasAndroidResourceDeps) {
+          androidResourceRule = (HasAndroidResourceDeps) rule;
+        } else if (rule.getBuildable() instanceof HasAndroidResourceDeps) {
+          androidResourceRule = (HasAndroidResourceDeps) rule.getBuildable();
+        }
+        if (androidResourceRule != null && androidResourceRule.getRes() != null) {
+          androidResources.add(androidResourceRule);
+        }
+
+        // Only certain types of rules should be considered as part of this traversal.
+        BuildRuleType type = rule.getType();
+        ImmutableSet<BuildRule> depsToVisit = maybeVisitAllDeps(rule,
+            TRAVERSABLE_TYPES.contains(type));
+        mutableGraph.addNode(rule);
+        for (BuildRule dep : depsToVisit) {
+          mutableGraph.addEdge(rule, dep);
+        }
+        return depsToVisit;
+      }
+
+    };
+    visitor.start();
+
+    final Set<HasAndroidResourceDeps> allAndroidResourceRules = androidResources.build();
+
+    // Now that we have the transitive set of AndroidResourceRules, we need to return them in
+    // topologically sorted order. This is critical because the order in which -S flags are passed
+    // to aapt is significant and must be consistent.
+    Predicate<BuildRule> inclusionPredicate = new Predicate<BuildRule>() {
+      @Override
+      public boolean apply(BuildRule rule) {
+        return allAndroidResourceRules.contains(rule) ||
+            allAndroidResourceRules.contains(rule.getBuildable());
+      }
+    };
+    ImmutableList<BuildRule> sortedAndroidResourceRules = TopologicalSort.sort(mutableGraph,
+        inclusionPredicate);
+
+    // TopologicalSort.sort() returns rules in leaves-first order, which is the opposite of what we
+    // want, so we must reverse the list and cast BuildRules to AndroidResourceRules.
+    return ImmutableList.copyOf(
+        Iterables.transform(
+            sortedAndroidResourceRules.reverse(),
+            CAST_TO_ANDROID_RESOURCE_RULE)
+        );
+  }

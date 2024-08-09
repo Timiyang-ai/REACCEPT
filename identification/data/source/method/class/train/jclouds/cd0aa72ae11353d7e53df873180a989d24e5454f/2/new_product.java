@@ -1,0 +1,1 @@
+Task edit(URI vmURI, Vm vm);

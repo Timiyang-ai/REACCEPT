@@ -1,0 +1,1 @@
+List<byte[]> rowKeys(String profile, String entity, List<Object> groups, long durationAgo, TimeUnit unit);

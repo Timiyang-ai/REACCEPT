@@ -1,0 +1,1 @@
+public void unvoidPatient(Patient patient) throws APIException;

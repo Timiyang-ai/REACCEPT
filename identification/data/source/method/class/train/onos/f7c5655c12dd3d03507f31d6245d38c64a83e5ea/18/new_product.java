@@ -1,0 +1,1 @@
+void deleteConfig(List<OspfProcess> processes, String attribute);

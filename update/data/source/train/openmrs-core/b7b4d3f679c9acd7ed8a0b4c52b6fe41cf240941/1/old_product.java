@@ -1,0 +1,1 @@
+public Message processHL7String(String hl7String) throws HL7Exception;

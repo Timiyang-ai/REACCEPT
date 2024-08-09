@@ -1,0 +1,3 @@
+int getOptions() {
+    return options;
+  }

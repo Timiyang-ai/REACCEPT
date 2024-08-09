@@ -1,0 +1,1 @@
+List<PushApplication> findAllPushApplicationsForDeveloper(String loginName);

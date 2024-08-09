@@ -1,0 +1,1 @@
+IDocument getDocument(Object document);

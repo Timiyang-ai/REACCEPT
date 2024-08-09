@@ -1,0 +1,799 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.0
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 1
+----------------------------------------------------------------
+old description: 单元测试不通过
+----------------------------------------------------------------
+old message
+-------------------------------------------------------------------------------
+Test set: org.basex.query.func.ArrayModuleTest
+-------------------------------------------------------------------------------
+Tests run: 16, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 8.42 sec <<< FAILURE! - in org.basex.query.func.ArrayModuleTest
+sort(org.basex.query.func.ArrayModuleTest)  Time elapsed: 0.132 sec  <<< FAILURE!
+java.lang.AssertionError: 
+Query failed:
+array:sort( [1,-2,5,10,-10,10,8], abs#1)
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:169)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:160)
+Caused by: org.basex.query.QueryException: 
+Stopped at E:/1/basex/basex-core/, 1/11:
+[FOTY0013] Items of type function(xs:numeric?) as xs:numeric? cannot be atomized.
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:169)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:160)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+private void sort(final QueryContext qc) throws QueryException {
+        // keys are stored at odd positions, values at even ones
+        List<Value[]> tuples = new ArrayList<>();
+        while(sub.next(qc)) {
+          final int kl = keys.length;
+          final Item[] key = new Item[kl];
+          for(int k = 0; k < kl; k++) key[k] = keys[k].expr.atomItem(qc, keys[k].info);
+          tuples.add(key);
+
+          final int rl = refs.length;
+          final Value[] vals = new Value[rl];
+          for(int r = 0; r < rl; r++) vals[r] = refs[r].value(qc);
+          tuples.add(vals);
+        }
+
+        final int len = tuples.size() >>> 1;
+        final Item[][] ks = new Item[len][];
+        perm = new Integer[len];
+        tpls = new Value[len][];
+        for(int i = 0; i < len; i++) {
+          perm[i] = i;
+          tpls[i] = tuples.get(i << 1 | 1);
+          ks[i] = (Item[]) tuples.get(i << 1);
+        }
+        // be nice to the garbage collector
+        tuples = null;
+        try {
+          Arrays.sort(perm, new Comparator<Integer>() {
+            @Override
+            public int compare(final Integer x, final Integer y) {
+              try {
+                final Item[] a = ks[x], b = ks[y];
+                final int kl = keys.length;
+                for(int k = 0; k < kl; k++) {
+                  final Key or = keys[k];
+                  Item m = a[k], n = b[k];
+                  if(m == Dbl.NAN || m == Flt.NAN) m = null;
+                  if(n == Dbl.NAN || n == Flt.NAN) n = null;
+                  if(m != null && n != null && !m.comparable(n))
+                    throw castError(n, m.type, or.info);
+
+                  final int c = m == null
+                      ? n == null ? 0                 : or.least ? -1 : 1
+                      : n == null ? or.least ? 1 : -1 : m.diff(n, or.coll, or.info);
+                  if(c != 0) return or.desc ? -c : c;
+                }
+                return 0;
+              } catch(final QueryException ex) {
+                throw new QueryRTException(ex);
+              }
+            }
+          });
+        } catch(final QueryRTException ex) {
+          throw ex.getCause();
+        }
+      }
+----------------------------------------------------------------
+old test
+@Test public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+  }
+----------------------------------------------------------------
+new product
+private void sort(final QueryContext qc) throws QueryException {
+        // keys are stored at odd positions, values at even ones
+        List<Value[]> tuples = new ArrayList<>();
+        while(sub.next(qc)) {
+          final int kl = keys.length;
+          final Item[] key = new Item[kl];
+          for(int k = 0; k < kl; k++) key[k] = keys[k].expr.atomItem(qc, keys[k].info);
+          tuples.add(key);
+
+          final int rl = refs.length;
+          final Value[] vals = new Value[rl];
+          for(int r = 0; r < rl; r++) vals[r] = refs[r].value(qc);
+          tuples.add(vals);
+        }
+
+        final int len = tuples.size() >>> 1;
+        final Item[][] ks = new Item[len][];
+        perm = new Integer[len];
+        tpls = new Value[len][];
+        for(int i = 0; i < len; i++) {
+          perm[i] = i;
+          tpls[i] = tuples.get(i << 1 | 1);
+          ks[i] = (Item[]) tuples.get(i << 1);
+        }
+        // be nice to the garbage collector
+        tuples = null;
+        try {
+          Arrays.sort(perm, new Comparator<Integer>() {
+            @Override
+            public int compare(final Integer x, final Integer y) {
+              try {
+                final Item[] a = ks[x], b = ks[y];
+                final int kl = keys.length;
+                for(int k = 0; k < kl; k++) {
+                  final Key key = keys[k];
+                  Item m = a[k], n = b[k];
+                  if(m == Dbl.NAN || m == Flt.NAN) m = null;
+                  if(n == Dbl.NAN || n == Flt.NAN) n = null;
+                  if(m != null && n != null && !m.comparable(n))
+                    throw castError(n, m.type, key.info);
+
+                  final int c = m == null
+                      ? n == null ? 0                 : key.least ? -1 : 1
+                      : n == null ? key.least ? 1 : -1 : m.diff(n, key.coll, key.info);
+                  if(c != 0) return key.desc ? -c : c;
+                }
+                return 0;
+              } catch(final QueryException ex) {
+                throw new QueryRTException(ex);
+              }
+            }
+          });
+        } catch(final QueryRTException ex) {
+          throw ex.getCause();
+        }
+      }
+----------------------------------------------------------------
+new test
+@Test public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", "", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+  }
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index 03d4fa6..323bfa2 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -32,17 +32,17 @@ private void sort(final QueryContext qc) throws QueryException {
+                 final Item[] a = ks[x], b = ks[y];
+                 final int kl = keys.length;
+                 for(int k = 0; k < kl; k++) {
+-                  final Key or = keys[k];
++                  final Key key = keys[k];
+                   Item m = a[k], n = b[k];
+                   if(m == Dbl.NAN || m == Flt.NAN) m = null;
+                   if(n == Dbl.NAN || n == Flt.NAN) n = null;
+                   if(m != null && n != null && !m.comparable(n))
+-                    throw castError(n, m.type, or.info);
++                    throw castError(n, m.type, key.info);
+ 
+                   final int c = m == null
+-                      ? n == null ? 0                 : or.least ? -1 : 1
+-                      : n == null ? or.least ? 1 : -1 : m.diff(n, or.coll, or.info);
+-                  if(c != 0) return or.desc ? -c : c;
++                      ? n == null ? 0                 : key.least ? -1 : 1
++                      : n == null ? key.least ? 1 : -1 : m.diff(n, key.coll, key.info);
++                  if(c != 0) return key.desc ? -c : c;
+                 }
+                 return 0;
+               } catch(final QueryException ex) {
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index 40e63fc..8a67600 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,5 +1,5 @@
+ @Test public void sort() {
+     array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+     array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+-    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
++    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", "", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+   }
+\ No newline at end of file
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index 384694c..b79b111 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -10,13 +10,16 @@ public static Integer[] sort(final ValueList vl, final StandardFunc sf) throws Q
+             final Value v1 = vl.get(i1), v2 = vl.get(i2);
+             final long s1 = v1.size(), s2 = v2.size(), sl = Math.min(s1, s2);
+             for(int v = 0; v < sl; v++) {
+-              final Item it1 = v1.itemAt(v), it2 = v2.itemAt(v);
+-              if(!it1.comparable(it2)) {
+-                throw it1 instanceof FItem ? FIEQ_X.get(sf.info, it1.type) :
+-                      it2 instanceof FItem ? FIEQ_X.get(sf.info, it2.type) :
+-                      diffError(it1, it2, sf.info);
++              Item m = v1.itemAt(v), n = v2.itemAt(v);
++              if(m == Dbl.NAN || m == Flt.NAN) m = null;
++              if(n == Dbl.NAN || n == Flt.NAN) n = null;
++              if(m != null && n != null && !m.comparable(n)) {
++                throw m instanceof FItem ? FIEQ_X.get(sf.info, m.type) :
++                      n instanceof FItem ? FIEQ_X.get(sf.info, n.type) :
++                      diffError(m, n, sf.info);
+               }
+-              final int d = it1.diff(it2, sf.sc.collation, sf.info);
++              final int d = m == null ? n == null ? 0 : -1 : n == null ? 1 :
++                m.diff(n, sf.sc.collation, sf.info);
+               if(d != 0 && d != Item.UNDEF) return d;
+             }
+             return (int) (s1 - s2);
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index b1ff6a6..f5ac5e1 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -3,4 +3,8 @@
+     query(SORT.args("(1, 4, 6, 5, 3)"), "1\n3\n4\n5\n6");
+     query(SORT.args("(1,-2,5,10,-10,10,8)", " abs#1"), "1\n-2\n5\n8\n10\n-10\n10");
+     query(SORT.args("((1,0), (1,1), (0,1), (0,0))"), "0\n0\n0\n0\n1\n1\n1\n1");
++    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
++        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
++        + ",'15','10','03','05','1')", "function($s) { number($s) }")),
++        "33");
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+coverage: 0.0
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { number($s) }")),
+        "33");
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { number($s) }")),
+        "33");
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,5 +1,10 @@
+
+-@Test public void sort() {
++@Test
++public void sort() {
+     array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+-    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
++    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)");
+     array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+-  }
++    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
++        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
++        + ",'15','10','03','05','1')", "function($s) { number($s) }")),
++        "33");
++}
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.basex.query.func.ArrayModuleTest
+-------------------------------------------------------------------------------
+Tests run: 16, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 6.255 sec <<< FAILURE! - in org.basex.query.func.ArrayModuleTest
+sort(org.basex.query.func.ArrayModuleTest)  Time elapsed: 0.05 sec  <<< FAILURE!
+org.junit.ComparisonFailure: 
+Wrong result:
+[Q] array:sort( [(1,0), (1,1), (0,1), (0,0)])
+[E] ?[(0, 0), (0, 1), (1, 0), (1, 1)?
+[F] ?[(0, 0), (0, 1), (1, 0), (1, 1)]?
+ expected:<..., 1), (1, 0), (1, 1)[]> but was:<..., 1), (1, 0), (1, 1)[]]>
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:160)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 2
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { number($s) }")),
+        "33");
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { number($s) }")),
+        "33");
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,7 +1,7 @@
+
+ @Test
+ public void sort() {
+     array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+-    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)");
++    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+     array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+     query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+         + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.basex.query.func.ArrayModuleTest
+-------------------------------------------------------------------------------
+Tests run: 16, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 5.243 sec <<< FAILURE! - in org.basex.query.func.ArrayModuleTest
+sort(org.basex.query.func.ArrayModuleTest)  Time elapsed: 0.127 sec  <<< FAILURE!
+java.lang.AssertionError: 
+Query failed:
+array:sort( [1,-2,5,10,-10,10,8], abs#1)
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+Caused by: org.basex.query.QueryException: 
+Stopped at E:/1/basex/basex-core/, 1/11:
+[FOTY0013] Items of type function(xs:numeric?) as xs:numeric? cannot be atomized.
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 3
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { number($s) }")),
+        "33");
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { number($s) }")),
+        "33");
+}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.basex.query.func.ArrayModuleTest
+-------------------------------------------------------------------------------
+Tests run: 16, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 5.916 sec <<< FAILURE! - in org.basex.query.func.ArrayModuleTest
+sort(org.basex.query.func.ArrayModuleTest)  Time elapsed: 0.115 sec  <<< FAILURE!
+java.lang.AssertionError: 
+Query failed:
+array:sort( [1,-2,5,10,-10,10,8], abs#1)
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+Caused by: org.basex.query.QueryException: 
+Stopped at E:/1/basex/basex-core/, 1/11:
+[FOTY0013] Items of type function(xs:numeric?) as xs:numeric? cannot be atomized.
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 4
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { xs:double($s) }")),
+        "33");
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { xs:double($s) }")),
+        "33");
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -5,6 +5,6 @@
+
+     array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+     query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+         + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+-        + ",'15','10','03','05','1')", "function($s) { number($s) }")),
++        + ",'15','10','03','05','1')", "function($s) { xs:double($s) }")),
+         "33");
+ }
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.basex.query.func.ArrayModuleTest
+-------------------------------------------------------------------------------
+Tests run: 16, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 5.442 sec <<< FAILURE! - in org.basex.query.func.ArrayModuleTest
+sort(org.basex.query.func.ArrayModuleTest)  Time elapsed: 0.112 sec  <<< FAILURE!
+java.lang.AssertionError: 
+Query failed:
+array:sort( [1,-2,5,10,-10,10,8], abs#1)
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+Caused by: org.basex.query.QueryException: 
+Stopped at E:/1/basex/basex-core/, 1/11:
+[FOTY0013] Items of type function(xs:numeric?) as xs:numeric? cannot be atomized.
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 5
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { xs:double($s) }")),
+        "33");
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { xs:double($s) }")),
+        "33");
+}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.basex.query.func.ArrayModuleTest
+-------------------------------------------------------------------------------
+Tests run: 16, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 5.052 sec <<< FAILURE! - in org.basex.query.func.ArrayModuleTest
+sort(org.basex.query.func.ArrayModuleTest)  Time elapsed: 0.115 sec  <<< FAILURE!
+java.lang.AssertionError: 
+Query failed:
+array:sort( [1,-2,5,10,-10,10,8], abs#1)
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+Caused by: org.basex.query.QueryException: 
+Stopped at E:/1/basex/basex-core/, 1/11:
+[FOTY0013] Items of type function(xs:numeric?) as xs:numeric? cannot be atomized.
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 6
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { xs:double($s) }")),
+        "33");
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { xs:double($s) }")),
+        "33");
+}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.basex.query.func.ArrayModuleTest
+-------------------------------------------------------------------------------
+Tests run: 16, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 5.232 sec <<< FAILURE! - in org.basex.query.func.ArrayModuleTest
+sort(org.basex.query.func.ArrayModuleTest)  Time elapsed: 0.097 sec  <<< FAILURE!
+java.lang.AssertionError: 
+Query failed:
+array:sort( [1,-2,5,10,-10,10,8], abs#1)
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+Caused by: org.basex.query.QueryException: 
+Stopped at E:/1/basex/basex-core/, 1/11:
+[FOTY0013] Items of type function(xs:numeric?) as xs:numeric? cannot be atomized.
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 7
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { xs:double($s) }")),
+        "33");
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { xs:double($s) }")),
+        "33");
+}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.basex.query.func.ArrayModuleTest
+-------------------------------------------------------------------------------
+Tests run: 16, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 7.056 sec <<< FAILURE! - in org.basex.query.func.ArrayModuleTest
+sort(org.basex.query.func.ArrayModuleTest)  Time elapsed: 0.116 sec  <<< FAILURE!
+java.lang.AssertionError: 
+Query failed:
+array:sort( [1,-2,5,10,-10,10,8], abs#1)
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+Caused by: org.basex.query.QueryException: 
+Stopped at E:/1/basex/basex-core/, 1/11:
+[FOTY0013] Items of type function(xs:numeric?) as xs:numeric? cannot be atomized.
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 8
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { xs:double($s) }")),
+        "33");
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { xs:double($s) }")),
+        "33");
+}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.basex.query.func.ArrayModuleTest
+-------------------------------------------------------------------------------
+Tests run: 16, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 5.467 sec <<< FAILURE! - in org.basex.query.func.ArrayModuleTest
+sort(org.basex.query.func.ArrayModuleTest)  Time elapsed: 0.08 sec  <<< FAILURE!
+java.lang.AssertionError: 
+Query failed:
+array:sort( [1,-2,5,10,-10,10,8], abs#1)
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+Caused by: org.basex.query.QueryException: 
+Stopped at E:/1/basex/basex-core/, 1/11:
+[FOTY0013] Items of type function(xs:numeric?) as xs:numeric? cannot be atomized.
+	at org.basex.query.func.ArrayModuleTest.array(ArrayModuleTest.java:174)
+	at org.basex.query.func.ArrayModuleTest.sort(ArrayModuleTest.java:161)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 1
+----------------------------------------------------------------
+generated test
+@Test
+public void sort() {
+    array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)");
+    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+        + ",'15','10','03','05','1')", "function($s) { number($s) }")),
+        "33");
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,5 +1,10 @@
+
+-@Test public void sort() {
++@Test
++public void sort() {
+     array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+-    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
++    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)");
+     array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+-  }
++    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
++        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
++        + ",'15','10','03','05','1')", "function($s) { number($s) }")),
++        "33");
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,10 +1,5 @@
+
+-@Test
+-public void sort() {
++@Test public void sort() {
+     array(_ARRAY_SORT.args(" [1,4,6,5,3]"), "[1, 3, 4, 5, 6]");
+-    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)");
+-    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
+-    query(COUNT.args(SORT.args("('9','8','29','310','75','85','36-37','68-69','93','72','185',"
+-        + "'188','86','87','83','79','82','71','67','63','58','57','53','31','26','22','21','20'"
+-        + ",'15','10','03','05','1')", "function($s) { number($s) }")),
+-        "33");
+-}
++    array(_ARRAY_SORT.args(" [(1,0), (1,1), (0,1), (0,0)]"), "[(0, 0), (0, 1), (1, 0), (1, 1)]");
++    array(_ARRAY_SORT.args(" [1,-2,5,10,-10,10,8]", "", " abs#1"), "[1, -2, 5, 8, 10, -10, 10]");
++  }
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+--------------------------------------------------------------------------------------------------------------------------------

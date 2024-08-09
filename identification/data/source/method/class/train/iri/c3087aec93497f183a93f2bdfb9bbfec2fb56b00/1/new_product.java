@@ -1,0 +1,1 @@
+public byte[] trits();

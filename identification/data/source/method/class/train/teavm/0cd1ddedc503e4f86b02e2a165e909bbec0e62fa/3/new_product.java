@@ -1,0 +1,1 @@
+private static native int getMinimalDaysInFirstWeek(String localeCode);

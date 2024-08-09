@@ -1,0 +1,2 @@
+@Authorized(PrivilegeConstants.PURGE_ORDER_FREQUENCIES)
+	public void purgeOrderFrequency(OrderFrequency orderFrequency) throws APIException;

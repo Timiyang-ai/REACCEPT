@@ -1,0 +1,33 @@
+@Test
+    public void testParse() throws GeniePreconditionException {
+        Assert.assertEquals(ProcessStatus.JOB_INTERRUPTED,
+                ProcessStatus.parse(-1));
+        Assert.assertEquals(ProcessStatus.SUCCESS,
+                ProcessStatus.parse(0));
+        Assert.assertEquals(ProcessStatus.MKDIR_JAR_FAILURE,
+                ProcessStatus.parse(201));
+        Assert.assertEquals(ProcessStatus.MKDIR_CONF_FAILURE,
+                ProcessStatus.parse(202));
+        Assert.assertEquals(ProcessStatus.HADOOP_LOCAL_CONF_COPY_FAILURE,
+                ProcessStatus.parse(203));
+        Assert.assertEquals(ProcessStatus.UPDATE_CORE_SITE_XML_FAILURE,
+                ProcessStatus.parse(204));
+        Assert.assertEquals(ProcessStatus.ENV_VARIABLES_SOURCE_AND_SETUP_FAILURE,
+                ProcessStatus.parse(205));
+        Assert.assertEquals(ProcessStatus.CLUSTER_CONF_FILES_COPY_FAILURE,
+                ProcessStatus.parse(206));
+        Assert.assertEquals(ProcessStatus.COMMAND_CONF_FILES_COPY_FAILURE,
+                ProcessStatus.parse(207));
+        Assert.assertEquals(ProcessStatus.APPLICATION_CONF_FILES_COPY_FAILURE,
+                ProcessStatus.parse(208));
+        Assert.assertEquals(ProcessStatus.APPLICATION_JAR_FILES_COPY_FAILURE,
+                ProcessStatus.parse(209));
+        Assert.assertEquals(ProcessStatus.JOB_DEPENDENCIES_COPY_FAILURE,
+                ProcessStatus.parse(210));
+        Assert.assertEquals(ProcessStatus.JOB_KILLED,
+                ProcessStatus.parse(211));
+        Assert.assertEquals(ProcessStatus.ZOMBIE_JOB,
+                ProcessStatus.parse(212));
+        Assert.assertEquals(ProcessStatus.COMMAND_RUN_FAILURE,
+                ProcessStatus.parse(213));
+    }

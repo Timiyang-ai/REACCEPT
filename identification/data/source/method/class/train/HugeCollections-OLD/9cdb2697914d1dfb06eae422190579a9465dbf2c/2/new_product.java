@@ -1,0 +1,1 @@
+boolean remove(int key, int value);

@@ -1,0 +1,1 @@
+public Stream<LabeledVector<Vector, Double>> labeled();

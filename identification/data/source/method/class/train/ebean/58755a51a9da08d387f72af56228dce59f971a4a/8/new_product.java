@@ -1,0 +1,1 @@
+Object toObject(Type genericType, String json) throws JsonIOException;

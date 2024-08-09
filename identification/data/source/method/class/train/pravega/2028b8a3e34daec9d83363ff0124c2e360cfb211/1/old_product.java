@@ -1,0 +1,1 @@
+abstract boolean compareAndSetAttribute(SegmentAttribute attribute, long expectedValue, long newValue, String delegationToken);

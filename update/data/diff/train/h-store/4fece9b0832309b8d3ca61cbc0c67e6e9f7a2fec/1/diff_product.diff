@@ -1,0 +1,56 @@
+diff --git a/old_product.java b/new_product.java
+index 817963d..e5a6285 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,4 +1,6 @@
+-public void addFeature(TransactionTrace txn, String key, Object val, Type type) {
++public synchronized void addFeature(TransactionTrace txn, String key, Object val, Type type) {
++        final boolean trace = LOG.isTraceEnabled();
++        final boolean debug = LOG.isDebugEnabled();
+         String txn_id = txn.getTransactionId();
+         
+         // Add the attribute if it's new
+@@ -16,14 +18,14 @@ public void addFeature(TransactionTrace txn, String key, Object val, Type type)
+                     type = Type.RANGE;
+                 }
+             }
+-            LOG.debug("Adding new attribute " + key + " [" + type + "]");
++            if (debug) LOG.debug("Adding new attribute " + key + " [" + type + "]");
+             this.attributes.put(key, type);
+         }
+         
+         // Store ranges if needed
+         if (type == Type.RANGE || type == Type.BOOLEAN) {
+             if (!this.attribute_ranges.containsKey(key)) {
+-                this.attribute_ranges.put(key, new HashSet<String>());
++                this.attribute_ranges.put(key, new TreeSet<String>());
+                 if (type == Type.BOOLEAN) {
+                     this.attribute_ranges.get(key).add(Boolean.toString(true));
+                     this.attribute_ranges.get(key).add(Boolean.toString(false));
+@@ -33,9 +35,22 @@ public void addFeature(TransactionTrace txn, String key, Object val, Type type)
+         }
+         
+         int idx = this.attributes.indexOf(key);
+-        if (!this.txn_values.containsKey(txn_id)) {
+-            this.txn_values.put(txn_id, new Vector<Object>(this.attributes.size()));
++        int num_attributes = this.attributes.size();
++        Vector<Object> values = this.txn_values.get(txn_id); 
++        if (values == null) {
++            if (trace) LOG.trace("Creating new feature vector for " + txn_id);
++            values = new Vector<Object>(num_attributes);
++            values.setSize(num_attributes);
++            this.txn_values.put(txn_id, values);
++        }
++        if (num_attributes != this.last_num_attributes) {
++            assert(num_attributes > this.last_num_attributes);
++            for (Vector<Object> v : this.txn_values.values()) {
++                v.setSize(num_attributes);
++            } // FOR
++            this.last_num_attributes = num_attributes;
++            if (debug) LOG.debug("Increased FeatureSet size to " + this.last_num_attributes + " attributes");
+         }
+-        this.txn_values.get(txn_id).setSize(this.attributes.size());
+         this.txn_values.get(txn_id).set(idx, val);
++        if (trace) LOG.trace(txn_id + ": " + key + " => " + val);
+     }
+\ No newline at end of file

@@ -1,0 +1,1 @@
+ResourceConsumer getTunnelInfo(TunnelId tunnelId);

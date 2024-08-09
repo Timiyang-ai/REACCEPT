@@ -1,0 +1,1 @@
+public void impute(double[][] data) throws MissingValueImputationException;

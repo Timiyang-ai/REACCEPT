@@ -1,0 +1,5 @@
+public static byte[] expandLabel(String macAlgorithm, byte[] prk, String labelIn, byte[] hashValue, int outLen) {
+        byte[] info = labelEncoder(hashValue, labelIn, outLen);
+        byte[] result = expand(macAlgorithm, prk, info, outLen);
+        return result;
+    }

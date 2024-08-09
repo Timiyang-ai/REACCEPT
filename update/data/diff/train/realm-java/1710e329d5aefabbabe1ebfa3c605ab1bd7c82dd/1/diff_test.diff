@@ -1,0 +1,61 @@
+diff --git a/old_test.java b/new_test.java
+index b985441..e85610a 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,6 +1,8 @@
+-@Test
++@Test(timeout=5000)
+     public void logout_sameSyncUserMultipleSessions() {
+-        SyncUser user = UserFactory.createUniqueUser(Constants.AUTH_URL);
++        String uniqueName = UUID.randomUUID().toString();
++        SyncCredentials credentials = SyncCredentials.usernamePassword(uniqueName, "password", true);
++        SyncUser user =  SyncUser.login(credentials, Constants.AUTH_URL);
+ 
+         SyncConfiguration syncConfiguration1 = configFactory
+                 .createSyncConfigurationBuilder(user, Constants.SYNC_SERVER_URL)
+@@ -17,29 +19,27 @@
+ 
+         // make sure the `access_token` is acquired. otherwise we can still be
+         // in WAITING_FOR_ACCESS_TOKEN state
+-        SystemClock.sleep(TimeUnit.SECONDS.toMillis(2));
+-
+-        assertNotEquals(session1, session2);
++        while(session1.getState() != SyncSession.State.ACTIVE || session2.getState() != SyncSession.State.ACTIVE) {
++            SystemClock.sleep(200);
++        }
+         assertEquals(SyncSession.State.ACTIVE, session1.getState());
+         assertEquals(SyncSession.State.ACTIVE, session2.getState());
++        assertNotEquals(session1, session2);
++
+         assertEquals(session1.getUser(), session2.getUser());
+ 
+-        try {
+-            user.logout();
+-            fail("Should not be able to logout with two open Realm instances");
+-        } catch (IllegalStateException e) {
+-            Assert.assertThat(e.getMessage(), CoreMatchers.containsString("A Realm controlled by this user is still open. Close all Realms before logging out"));
+-        }
++        user.logout();
+ 
+-        realm1.close();
++        assertEquals(SyncSession.State.INACTIVE, session1.getState());
++        assertEquals(SyncSession.State.INACTIVE, session2.getState());
+ 
+-        try {
+-            user.logout();
+-            fail("Should not be able to logout with one open Realm instance");
+-        } catch (IllegalStateException e) {
+-            Assert.assertThat(e.getMessage(), CoreMatchers.containsString("A Realm controlled by this user is still open. Close all Realms before logging out"));
+-        }
++        credentials = SyncCredentials.usernamePassword(uniqueName, "password", false);
++        SyncUser.login(credentials, Constants.AUTH_URL);
+ 
++        // reviving the sessions
++        assertEquals(SyncSession.State.WAITING_FOR_ACCESS_TOKEN, session1.getState());
++        assertEquals(SyncSession.State.WAITING_FOR_ACCESS_TOKEN, session2.getState());
++
++        realm1.close();
+         realm2.close();
+-        user.logout();
+     }
+\ No newline at end of file

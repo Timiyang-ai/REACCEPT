@@ -1,0 +1,1 @@
+public boolean allowAddSubmissionCheckGroups(String context, Assignment assignment);

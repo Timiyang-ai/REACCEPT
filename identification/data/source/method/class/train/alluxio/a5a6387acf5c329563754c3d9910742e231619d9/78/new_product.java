@@ -1,0 +1,117 @@
+public CreatePathResult createPath(TachyonURI path, CreatePathOptions options)
+      throws FileAlreadyExistsException, BlockInfoException, InvalidPathException, IOException {
+    if (path.isRoot()) {
+      LOG.info("FileAlreadyExistsException: " + path);
+      throw new FileAlreadyExistsException(path.toString());
+    }
+    if (!options.isDirectory() && options.getBlockSizeBytes() < 1) {
+      throw new BlockInfoException("Invalid block size " + options.getBlockSizeBytes());
+    }
+
+    LOG.debug("createPath {}", FormatUtils.parametersToString(path));
+
+    String[] pathComponents = PathUtils.getPathComponents(path.getPath());
+    String name = path.getName();
+
+    String[] parentPath = new String[pathComponents.length - 1];
+    System.arraycopy(pathComponents, 0, parentPath, 0, parentPath.length);
+
+    TraversalResult traversalResult = traverseToInode(parentPath, options.isPersisted());
+    // pathIndex is the index into pathComponents where we start filling in the path from the inode.
+    int pathIndex = parentPath.length;
+    if (!traversalResult.isFound()) {
+      // Then the path component at errorInd k doesn't exist. If it's not recursive, we throw an
+      // exception here. Otherwise we add the remaining path components to the list of components
+      // to create.
+      if (!options.isRecursive()) {
+        final String msg = "File " + path + " creation failed. Component "
+            + traversalResult.getNonexistentPathIndex() + "("
+            + parentPath[traversalResult.getNonexistentPathIndex()] + ") does not exist";
+        LOG.info("InvalidPathException: " + msg);
+        throw new InvalidPathException(msg);
+      } else {
+        // We will start filling at the index of the non-existing step found by the traversal.
+        pathIndex = traversalResult.getNonexistentPathIndex();
+      }
+    }
+
+    if (!traversalResult.getInode().isDirectory()) {
+      throw new InvalidPathException("Could not traverse to parent directory of path " + path
+          + ". Component " + pathComponents[pathIndex - 1] + " is not a directory.");
+    }
+    InodeDirectory currentInodeDirectory = (InodeDirectory) traversalResult.getInode();
+    List<Inode> createdInodes = Lists.newArrayList();
+    // Fill in the directories that were missing.
+    for (int k = pathIndex; k < parentPath.length; k ++) {
+      Inode dir =
+          new InodeDirectory.Builder().setName(pathComponents[k])
+              .setId(mDirectoryIdGenerator.getNewDirectoryId())
+              .setParentId(currentInodeDirectory.getId())
+              .setPersisted(options.isPersisted())
+              .setCreationTimeMs(options.getOperationTimeMs()).build();
+      dir.setPinned(currentInodeDirectory.isPinned());
+      currentInodeDirectory.addChild(dir);
+      currentInodeDirectory.setLastModificationTimeMs(options.getOperationTimeMs());
+      if (options.isPersisted()) {
+        String ufsPath = mMountTable.resolve(getPath(dir)).getPath();
+        UnderFileSystem ufs = UnderFileSystem.get(ufsPath, MasterContext.getConf());
+        ufs.mkdirs(ufsPath, false);
+      }
+      createdInodes.add(dir);
+      mInodes.add(dir);
+      currentInodeDirectory = (InodeDirectory) dir;
+    }
+
+    // Create the final path component. First we need to make sure that there isn't already a file
+    // here with that name. If there is an existing file that is a directory and we're creating a
+    // directory, update persistence property of the directories if needed, otherwise, nothing needs
+    // to be done.
+    Inode lastInode = currentInodeDirectory.getChild(name);
+    if (lastInode != null) {
+      if (lastInode.isDirectory() && options.isDirectory()) {
+        if (!lastInode.isPersisted() && options.isPersisted()) {
+          lastInode.setPersisted(true);
+          traversalResult.getPersisted().add(lastInode);
+          String ufsPath = mMountTable.resolve(getPath(lastInode)).getPath();
+          UnderFileSystem ufs = UnderFileSystem.get(ufsPath, MasterContext.getConf());
+          ufs.mkdirs(ufsPath, false);
+        }
+        return new CreatePathResult(Collections.<Inode>emptyList(), createdInodes,
+            traversalResult.getPersisted());
+      }
+      LOG.info("FileAlreadyExistsException: " + path);
+      throw new FileAlreadyExistsException(path.toString());
+    }
+    if (options.isDirectory()) {
+      lastInode =
+          new InodeDirectory.Builder().setName(name)
+              .setId(mDirectoryIdGenerator.getNewDirectoryId())
+              .setParentId(currentInodeDirectory.getId()).setPersisted(options.isPersisted())
+              .build();
+      if (options.isPersisted()) {
+        String ufsPath = mMountTable.resolve(getPath(lastInode)).getPath();
+        UnderFileSystem ufs = UnderFileSystem.get(ufsPath, MasterContext.getConf());
+        ufs.mkdirs(ufsPath, false);
+      }
+    } else {
+      lastInode =
+          new InodeFile.Builder().setBlockContainerId(mContainerIdGenerator.getNewContainerId())
+              .setBlockSizeBytes(options.getBlockSizeBytes()).setTTL(options.getTTL()).setName(name)
+              .setParentId(currentInodeDirectory.getId()).setPersisted(options.isPersisted())
+              .setCreationTimeMs(options.getOperationTimeMs()).build();
+      if (currentInodeDirectory.isPinned()) {
+        // Update set of pinned file ids.
+        mPinnedInodeFileIds.add(lastInode.getId());
+      }
+    }
+    lastInode.setPinned(currentInodeDirectory.isPinned());
+
+    createdInodes.add(lastInode);
+    mInodes.add(lastInode);
+    currentInodeDirectory.addChild(lastInode);
+    currentInodeDirectory.setLastModificationTimeMs(options.getOperationTimeMs());
+
+    LOG.debug("createFile: File Created: {} parent: ", lastInode, currentInodeDirectory);
+    return new CreatePathResult(Lists.newArrayList(traversalResult.getInode()), createdInodes,
+        traversalResult.getPersisted());
+  }

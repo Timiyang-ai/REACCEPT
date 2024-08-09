@@ -1,0 +1,1 @@
+PinpointClient connect(InetSocketAddress connectAddress) throws PinpointSocketException;

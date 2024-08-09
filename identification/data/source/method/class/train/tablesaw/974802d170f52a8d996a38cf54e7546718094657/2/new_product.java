@@ -1,0 +1,1 @@
+Selection addRange(int start, int end);

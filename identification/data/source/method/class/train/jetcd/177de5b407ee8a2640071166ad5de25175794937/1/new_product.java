@@ -1,0 +1,1 @@
+void onWatch(EtcdHeader header, List<WatchEvent> events);

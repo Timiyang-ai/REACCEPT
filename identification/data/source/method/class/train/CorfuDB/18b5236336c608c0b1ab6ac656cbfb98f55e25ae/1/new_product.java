@@ -1,0 +1,1 @@
+Optional<NodeRank> failedServer(ClusterState clusterState);

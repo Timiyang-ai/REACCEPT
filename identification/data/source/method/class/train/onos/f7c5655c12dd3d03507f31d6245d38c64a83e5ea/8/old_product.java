@@ -1,0 +1,1 @@
+void deleteLink(OspfRouter ospfRouter);

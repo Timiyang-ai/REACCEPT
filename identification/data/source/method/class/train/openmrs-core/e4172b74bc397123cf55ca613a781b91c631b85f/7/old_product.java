@@ -1,0 +1,1 @@
+public Order getOrderByUuid(String uuid) throws APIException;

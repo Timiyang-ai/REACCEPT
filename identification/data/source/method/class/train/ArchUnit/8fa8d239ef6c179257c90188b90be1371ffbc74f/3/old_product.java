@@ -1,0 +1,1 @@
+ClassesShouldConjunction implement(String typeName);

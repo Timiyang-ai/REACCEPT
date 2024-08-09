@@ -1,0 +1,1 @@
+public final long[] espc() { if( _espc==null ) _espc = ESPC.espc(this); return _espc; }

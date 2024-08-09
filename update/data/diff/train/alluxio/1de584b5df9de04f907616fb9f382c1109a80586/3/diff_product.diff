@@ -1,0 +1,329 @@
+diff --git a/old_product.java b/new_product.java
+index 92a2416..9c7ed70 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -51,20 +51,20 @@ public CreatePathResult createPath(RpcContext rpcContext, LockedInodePath inodeP
+       }
+     }
+     // The ancestor inode (parent or ancestor) of the target path.
+-    Inode<?> ancestorInode = extensibleInodePath.getAncestorInode();
++    InodeView ancestorInode = extensibleInodePath.getAncestorInode();
+     if (!ancestorInode.isDirectory()) {
+       throw new InvalidPathException("Could not traverse to parent directory of path " + path
+           + ". Component " + pathComponents[pathIndex - 1] + " is not a directory.");
+     }
+-    InodeDirectory currentInodeDirectory = (InodeDirectory) ancestorInode;
++    InodeDirectoryView currentInodeDirectory = (InodeDirectoryView) ancestorInode;
+ 
+-    List<Inode<?>> createdInodes = new ArrayList<>();
+-    List<Inode<?>> modifiedInodes = new ArrayList<>();
++    List<InodeView> createdInodes = new ArrayList<>();
++    List<InodeView> modifiedInodes = new ArrayList<>();
+     if (options.isPersisted()) {
+       // Synchronously persist directories. These inodes are already READ locked.
+-      for (Inode inode : traversalResult.getNonPersisted()) {
++      for (InodeView inode : traversalResult.getNonPersisted()) {
+         // This cast is safe because we've already verified that the file inode doesn't exist.
+-        syncPersistDirectory(rpcContext, (InodeDirectory) inode);
++        syncPersistExistingDirectory(rpcContext, (InodeDirectoryView) inode);
+       }
+     }
+     if ((pathIndex < (pathComponents.length - 1) || currentInodeDirectory.getChild(name) == null)
+@@ -73,14 +73,11 @@ public CreatePathResult createPath(RpcContext rpcContext, LockedInodePath inodeP
+       // (2) The last component of the path needs to be created.
+       // In these two cases, the last traversed Inode will be modified if the new timestamp is after
+       // the existing last modified time.
+-      currentInodeDirectory.setLastModificationTimeMs(options.getOperationTimeMs());
++      mState.applyAndJournal(rpcContext, UpdateInodeEntry.newBuilder()
++          .setId(currentInodeDirectory.getId())
++          .setLastModificationTimeMs(options.getOperationTimeMs())
++          .build());
+       modifiedInodes.add(currentInodeDirectory);
+-
+-      File.InodeLastModificationTimeEntry inodeLastModificationTime =
+-          File.InodeLastModificationTimeEntry.newBuilder().setId(currentInodeDirectory.getId())
+-              .setLastModificationTimeMs(options.getOperationTimeMs()).build();
+-      rpcContext.journal(Journal.JournalEntry.newBuilder()
+-          .setInodeLastModificationTime(inodeLastModificationTime).build());
+     }
+ 
+     // Fill in the ancestor directories that were missing.
+@@ -96,56 +93,55 @@ public CreatePathResult createPath(RpcContext rpcContext, LockedInodePath inodeP
+         .setTtl(options.getTtl())
+         .setTtlAction(options.getTtlAction());
+     for (int k = pathIndex; k < (pathComponents.length - 1); k++) {
+-      InodeDirectory dir = null;
++      InodeDirectoryView dir = null;
+       while (dir == null) {
+-        dir = InodeDirectory.create(
++        InodeDirectory newDir = InodeDirectory.create(
+             mDirectoryIdGenerator.getNewDirectoryId(rpcContext.getJournalContext()),
+             currentInodeDirectory.getId(), pathComponents[k], missingDirOptions);
+         // Lock the newly created inode before subsequent operations, and add it to the lock group.
+-        extensibleInodePath.getLockList().lockWriteAndCheckNameAndParent(dir,
++        extensibleInodePath.getLockList().lockWriteAndCheckNameAndParent(newDir,
+             currentInodeDirectory, pathComponents[k]);
+ 
+-        if (!currentInodeDirectory.addChild(dir)) {
++        newDir.setPinned(currentInodeDirectory.isPinned());
++
++        // if the parent has default ACL, copy that default ACL as the new directory's default
++        // and access acl.
++        if (!options.isMetadataLoad()) {
++          DefaultAccessControlList dAcl = currentInodeDirectory.getDefaultACL();
++          if (!dAcl.isEmpty()) {
++            Pair<AccessControlList, DefaultAccessControlList> pair = dAcl.generateChildDirACL();
++            newDir.setInternalAcl(pair.getFirst());
++            newDir.setDefaultACL(pair.getSecond());
++          }
++        }
++
++        if (mState.applyAndJournal(rpcContext, newDir)) {
++          // After creation and journaling, downgrade to a read lock.
++          extensibleInodePath.getLockList().downgradeLast();
++          dir = newDir;
++        } else {
+           // The child directory inode already exists. Get the existing child inode.
+           extensibleInodePath.getLockList().unlockLast();
+ 
+-          dir =
+-              (InodeDirectory) currentInodeDirectory.getChildReadLock(pathComponents[k],
+-                  extensibleInodePath.getLockList());
+-          if (dir == null) {
+-            // Could not get the child inode. Continue and try again.
++          InodeView existing = currentInodeDirectory.getChildReadLock(pathComponents[k],
++              extensibleInodePath.getLockList());
++
++          if (existing == null) {
++            // The competing directory could have been removed.
+             continue;
+           }
+-        } else {
+-          try {
+-            // Successfully added the child, while holding the write lock.
+-            dir.setPinned(currentInodeDirectory.isPinned());
+ 
+-            // if the parent has default ACL, copy that default ACL as the new directory's default
+-            // and access acl.
+-            if (!options.isMetadataLoad()) {
+-              DefaultAccessControlList dAcl = currentInodeDirectory.getDefaultACL();
+-              if (!dAcl.isEmpty()) {
+-                Pair<AccessControlList, DefaultAccessControlList> pair = dAcl.generateChildDirACL();
+-                dir.setInternalAcl(pair.getFirst());
+-                dir.setDefaultACL(pair.getSecond());
+-              }
+-            }
+-            if (options.isPersisted()) {
+-              // Do not journal the persist entry, since a creation entry will be journaled instead.
+-              syncPersistDirectory(RpcContext.NOOP, dir);
+-            }
+-          } catch (Exception e) {
+-            // Failed to persist the directory, so remove it from the parent.
+-            currentInodeDirectory.removeChild(dir);
+-            throw e;
++          if (existing.isFile()) {
++            throw new FileAlreadyExistsException(String.format(
++                "Directory creation for %s failed. Inode %s is a file", path, existing.getName()));
+           }
+-          // Journal the new inode.
+-          rpcContext.getJournalContext().append(dir.toJournalEntry());
+-          mInodes.add(dir);
++          dir = (InodeDirectoryView) existing;
++        }
+ 
+-          // After creation and journaling, downgrade to a read lock.
+-          extensibleInodePath.getLockList().downgradeLast();
++        // Persist the directory *after* it exists in the inode tree. This prevents multiple
++        // concurrent creates from trying to persist the same directory name.
++        if (options.isPersisted()) {
++          syncPersistExistingDirectory(rpcContext, dir);
+         }
+       }
+ 
+@@ -157,119 +153,107 @@ public CreatePathResult createPath(RpcContext rpcContext, LockedInodePath inodeP
+     // here with that name. If there is an existing file that is a directory and we're creating a
+     // directory, update persistence property of the directories if needed, otherwise, throw
+     // FileAlreadyExistsException unless options.allowExists is true.
+-    Inode<?> lastInode = null;
+-    while (lastInode == null) {
++    while (true) {
+       // Try to lock the last inode with the lock mode of the path.
++      InodeView lastLockedInode;
+       switch (extensibleInodePath.getLockMode()) {
+         case READ:
+-          lastInode = currentInodeDirectory.getChildReadLock(name,
++          lastLockedInode = currentInodeDirectory.getChildReadLock(name,
+               extensibleInodePath.getLockList());
+           break;
+         case WRITE_PARENT:
+         case WRITE:
+-          lastInode = currentInodeDirectory.getChildWriteLock(name,
++          lastLockedInode = currentInodeDirectory.getChildWriteLock(name,
+               extensibleInodePath.getLockList());
+           break;
+         default:
+           // This should not be reachable.
+-          LOG.warn("Unexpected lock mode encountered: {}", extensibleInodePath.getLockMode());
++          throw new IllegalStateException(String.format("Unexpected lock mode encountered: %s",
++              extensibleInodePath.getLockMode()));
+       }
+-      if (lastInode != null) {
++      if (lastLockedInode != null) {
+         // inode to create already exists
+         // We need to remove the last inode from the locklist because it was locked during
+         // traversal and locked here again
+         extensibleInodePath.getLockList().unlockLast();
+-        if (lastInode.isDirectory() && options instanceof CreateDirectoryOptions && !lastInode
+-            .isPersisted() && options.isPersisted()) {
++        if (lastLockedInode.isDirectory() && options instanceof CreateDirectoryOptions
++            && !lastLockedInode.isPersisted() && options.isPersisted()) {
+           // The final path component already exists and is not persisted, so it should be added
+           // to the non-persisted Inodes of traversalResult.
+-          syncPersistDirectory(rpcContext, (InodeDirectory) lastInode);
+-
+-        } else if (!lastInode.isDirectory() || !(options instanceof CreateDirectoryOptions
++          syncPersistExistingDirectory(rpcContext, (InodeDirectoryView) lastLockedInode);
++        } else if (!lastLockedInode.isDirectory() || !(options instanceof CreateDirectoryOptions
+             && ((CreateDirectoryOptions) options).isAllowExists())) {
+           String errorMessage = ExceptionMessage.FILE_ALREADY_EXISTS.getMessage(path);
+           LOG.error(errorMessage);
+           throw new FileAlreadyExistsException(errorMessage);
+         }
++        break;
++      }
+ 
+-      } else {
+-        // create the new inode, with a write lock
+-        if (options instanceof CreateDirectoryOptions) {
+-          CreateDirectoryOptions directoryOptions = (CreateDirectoryOptions) options;
+-          lastInode = InodeDirectory.create(
+-              mDirectoryIdGenerator.getNewDirectoryId(rpcContext.getJournalContext()),
+-              currentInodeDirectory.getId(), name, directoryOptions);
+-
+-          // Lock the created inode before subsequent operations, and add it to the lock group.
+-
+-          extensibleInodePath.getLockList().lockWriteAndCheckNameAndParent(lastInode,
+-              currentInodeDirectory, name);
+-
+-          // if the parent has default ACL, copy that default ACL as the new directory's default
+-          // and access acl.
+-          DefaultAccessControlList dAcl = currentInodeDirectory.getDefaultACL();
+-          if (!dAcl.isEmpty()) {
+-            Pair<AccessControlList, DefaultAccessControlList> pair = dAcl.generateChildDirACL();
+-            InodeDirectory lastInodeDirectory = (InodeDirectory) lastInode;
+-            lastInodeDirectory.setInternalAcl(pair.getFirst());
+-            lastInodeDirectory.setDefaultACL(pair.getSecond());
+-          }
+-
+-          if (directoryOptions.isPersisted()) {
+-            // Do not journal the persist entry, since a creation entry will be journaled instead.
+-            // TODO(david): remove this call to syncPersistDirectory to improve performance
+-            // of recursive ls.
+-            syncPersistDirectory(RpcContext.NOOP, (InodeDirectory) lastInode);
+-          }
+-        } else if (options instanceof CreateFileOptions) {
+-          CreateFileOptions fileOptions = (CreateFileOptions) options;
+-          lastInode = InodeFile.create(mContainerIdGenerator.getNewContainerId(),
+-              currentInodeDirectory.getId(), name, System.currentTimeMillis(), fileOptions);
+-          // Lock the created inode before subsequent operations, and add it to the lock group.
++      Inode<?> newInode;
++      // create the new inode, with a write lock
++      if (options instanceof CreateDirectoryOptions) {
++        CreateDirectoryOptions directoryOptions = (CreateDirectoryOptions) options;
++        InodeDirectory newDir = InodeDirectory.create(
++            mDirectoryIdGenerator.getNewDirectoryId(rpcContext.getJournalContext()),
++            currentInodeDirectory.getId(), name, directoryOptions);
+ 
+-          extensibleInodePath.getLockList().lockWriteAndCheckNameAndParent(lastInode,
+-              currentInodeDirectory, name);
++        // Lock the created inode before subsequent operations, and add it to the lock group.
+ 
+-          // if the parent has a default ACL, copy that default ACL as the new file's access ACL.
+-          DefaultAccessControlList dAcl = currentInodeDirectory.getDefaultACL();
+-          if (!dAcl.isEmpty()) {
+-            AccessControlList acl = dAcl.generateChildFileACL();
+-            lastInode.setInternalAcl(acl);
+-          }
++        extensibleInodePath.getLockList().lockWriteAndCheckNameAndParent(newDir,
++            currentInodeDirectory, name);
+ 
+-          if (fileOptions.isCacheable()) {
+-            ((InodeFile) lastInode).setCacheable(true);
+-          }
++        // if the parent has default ACL, copy that default ACL as the new directory's default
++        // and access acl.
++        DefaultAccessControlList dAcl = currentInodeDirectory.getDefaultACL();
++        if (!dAcl.isEmpty()) {
++          Pair<AccessControlList, DefaultAccessControlList> pair = dAcl.generateChildDirACL();
++          newDir.setInternalAcl(pair.getFirst());
++          newDir.setDefaultACL(pair.getSecond());
+         }
+-        lastInode.setPinned(currentInodeDirectory.isPinned());
+ 
+-        // Update state while holding the write lock.
+-        // lastInode should be added to mInodes before getting added to its parent list, because it
+-        // becomes visible at this point.
+-        mInodes.add(lastInode);
+-        if (!currentInodeDirectory.addChild(lastInode)) {
+-          // Could not add the child inode to the parent. Continue and try again.
+-          // Cleanup is not necessary, since other state is updated later, after a successful add.
+-          mInodes.remove(lastInode);
+-          extensibleInodePath.getLockList().unlockLast();
+-          lastInode = null;
+-          continue;
++        if (directoryOptions.isPersisted()) {
++          // Do not journal the persist entry, since a creation entry will be journaled instead.
++          // TODO(david): remove this call to syncPersistDirectory to improve performance
++          // of recursive ls.
++          syncPersistNewDirectory(newDir);
+         }
++        newInode = newDir;
++      } else if (options instanceof CreateFileOptions) {
++        CreateFileOptions fileOptions = (CreateFileOptions) options;
++        InodeFile newFile = InodeFile.create(mContainerIdGenerator.getNewContainerId(),
++            currentInodeDirectory.getId(), name, System.currentTimeMillis(), fileOptions);
++        // Lock the created inode before subsequent operations, and add it to the lock group.
+ 
+-        if (lastInode instanceof InodeFile) {
+-          if (currentInodeDirectory.isPinned()) {
+-            // Update set of pinned file ids.
+-            mPinnedInodeFileIds.add(lastInode.getId());
+-          }
++        extensibleInodePath.getLockList().lockWriteAndCheckNameAndParent(newFile,
++            currentInodeDirectory, name);
++
++        // if the parent has a default ACL, copy that default ACL as the new file's access ACL.
++        DefaultAccessControlList dAcl = currentInodeDirectory.getDefaultACL();
++        if (!dAcl.isEmpty()) {
++          AccessControlList acl = dAcl.generateChildFileACL();
++          newFile.setInternalAcl(acl);
+         }
+ 
+-        // Journal the new inode.
+-        rpcContext.getJournalContext().append(lastInode.toJournalEntry());
++        if (fileOptions.isCacheable()) {
++          newFile.setCacheable(true);
++        }
++        newInode = newFile;
++      } else {
++        throw new IllegalStateException(String.format("Unrecognized create options: %s", options));
++      }
++      newInode.setPinned(currentInodeDirectory.isPinned());
+ 
+-        createdInodes.add(lastInode);
++      if (!mState.applyAndJournal(rpcContext, newInode)) {
++        // Could not add the child inode to the parent. Continue and try again.
++        // Cleanup is not necessary, since other state is updated later, after a successful add.
++        extensibleInodePath.getLockList().unlockLast();
++        continue;
+       }
+-    }
+ 
+-    LOG.debug("createFile: File Created: {} parent: {}", lastInode, currentInodeDirectory);
++      createdInodes.add(newInode);
++      LOG.debug("createFile: File Created: {} parent: {}", newInode, currentInodeDirectory);
++      break;
++    }
+     return new CreatePathResult(modifiedInodes, createdInodes);
+   }
+\ No newline at end of file

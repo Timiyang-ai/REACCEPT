@@ -1,0 +1,42 @@
+diff --git a/old_test.java b/new_test.java
+index 4ce98ee..731e9a8 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -40,4 +40,36 @@
+         when(mockControllerService.listStreamsInScope("scope1")).thenReturn(completableFuture);
+         response = target(resourceURI).request().async().get();
+         assertEquals("List Streams response code", 500, response.get().getStatus());
++
++        // Test for filtering streams.
++        final StreamConfiguration streamConfiguration3 = StreamConfiguration.builder()
++                .scope(scope1)
++                .streamName(NameUtils.getInternalNameForStream("stream3"))
++                .scalingPolicy(ScalingPolicy.fixed(1))
++                .retentionPolicy(RetentionPolicy.INFINITE)
++                .build();
++        List<StreamConfiguration> allStreamsList = Arrays.asList(streamConfiguration1, streamConfiguration2,
++                streamConfiguration3);
++        when(mockControllerService.listStreamsInScope("scope1")).thenReturn(
++                CompletableFuture.completedFuture(allStreamsList));
++        response = target(resourceURI).request().async().get();
++        StreamsList streamsListResp = response.get().readEntity(StreamsList.class);
++        assertEquals("List Streams response code", 200, response.get().getStatus());
++        assertEquals("List count", 2, streamsListResp.getStreams().size());
++        assertEquals("List element", "stream1", streamsListResp.getStreams().get(0).getStreamName());
++        assertEquals("List element", "stream2", streamsListResp.getStreams().get(1).getStreamName());
++        response = target(resourceURI).queryParam("showInternalStreams", "true").request().async().get();
++        streamsListResp = response.get().readEntity(StreamsList.class);
++        assertEquals("List Streams response code", 200, response.get().getStatus());
++        assertEquals("List count", 1, streamsListResp.getStreams().size());
++        assertEquals("List element", NameUtils.getInternalNameForStream("stream3"),
++                streamsListResp.getStreams().get(0).getStreamName());
++
++        // Test to list large number of streams.
++        streamsList = Collections.nCopies(1000, streamConfiguration1);
++        when(mockControllerService.listStreamsInScope("scope1")).thenReturn(CompletableFuture.completedFuture(streamsList));
++        response = target(resourceURI).request().async().get();
++        final StreamsList streamsList2 = response.get().readEntity(StreamsList.class);
++        assertEquals("List Streams response code", 200, response.get().getStatus());
++        assertEquals("List count", 200, streamsList2.getStreams().size());
+     }
+\ No newline at end of file

@@ -1,0 +1,1 @@
+void invalidate(Object key);

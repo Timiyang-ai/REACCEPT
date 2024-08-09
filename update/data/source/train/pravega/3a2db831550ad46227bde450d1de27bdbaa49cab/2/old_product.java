@@ -1,0 +1,1 @@
+CompletableFuture<Boolean> updateStream(final StreamConfiguration streamConfig);

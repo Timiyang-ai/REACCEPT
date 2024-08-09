@@ -1,0 +1,2 @@
+@Authorized(PrivilegeConstants.MANAGE_CONCEPT_SOURCES)
+	public ConceptSource saveConceptSource(ConceptSource conceptSource) throws APIException;

@@ -1,0 +1,1 @@
+void unmount(TachyonURI path) throws IOException, TachyonException;

@@ -1,0 +1,1 @@
+public StepFunction<T>[] calculate(DecisionTreeData data);

@@ -1,0 +1,1 @@
+Map<Pair<String, String>, Long> getCapacityBytesOnDirs();

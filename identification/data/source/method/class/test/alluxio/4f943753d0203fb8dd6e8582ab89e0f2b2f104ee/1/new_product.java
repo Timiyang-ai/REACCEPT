@@ -1,0 +1,1 @@
+BlockInfo getBlockInfo(long blockId) throws BlockInfoException, UnavailableException;

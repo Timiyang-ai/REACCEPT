@@ -1,0 +1,9 @@
+@Override
+	public Long geoAdd(byte[] key, Map<byte[], Point> memberCoordinateMap) {
+
+		Long result = delegate.geoAdd(key, memberCoordinateMap);
+		if (isFutureConversion()) {
+			addResultConverter(identityConverter);
+		}
+		return result;
+	}

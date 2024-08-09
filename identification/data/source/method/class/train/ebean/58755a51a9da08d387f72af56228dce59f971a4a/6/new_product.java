@@ -1,0 +1,1 @@
+public Object toObject(Type genericType, String json);

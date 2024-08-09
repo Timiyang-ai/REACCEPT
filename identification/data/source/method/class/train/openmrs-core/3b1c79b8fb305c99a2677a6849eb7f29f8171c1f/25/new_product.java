@@ -1,0 +1,1 @@
+public List<GlobalProperty> getGlobalPropertiesByPrefix(String prefix);

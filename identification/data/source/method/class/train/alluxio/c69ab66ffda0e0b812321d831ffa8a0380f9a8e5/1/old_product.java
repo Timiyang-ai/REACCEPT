@@ -1,0 +1,1 @@
+void mount(AlluxioURI tachyonPath, AlluxioURI ufsPath) throws IOException, AlluxioException;

@@ -1,0 +1,1 @@
+int read( long filePageId, Page page ) throws IOException;

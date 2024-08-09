@@ -1,0 +1,1 @@
+boolean isLast(E e);

@@ -1,0 +1,1 @@
+Trace createTrace(TraceContext traceContext, ConsumerRecords consumerRecords);

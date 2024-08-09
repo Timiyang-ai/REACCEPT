@@ -1,0 +1,1 @@
+void process(String output, boolean newPush, GitRepository alternateRepo);

@@ -1,0 +1,1 @@
+public LockBlockResult lockBlock(long blockId, long sessionId, LockBlockTOptions options) throws alluxio.thrift.AlluxioTException, org.apache.thrift.TException;

@@ -1,0 +1,36 @@
+diff --git a/old_product.java b/new_product.java
+index 38af62c..e3fe029 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,11 +1,11 @@
+-CompletableFuture<Void> initialize(Duration timeout, Executor executor) {
++CompletableFuture<Void> initialize(Duration timeout) {
+         Exceptions.checkNotClosed(isClosed(), this);
+         Preconditions.checkState(this.state.get() == AggregatorState.NotInitialized, "SegmentAggregator has already been initialized.");
+         assert this.handle.get() == null : "non-null handle but state == " + this.state.get();
+         long traceId = LoggerHelpers.traceEnterWithContext(log, this.traceObjectId, "initialize");
+ 
+-        return openWrite(this.metadata.getName(), this.handle, executor, timeout)
+-                .thenAccept(segmentInfo -> {
++        return openWrite(this.metadata.getName(), this.handle, timeout)
++                .thenAcceptAsync(segmentInfo -> {
+                     // Check & Update StorageLength in metadata.
+                     if (this.metadata.getStorageLength() != segmentInfo.getLength()) {
+                         if (this.metadata.getStorageLength() >= 0) {
+@@ -25,14 +25,14 @@ CompletableFuture<Void> initialize(Duration timeout, Executor executor) {
+ 
+                         if (!this.metadata.isSealedInStorage()) {
+                             this.metadata.markSealedInStorage();
+-                            log.warn("{}: Segment is sealed in Storage but metadata does not reflect that - updating metadata.", this.traceObjectId, segmentInfo.getLength());
++                            log.warn("{}: Segment is sealed in Storage but metadata does not reflect that - updating metadata.", this.traceObjectId);
+                         }
+                     }
+ 
+                     log.info("{}: Initialized. StorageLength = {}, Sealed = {}.", this.traceObjectId, segmentInfo.getLength(), segmentInfo.isSealed());
+                     LoggerHelpers.traceLeave(log, this.traceObjectId, "initialize", traceId);
+                     setState(AggregatorState.Writing);
+-                })
++                }, this.executor)
+                 .exceptionally(ex -> {
+                     ex = Exceptions.unwrap(ex);
+                     if (ex instanceof StreamSegmentNotExistsException) {

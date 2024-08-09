@@ -1,0 +1,1 @@
+long append(ByteBuffer inputBuf) throws IOException;

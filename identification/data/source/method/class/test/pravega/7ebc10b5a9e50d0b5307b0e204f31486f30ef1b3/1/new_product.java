@@ -1,0 +1,1 @@
+CompletableFuture<Void> concat(SegmentHandle targetHandle, long offset, String sourceSegment, Duration timeout);

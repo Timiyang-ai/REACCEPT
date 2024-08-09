@@ -1,0 +1,28 @@
+diff --git a/old_product.java b/new_product.java
+index ce0d840..2008488 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,5 +1,21 @@
+ @Override public GridClientFuture<ClusterState> state(
+         UUID destNodeId
+     ) throws GridClientClosedException, GridClientConnectionResetException {
+-        return makeRequest(GridClientClusterStateRequest.currentState(), destNodeId);
++        if (nodeSupports(destNodeId, CLUSTER_READ_ONLY_MODE))
++            return makeRequest(GridClientClusterStateRequest.currentState(), destNodeId);
++        else {
++            // Backward compatibility
++            GridClientFutureAdapter<ClusterState> resFut = new GridClientFutureAdapter<>();
++
++            currentState(destNodeId).listen(fut -> {
++                try {
++                    resFut.onDone(fut.get() ? ClusterState.ACTIVE : ClusterState.INACTIVE);
++                }
++                catch (GridClientException e) {
++                    resFut.onDone(e);
++                }
++            });
++
++            return resFut;
++        }
+     }
+\ No newline at end of file

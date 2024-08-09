@@ -1,0 +1,1 @@
+Set<? extends Resource> listFlavors();

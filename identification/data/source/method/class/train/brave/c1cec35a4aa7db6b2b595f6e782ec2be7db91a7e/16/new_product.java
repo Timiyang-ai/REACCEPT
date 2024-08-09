@@ -1,0 +1,15 @@
+public Span toSpan(TraceContext context) {
+    if (context == null) throw new NullPointerException("context == null");
+    // decorating here addresses join, new traces or children and ad-hoc trace contexts
+    TraceContext decorated = propagationFactory.decorate(context);
+    if (isNoop(decorated)) return new NoopSpan(decorated);
+    // allocate a mutable span in case multiple threads call this method.. they'll use the same data
+    PendingSpanRecord pendingSpanRecord = pendingSpanRecords.getOrCreate(decorated);
+    return new RealSpan(decorated,
+        pendingSpanRecords,
+        pendingSpanRecord.span(),
+        pendingSpanRecord.clock(),
+        spanReporter,
+        errorParser
+    );
+  }

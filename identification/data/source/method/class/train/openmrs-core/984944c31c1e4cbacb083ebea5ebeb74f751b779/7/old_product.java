@@ -1,0 +1,1 @@
+public PersonAttributeType getPersonAttributeType(Integer typeId);

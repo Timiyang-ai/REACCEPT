@@ -1,0 +1,70 @@
+diff --git a/old_test.java b/new_test.java
+index 732888c..078612c 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -15,11 +15,11 @@
+ 
+         URI uri = createDLMURI("/change-sequence-number");
+         zooKeeperClient.get().create(uri.getPath(), new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+-        DistributedLogNamespace namespace = DistributedLogNamespaceBuilder.newBuilder()
++        Namespace namespace = NamespaceBuilder.newBuilder()
+                 .conf(confLocal)
+                 .uri(uri)
+                 .build();
+-        DistributedLogNamespace readNamespace = DistributedLogNamespaceBuilder.newBuilder()
++        Namespace readNamespace = NamespaceBuilder.newBuilder()
+                 .conf(readConf)
+                 .uri(uri)
+                 .build();
+@@ -40,7 +40,7 @@
+         long expectedTxId = 1L;
+         DLSN lastDLSN = DLSN.InitialDLSN;
+         for (int i = 0; i < 4 * 10; i++) {
+-            LogRecordWithDLSN record = Await.result(reader.readNext());
++            LogRecordWithDLSN record = Utils.ioResult(reader.readNext());
+             assertNotNull(record);
+             DLMTestUtil.verifyLogRecord(record);
+             assertEquals(expectedTxId, record.getTransactionId());
+@@ -56,9 +56,9 @@
+         LOG.info("Injected bad log segment '3'");
+ 
+         // there isn't records should be read
+-        Future<LogRecordWithDLSN> readFuture = reader.readNext();
++        CompletableFuture<LogRecordWithDLSN> readFuture = reader.readNext();
+         try {
+-            LogRecordWithDLSN record = Await.result(readFuture);
++            LogRecordWithDLSN record = Utils.ioResult(readFuture);
+             fail("Should fail reading next record "
+                     + record
+                     + " when there is a corrupted log segment");
+@@ -74,7 +74,7 @@
+ 
+         try {
+             reader = readDLM.getAsyncLogReader(lastDLSN);
+-            Await.result(reader.readNext());
++            Utils.ioResult(reader.readNext());
+             fail("Should fail reading next when there is a corrupted log segment");
+         } catch (UnexpectedException ue) {
+             // expected
+@@ -89,18 +89,18 @@
+         // be able to read more after fix
+         reader = readDLM.getAsyncLogReader(lastDLSN);
+         // skip the first record
+-        Await.result(reader.readNext());
++        Utils.ioResult(reader.readNext());
+         readFuture = reader.readNext();
+ 
+         expectedTxId = 51L;
+-        LogRecord record = Await.result(readFuture);
++        LogRecord record = Utils.ioResult(readFuture);
+         assertNotNull(record);
+         DLMTestUtil.verifyLogRecord(record);
+         assertEquals(expectedTxId, record.getTransactionId());
+         expectedTxId++;
+ 
+         for (int i = 1; i < 10; i++) {
+-            record = Await.result(reader.readNext());
++            record = Utils.ioResult(reader.readNext());
+             assertNotNull(record);
+             DLMTestUtil.verifyLogRecord(record);
+             assertEquals(expectedTxId, record.getTransactionId());

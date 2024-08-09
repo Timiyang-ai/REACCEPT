@@ -1,0 +1,1 @@
+void setAuthorities(String identity, Set<Authority> authorities) throws UnknownIdentityException, AuthorityAccessException;

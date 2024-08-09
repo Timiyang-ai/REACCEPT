@@ -1,0 +1,2 @@
+@Authorized(OpenmrsConstants.PRIV_MANAGE_CONCEPT_SOURCES)
+	public ConceptSource saveConceptSource(ConceptSource conceptSource) throws APIException;

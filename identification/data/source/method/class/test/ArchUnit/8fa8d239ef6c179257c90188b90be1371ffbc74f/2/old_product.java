@@ -1,0 +1,1 @@
+ClassesShouldConjunction haveNameMatching(String regex);

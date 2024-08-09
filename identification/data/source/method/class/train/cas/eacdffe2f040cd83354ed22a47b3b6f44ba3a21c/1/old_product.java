@@ -1,0 +1,1 @@
+boolean supports(Credentials credential);

@@ -1,0 +1,1 @@
+public Form duplicateForm(Form form) throws APIException;

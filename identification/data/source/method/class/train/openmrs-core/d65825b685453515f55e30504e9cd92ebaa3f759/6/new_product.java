@@ -1,0 +1,2 @@
+@Authorized(value = { PrivilegeConstants.PRIV_UPDATE_HL7_IN_QUEUE, PrivilegeConstants.PRIV_ADD_HL7_IN_QUEUE }, requireAll = false)
+	public HL7InQueue saveHL7InQueue(HL7InQueue hl7InQueue) throws APIException;

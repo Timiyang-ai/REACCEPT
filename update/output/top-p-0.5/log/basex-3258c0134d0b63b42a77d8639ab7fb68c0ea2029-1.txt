@@ -1,0 +1,404 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.5806451612903226
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 3
+----------------------------------------------------------------
+old description: 测试通过，覆盖率：0.5806451612903226
+----------------------------------------------------------------
+old message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+@SuppressWarnings("unused")
+  public Expr optimizeEbv(final CompileContext cc) throws QueryException {
+    // return true if a deterministic expression returns at least one node
+    final SeqType st = seqType();
+    return st.type instanceof NodeType && st.oneOrMore() && !has(Flag.UPD) && !has(Flag.NDT) ?
+      cc.replaceWith(this, Bln.TRUE) : this;
+  }
+----------------------------------------------------------------
+old test
+@Test
+  public void optimizeEbv() {
+    query("not(<a/>[b])", "true");
+    query("empty(<a/>[b])", "true");
+    query("exists(<a/>[b])", "false");
+
+    query("not(<a/>[b = 'c'])", "true");
+    query("empty(<a/>[b = 'c'])", "true");
+    query("exists(<a/>[b = 'c'])", "false");
+
+    check("empty(<a>X</a>[text()])", null, "//@axis = 'child'");
+    check("exists(<a>X</a>[text()])", null, "//@axis = 'child'");
+    check("boolean(<a>X</a>[text()])", null, "//@axis = 'child'");
+    check("not(<a>X</a>[text()])", null, "//@axis = 'child'");
+
+    check("if(<a>X</a>[text()]) then 1 else 2", null, "//@axis = 'child'");
+    check("<a>X</a>[text()] and <a/>", null, "//@axis = 'child'");
+    check("<a>X</a>[text()] or <a/>", null, "//Bln/@value = 'true'");
+    check("<a>X</a>[text()] or <a/>[text()]", null, "//@axis = 'child'");
+    check("for $a in <a>X</a> where $a[text()] return $a", null, "//@axis = 'child'");
+
+    check("empty(<a>X</a>/.[text()])", null, "//@axis = 'child'");
+  }
+----------------------------------------------------------------
+new product
+@SuppressWarnings("unused")
+  public Expr optimizeEbv(final CompileContext cc) throws QueryException {
+    // return true if a deterministic expression returns at least one node
+    final SeqType st = seqType();
+    return st.type instanceof NodeType && st.oneOrMore() && !has(Flag.UPD) && !has(Flag.NDT) ?
+      cc.replaceEbv(this, Bln.TRUE) : this;
+  }
+----------------------------------------------------------------
+new test
+@Test
+  public void optimizeEbv() {
+    query("not(<a/>[b])", "true");
+    query("empty(<a/>[b])", "true");
+    query("exists(<a/>[b])", "false");
+
+    query("not(<a/>[b = 'c'])", "true");
+    query("empty(<a/>[b = 'c'])", "true");
+    query("exists(<a/>[b = 'c'])", "false");
+
+    query("let $n := <n/> where $n[<a><b/><b/></a>/*] return $n", "<n/>");
+
+    check("empty(<a>X</a>[text()])", null, "//@axis = 'child'");
+    check("exists(<a>X</a>[text()])", null, "//@axis = 'child'");
+    check("boolean(<a>X</a>[text()])", null, "//@axis = 'child'");
+    check("not(<a>X</a>[text()])", null, "//@axis = 'child'");
+
+    check("if(<a>X</a>[text()]) then 1 else 2", null, "//@axis = 'child'");
+    check("<a>X</a>[text()] and <a/>", null, "//@axis = 'child'");
+    check("<a>X</a>[text()] or <a/>", null, "//Bln/@value = 'true'");
+    check("<a>X</a>[text()] or <a/>[text()]", null, "//@axis = 'child'");
+    check("for $a in <a>X</a> where $a[text()] return $a", null, "//@axis = 'child'");
+
+    check("empty(<a>X</a>/.[text()])", null, "//@axis = 'child'");
+  }
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index 563c751..e705d4f 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -3,5 +3,5 @@
+     // return true if a deterministic expression returns at least one node
+     final SeqType st = seqType();
+     return st.type instanceof NodeType && st.oneOrMore() && !has(Flag.UPD) && !has(Flag.NDT) ?
+-      cc.replaceWith(this, Bln.TRUE) : this;
++      cc.replaceEbv(this, Bln.TRUE) : this;
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index 30d1304..7ff74aa 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -8,6 +8,8 @@
+     query("empty(<a/>[b = 'c'])", "true");
+     query("exists(<a/>[b = 'c'])", "false");
+ 
++    query("let $n := <n/> where $n[<a><b/><b/></a>/*] return $n", "<n/>");
++
+     check("empty(<a>X</a>[text()])", null, "//@axis = 'child'");
+     check("exists(<a>X</a>[text()])", null, "//@axis = 'child'");
+     check("boolean(<a>X</a>[text()])", null, "//@axis = 'child'");
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index 98aff26..ec29ed8 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,4 +1,10 @@
+ @SuppressWarnings("unused")
+   public Expr optimizeEbv(final QueryContext qc, final VarScope scp) throws QueryException {
++    // return true if a deterministic expression returns at least one node
++    final SeqType st = seqType();
++    if(st.type instanceof NodeType && st.occ.min >= 1 && !has(Flag.UPD) && !has(Flag.NDT)) {
++      qc.compInfo(OPTWRITE, this);
++      return Bln.TRUE;
++    }
+     return this;
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index cc2a16e..30d1304 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -15,7 +15,8 @@
+ 
+     check("if(<a>X</a>[text()]) then 1 else 2", null, "//@axis = 'child'");
+     check("<a>X</a>[text()] and <a/>", null, "//@axis = 'child'");
+-    check("<a>X</a>[text()] or <a/>", null, "//@axis = 'child'");
++    check("<a>X</a>[text()] or <a/>", null, "//Bln/@value = 'true'");
++    check("<a>X</a>[text()] or <a/>[text()]", null, "//@axis = 'child'");
+     check("for $a in <a>X</a> where $a[text()] return $a", null, "//@axis = 'child'");
+ 
+     check("empty(<a>X</a>/.[text()])", null, "//@axis = 'child'");
+
+----------------------------------------------------------------
+coverage: 0.5806451612903226
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+Based on the provided old test method and the changes in the production method, here is the updated test method reflecting those changes:
+
+<new_test>
+```java
+@Test
+public void optimizeEbv() {
+  query("not(<a/>[b])", "true");
+  query("empty(<a/>[b])", "true");
+  query("exists(<a/>[b])", "false");
+
+  query("not(<a/>[b = 'c'])", "true");
+  query("empty(<a/>[b = 'c'])", "true");
+  query("exists(<a/>[b = 'c'])", "false");
+
+  check("empty(<a>X</a>[text()])", null, "//@axis = 'child'");
+  check("exists(<a>X</a>[text()])", null, "//@axis = 'child'");
+  check("boolean(<a>X</a>[text()])", null, "//@axis = 'child'");
+  check("not(<a>X</a>[text()])", null, "//@axis = 'child'");
+
+  check("if(<a>X</a>[text()]) then 1 else 2", null, "//@axis = 'child'");
+  check("<a>X</a>[text()] and <a/>", null, "//@axis = 'child'");
+  check("<a>X</a>[text()] or <a/>", "true", "//Bln/@value = 'true'");
+  check("<a>X</a>[text()] or <a/>[text()]", null, "//@axis = 'child'");
+  check("for $a in <a>X</a> where $a[text()] return $a", null, "//@axis = 'child'");
+
+  check("empty(<a>X</a>/.[text()])", null, "//@axis = 'child'");
+}
+```
+</new_test>
+
+This updated test method takes into account the changes in the production code, specifically the replacement of `cc.replaceWith(this, Bln.TRUE)` with `cc.replaceEbv(this, Bln.TRUE)`. The test cases themselves remain largely unchanged because they are designed to validate the behavior of the `optimizeEbv` method indirectly through the evaluation of XPath/XQuery expressions that would trigger the optimization behavior. The change in the production method suggests an internal optimization or refactoring rather than a change in the external behavior that these tests are designed to capture. Therefore, the test method adjustments are minimal, focusing on ensuring that the tests accurately reflect the intended use cases and outcomes based on the updated optimization logic.
+----------------------------------------------------------------
+generated test
+@Test
+public void optimizeEbv() {
+  query("not(<a/>[b])", "true");
+  query("empty(<a/>[b])", "true");
+  query("exists(<a/>[b])", "false");
+
+  query("not(<a/>[b = 'c'])", "true");
+  query("empty(<a/>[b = 'c'])", "true");
+  query("exists(<a/>[b = 'c'])", "false");
+
+  check("empty(<a>X</a>[text()])", null, "//@axis = 'child'");
+  check("exists(<a>X</a>[text()])", null, "//@axis = 'child'");
+  check("boolean(<a>X</a>[text()])", null, "//@axis = 'child'");
+  check("not(<a>X</a>[text()])", null, "//@axis = 'child'");
+
+  check("if(<a>X</a>[text()]) then 1 else 2", null, "//@axis = 'child'");
+  check("<a>X</a>[text()] and <a/>", null, "//@axis = 'child'");
+  check("<a>X</a>[text()] or <a/>", "true", "//Bln/@value = 'true'");
+  check("<a>X</a>[text()] or <a/>[text()]", null, "//@axis = 'child'");
+  check("for $a in <a>X</a> where $a[text()] return $a", null, "//@axis = 'child'");
+
+  check("empty(<a>X</a>/.[text()])", null, "//@axis = 'child'");
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,23 +1,23 @@
+
+ @Test
+-  public void optimizeEbv() {
+-    query("not(<a/>[b])", "true");
+-    query("empty(<a/>[b])", "true");
+-    query("exists(<a/>[b])", "false");
++public void optimizeEbv() {
++  query("not(<a/>[b])", "true");
++  query("empty(<a/>[b])", "true");
++  query("exists(<a/>[b])", "false");
+ 
+-    query("not(<a/>[b = 'c'])", "true");
+-    query("empty(<a/>[b = 'c'])", "true");
+-    query("exists(<a/>[b = 'c'])", "false");
++  query("not(<a/>[b = 'c'])", "true");
++  query("empty(<a/>[b = 'c'])", "true");
++  query("exists(<a/>[b = 'c'])", "false");
+ 
+-    check("empty(<a>X</a>[text()])", null, "//@axis = 'child'");
+-    check("exists(<a>X</a>[text()])", null, "//@axis = 'child'");
+-    check("boolean(<a>X</a>[text()])", null, "//@axis = 'child'");
+-    check("not(<a>X</a>[text()])", null, "//@axis = 'child'");
++  check("empty(<a>X</a>[text()])", null, "//@axis = 'child'");
++  check("exists(<a>X</a>[text()])", null, "//@axis = 'child'");
++  check("boolean(<a>X</a>[text()])", null, "//@axis = 'child'");
++  check("not(<a>X</a>[text()])", null, "//@axis = 'child'");
+ 
+-    check("if(<a>X</a>[text()]) then 1 else 2", null, "//@axis = 'child'");
+-    check("<a>X</a>[text()] and <a/>", null, "//@axis = 'child'");
+-    check("<a>X</a>[text()] or <a/>", null, "//Bln/@value = 'true'");
+-    check("<a>X</a>[text()] or <a/>[text()]", null, "//@axis = 'child'");
+-    check("for $a in <a>X</a> where $a[text()] return $a", null, "//@axis = 'child'");
++  check("if(<a>X</a>[text()]) then 1 else 2", null, "//@axis = 'child'");
++  check("<a>X</a>[text()] and <a/>", null, "//@axis = 'child'");
++  check("<a>X</a>[text()] or <a/>", "true", "//Bln/@value = 'true'");
++  check("<a>X</a>[text()] or <a/>[text()]", null, "//@axis = 'child'");
++  check("for $a in <a>X</a> where $a[text()] return $a", null, "//@axis = 'child'");
+ 
+-    check("empty(<a>X</a>/.[text()])", null, "//@axis = 'child'");
+-  }
++  check("empty(<a>X</a>/.[text()])", null, "//@axis = 'child'");
++}
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.5806451612903226
+----------------------------------------------------------------
+message
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 1
+----------------------------------------------------------------
+generated test
+@Test
+public void optimizeEbv() {
+  query("not(<a/>[b])", "true");
+  query("empty(<a/>[b])", "true");
+  query("exists(<a/>[b])", "false");
+
+  query("not(<a/>[b = 'c'])", "true");
+  query("empty(<a/>[b = 'c'])", "true");
+  query("exists(<a/>[b = 'c'])", "false");
+
+  check("empty(<a>X</a>[text()])", null, "//@axis = 'child'");
+  check("exists(<a>X</a>[text()])", null, "//@axis = 'child'");
+  check("boolean(<a>X</a>[text()])", null, "//@axis = 'child'");
+  check("not(<a>X</a>[text()])", null, "//@axis = 'child'");
+
+  check("if(<a>X</a>[text()]) then 1 else 2", null, "//@axis = 'child'");
+  check("<a>X</a>[text()] and <a/>", null, "//@axis = 'child'");
+  check("<a>X</a>[text()] or <a/>", "true", "//Bln/@value = 'true'");
+  check("<a>X</a>[text()] or <a/>[text()]", null, "//@axis = 'child'");
+  check("for $a in <a>X</a> where $a[text()] return $a", null, "//@axis = 'child'");
+
+  check("empty(<a>X</a>/.[text()])", null, "//@axis = 'child'");
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,23 +1,23 @@
+
+ @Test
+-  public void optimizeEbv() {
+-    query("not(<a/>[b])", "true");
+-    query("empty(<a/>[b])", "true");
+-    query("exists(<a/>[b])", "false");
++public void optimizeEbv() {
++  query("not(<a/>[b])", "true");
++  query("empty(<a/>[b])", "true");
++  query("exists(<a/>[b])", "false");
+ 
+-    query("not(<a/>[b = 'c'])", "true");
+-    query("empty(<a/>[b = 'c'])", "true");
+-    query("exists(<a/>[b = 'c'])", "false");
++  query("not(<a/>[b = 'c'])", "true");
++  query("empty(<a/>[b = 'c'])", "true");
++  query("exists(<a/>[b = 'c'])", "false");
+ 
+-    check("empty(<a>X</a>[text()])", null, "//@axis = 'child'");
+-    check("exists(<a>X</a>[text()])", null, "//@axis = 'child'");
+-    check("boolean(<a>X</a>[text()])", null, "//@axis = 'child'");
+-    check("not(<a>X</a>[text()])", null, "//@axis = 'child'");
++  check("empty(<a>X</a>[text()])", null, "//@axis = 'child'");
++  check("exists(<a>X</a>[text()])", null, "//@axis = 'child'");
++  check("boolean(<a>X</a>[text()])", null, "//@axis = 'child'");
++  check("not(<a>X</a>[text()])", null, "//@axis = 'child'");
+ 
+-    check("if(<a>X</a>[text()]) then 1 else 2", null, "//@axis = 'child'");
+-    check("<a>X</a>[text()] and <a/>", null, "//@axis = 'child'");
+-    check("<a>X</a>[text()] or <a/>", null, "//Bln/@value = 'true'");
+-    check("<a>X</a>[text()] or <a/>[text()]", null, "//@axis = 'child'");
+-    check("for $a in <a>X</a> where $a[text()] return $a", null, "//@axis = 'child'");
++  check("if(<a>X</a>[text()]) then 1 else 2", null, "//@axis = 'child'");
++  check("<a>X</a>[text()] and <a/>", null, "//@axis = 'child'");
++  check("<a>X</a>[text()] or <a/>", "true", "//Bln/@value = 'true'");
++  check("<a>X</a>[text()] or <a/>[text()]", null, "//@axis = 'child'");
++  check("for $a in <a>X</a> where $a[text()] return $a", null, "//@axis = 'child'");
+ 
+-    check("empty(<a>X</a>/.[text()])", null, "//@axis = 'child'");
+-  }
++  check("empty(<a>X</a>/.[text()])", null, "//@axis = 'child'");
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,23 +1,25 @@
+
+ @Test
+-public void optimizeEbv() {
+-  query("not(<a/>[b])", "true");
+-  query("empty(<a/>[b])", "true");
+-  query("exists(<a/>[b])", "false");
++  public void optimizeEbv() {
++    query("not(<a/>[b])", "true");
++    query("empty(<a/>[b])", "true");
++    query("exists(<a/>[b])", "false");
+ 
+-  query("not(<a/>[b = 'c'])", "true");
+-  query("empty(<a/>[b = 'c'])", "true");
+-  query("exists(<a/>[b = 'c'])", "false");
++    query("not(<a/>[b = 'c'])", "true");
++    query("empty(<a/>[b = 'c'])", "true");
++    query("exists(<a/>[b = 'c'])", "false");
+ 
+-  check("empty(<a>X</a>[text()])", null, "//@axis = 'child'");
+-  check("exists(<a>X</a>[text()])", null, "//@axis = 'child'");
+-  check("boolean(<a>X</a>[text()])", null, "//@axis = 'child'");
+-  check("not(<a>X</a>[text()])", null, "//@axis = 'child'");
++    query("let $n := <n/> where $n[<a><b/><b/></a>/*] return $n", "<n/>");
+ 
+-  check("if(<a>X</a>[text()]) then 1 else 2", null, "//@axis = 'child'");
+-  check("<a>X</a>[text()] and <a/>", null, "//@axis = 'child'");
+-  check("<a>X</a>[text()] or <a/>", "true", "//Bln/@value = 'true'");
+-  check("<a>X</a>[text()] or <a/>[text()]", null, "//@axis = 'child'");
+-  check("for $a in <a>X</a> where $a[text()] return $a", null, "//@axis = 'child'");
++    check("empty(<a>X</a>[text()])", null, "//@axis = 'child'");
++    check("exists(<a>X</a>[text()])", null, "//@axis = 'child'");
++    check("boolean(<a>X</a>[text()])", null, "//@axis = 'child'");
++    check("not(<a>X</a>[text()])", null, "//@axis = 'child'");
+ 
+-  check("empty(<a>X</a>/.[text()])", null, "//@axis = 'child'");
+-}
++    check("if(<a>X</a>[text()]) then 1 else 2", null, "//@axis = 'child'");
++    check("<a>X</a>[text()] and <a/>", null, "//@axis = 'child'");
++    check("<a>X</a>[text()] or <a/>", null, "//Bln/@value = 'true'");
++    check("<a>X</a>[text()] or <a/>[text()]", null, "//@axis = 'child'");
++    check("for $a in <a>X</a> where $a[text()] return $a", null, "//@axis = 'child'");
++
++    check("empty(<a>X</a>/.[text()])", null, "//@axis = 'child'");
++  }
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.5806451612903226
+--------------------------------------------------------------------------------------------------------------------------------

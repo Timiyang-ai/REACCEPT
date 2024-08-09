@@ -1,0 +1,1 @@
+Selection add(int i);

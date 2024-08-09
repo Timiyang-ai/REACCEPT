@@ -1,0 +1,1 @@
+public Order signOrder(Order order, User provider) throws APIException;

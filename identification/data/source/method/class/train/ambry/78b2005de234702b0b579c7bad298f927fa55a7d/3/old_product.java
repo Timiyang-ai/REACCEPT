@@ -1,0 +1,1 @@
+void append(LogSegment segment, ByteBuffer buffer) throws IOException;

@@ -1,0 +1,57 @@
+diff --git a/old_product.java b/new_product.java
+index aa40d05..ffbb8b6 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,31 +1,31 @@
+-public void delete(final String pkg) throws QueryException {
+-    boolean found = false;
+-    final Repo repo = context.repo;
+-    final TokenMap dict = repo.pkgDict();
+-    final byte[] pp = token(pkg);
+-    for(final byte[] nextPkg : dict) {
+-      if(nextPkg == null) continue;
++public void delete(final String name) throws QueryException {
++    // find registered packages to be deleted
++    final EXPathRepo repo = context.repo;
++    final ArrayList<Pkg> delete = new ArrayList<>();
++    for(final Pkg pkg : repo.pkgDict().values()) {
+       // a package can be deleted by its name or the name suffixed with its version
+-      if(eq(nextPkg, pp) || eq(Package.name(nextPkg), pp)) {
++      if(pkg.name().equals(name) || pkg.id().equals(name)) {
+         // check if package to be deleted participates in a dependency
+-        final byte[] primPkg = primary(nextPkg);
+-        if(primPkg != null) throw BXRE_DEP_X_X.get(info, string(primPkg), pkg);
+-
+-        // clean package repository
+-        final IOFile f = repo.path(string(dict.get(nextPkg)));
+-        repo.delete(new PkgParser(info).parse(new IOFile(f, DESCRIPTOR)));
+-        // package does not participate in a dependency => delete it
+-        if(!f.delete()) throw BXRE_DELETE_X.get(info, f);
+-        found = true;
++        final String dep = primary(pkg);
++        if(dep != null) throw BXRE_DEP_X_X.get(info, dep, name);
++        delete.add(pkg);
+       }
+     }
+ 
+-    // traverse all files
+-    final IOFile file = file(pkg, repo);
++    // delete registered packages
++    for(final Pkg pkg : delete) {
++      repo.delete(pkg);
++      // delete files on disk
++      final IOFile dir = repo.path(pkg.dir());
++      if(!dir.delete()) throw BXRE_DELETE_X.get(info, dir);
++    }
++
++    // delete internal package
++    final IOFile file = find(name);
+     if(file != null) {
+       if(!file.delete()) throw BXRE_DELETE_X.get(info, file);
+       return;
+     }
+ 
+-    if(!found) throw BXRE_WHICH_X.get(info, pkg);
++    if(delete.isEmpty()) throw BXRE_WHICH_X.get(info, name);
+   }
+\ No newline at end of file

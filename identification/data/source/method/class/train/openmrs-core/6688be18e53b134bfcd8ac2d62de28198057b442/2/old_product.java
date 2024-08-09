@@ -1,0 +1,1 @@
+public GlobalProperty getGlobalPropertyObject(String propertyName);

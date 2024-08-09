@@ -1,0 +1,21 @@
+public static SortedMap<Integer, BitSet> closure(
+      SortedMap<Integer, BitSet> equivalence) {
+    if (equivalence.isEmpty()) {
+      return ImmutableSortedMap.of();
+    }
+    int length = equivalence.lastKey();
+    for (BitSet bitSet : equivalence.values()) {
+      length = Math.max(length, bitSet.length());
+    }
+    if (equivalence.size() < length
+        || equivalence.firstKey() != 0) {
+      SortedMap<Integer, BitSet> old = equivalence;
+      equivalence = new TreeMap<>();
+      for (int i = 0; i < length; i++) {
+        final BitSet bitSet = old.get(i);
+        equivalence.put(i, bitSet == null ? new BitSet() : bitSet);
+      }
+    }
+    final Closure closure = new Closure(equivalence);
+    return closure.closure;
+  }

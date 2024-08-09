@@ -1,0 +1,1 @@
+List<Alert> findAlertsByOwner(PrincipalUser owner);

@@ -1,0 +1,1 @@
+CompletableFuture<Void> delete(SegmentMetadata metadata, Duration timeout);

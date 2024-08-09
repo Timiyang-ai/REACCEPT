@@ -1,0 +1,1 @@
+void messageForConsole(MessageType type, String msg);

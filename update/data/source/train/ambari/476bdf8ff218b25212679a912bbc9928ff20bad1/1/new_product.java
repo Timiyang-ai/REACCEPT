@@ -1,0 +1,1 @@
+public void addLocalProperty(String property);

@@ -1,0 +1,1 @@
+abstract public void accept(T t) throws Exception;

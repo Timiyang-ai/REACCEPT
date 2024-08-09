@@ -1,0 +1,1 @@
+Selection flip(int rangeStart, int rangeEnd);

@@ -1,0 +1,1 @@
+void addTunnelInfo(TunnelId tunnelId, PceccTunnelInfo pceccTunnelInfo);

@@ -1,0 +1,1 @@
+<T> T getById(Serializable id, Class<T> clazz);

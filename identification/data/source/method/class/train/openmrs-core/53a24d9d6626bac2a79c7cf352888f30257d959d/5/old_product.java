@@ -1,0 +1,1 @@
+public Order getDiscontinuationOrder(Order order) throws APIException;

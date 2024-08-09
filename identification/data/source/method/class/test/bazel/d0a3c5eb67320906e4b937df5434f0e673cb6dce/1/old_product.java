@@ -1,0 +1,1 @@
+void visitLabels(AcceptsLabelAttribute observer) throws InterruptedException;

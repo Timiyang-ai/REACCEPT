@@ -1,0 +1,1 @@
+CompletableFuture<LogAddress> append(ArrayView data, Duration timeout);

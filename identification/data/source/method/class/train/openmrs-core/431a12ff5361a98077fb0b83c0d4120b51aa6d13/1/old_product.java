@@ -1,0 +1,1 @@
+VisitType saveVisitType(VisitType visitType);

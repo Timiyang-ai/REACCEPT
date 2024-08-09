@@ -1,0 +1,2 @@
+@Deprecated
+	Objectify transactionless();

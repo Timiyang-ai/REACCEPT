@@ -1,0 +1,1 @@
+public abstract Scope newScope(@Nullable TraceContext currentSpan);

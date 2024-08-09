@@ -1,0 +1,1 @@
+protected abstract int[] getValues(long from, long to, long divisor);

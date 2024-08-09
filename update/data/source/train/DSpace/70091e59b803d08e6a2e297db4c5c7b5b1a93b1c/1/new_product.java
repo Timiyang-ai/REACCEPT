@@ -1,0 +1,1 @@
+public Group getWorkflowGroup(Context context, Collection collection, int step);

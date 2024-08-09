@@ -1,0 +1,1 @@
+ClassesShouldConjunction resideOutsideOfPackages(String... packageIdentifiers);

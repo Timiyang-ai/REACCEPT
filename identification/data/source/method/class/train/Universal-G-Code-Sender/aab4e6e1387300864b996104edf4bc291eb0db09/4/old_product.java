@@ -1,0 +1,1 @@
+public PointSegment addCommand(String command) throws GcodeParserException;

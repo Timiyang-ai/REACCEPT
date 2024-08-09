@@ -1,0 +1,68 @@
+diff --git a/old_product.java b/new_product.java
+index a7f5041..fc127f1 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,43 +1,41 @@
+-public void logout() {
++@SuppressWarnings("FutureReturnValueIgnored")
++    public void logout() {
+         // Acquire lock to prevent users creating new instances
+         synchronized (Realm.class) {
+             if (!SyncManager.getUserStore().isActive(identity)) {
+                 return; // Already logged out status
+             }
+ 
+-//            // The ObjectStore will delete the associated Realms after the next app launch
+-//            // we can also have an optimistic approach and try to delete these Realms unless there's
+-//            // a remaining instance open.
+-//            for (final SyncConfiguration syncConfiguration : realms.keySet()) {
+-//                RealmCache.invokeWithGlobalRefCount(syncConfiguration, new RealmCache.Callback() {
+-//                    @Override
+-//                    public void onResult(int count) {
+-//                        if (count == 0) {
+-//                            // all instances are closed, remove the Realm
+-//                            File realmFile = new File(syncConfiguration.getPath());
+-//                            if (realmFile.exists() && !Util.deleteRealm(syncConfiguration.getPath(), realmFile.getParentFile(), realmFile.getName())) {
+-//                                RealmLog.error("Could not delete Realm when user logged out: " + syncConfiguration.getPath());
+-//                            }
+-//                        }
+-//                    }
+-//                });
+-//            }
+-
+             // Mark the user as logged out in the ObjectStore
+             SyncManager.getUserStore().remove(identity);
+ 
++            // invalidate all pending refresh_token queries
++            for (SyncConfiguration syncConfiguration : realms.keySet()) {
++                SyncSession session = SyncManager.getSession(syncConfiguration);
++                if (session != null) {
++                    session.clearScheduledAccessTokenRefresh();
++                }
++            }
++
+             // Remove all local tokens, preventing further connections.
++            // don't remove identity as this SyncUser might be re-activated and we need
++            // to avoid throwing a mismatch SyncConfiguration in RealmCache if we have
++            // the similar SyncConfiguration using the same identity, but with different (new)
++            // refresh-token.
+             realms.clear();
+ 
+             // Finally revoke server token. The local user is logged out in any case.
+             final AuthenticationServer server = SyncManager.getAuthServer();
+-            ThreadPoolExecutor networkPoolExecutor = SyncManager.NETWORK_POOL_EXECUTOR;
++            // don't reference directly the refreshToken inside the revoke request
++            // as it may revoke the newly acquired and refresh_token
++            final Token refreshTokenToBeRevoked = refreshToken;
+ 
+-            Future<?> submit = networkPoolExecutor.submit(new ExponentialBackoffTask<LogoutResponse>() {
++            ThreadPoolExecutor networkPoolExecutor = SyncManager.NETWORK_POOL_EXECUTOR;
++            networkPoolExecutor.submit(new ExponentialBackoffTask<LogoutResponse>() {
+ 
+                 @Override
+                 protected LogoutResponse execute() {
+-                    return server.logout(refreshToken, getAuthenticationUrl());
++                    return server.logout(refreshTokenToBeRevoked, getAuthenticationUrl());
+                 }
+ 
+                 @Override

@@ -1,0 +1,1 @@
+public A abmm(B b);

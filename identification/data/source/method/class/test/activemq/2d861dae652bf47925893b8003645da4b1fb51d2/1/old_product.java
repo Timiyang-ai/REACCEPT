@@ -1,0 +1,1 @@
+public abstract List<Job> getAllJobs(long start,long finish)throws Exception;

@@ -1,0 +1,1 @@
+void setAreaId(int areaId);

@@ -1,0 +1,1 @@
+void putAll(@NonNull Map<? extends @NonNull K,? extends @NonNull V> map);

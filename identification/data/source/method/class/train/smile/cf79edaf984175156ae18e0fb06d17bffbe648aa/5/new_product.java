@@ -1,0 +1,1 @@
+int getBigramFrequency(Bigram bigram);

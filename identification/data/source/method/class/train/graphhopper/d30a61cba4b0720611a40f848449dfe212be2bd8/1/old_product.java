@@ -1,0 +1,1 @@
+Path calcPath( LocationIDResult from, LocationIDResult to );

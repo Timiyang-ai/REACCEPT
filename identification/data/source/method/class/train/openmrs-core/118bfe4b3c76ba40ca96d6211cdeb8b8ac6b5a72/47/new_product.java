@@ -1,0 +1,2 @@
+@Authorized(PrivilegeConstants.GET_CONCEPT_SOURCES)
+	public ConceptSource getConceptSourceByName(String conceptSourceName) throws APIException;

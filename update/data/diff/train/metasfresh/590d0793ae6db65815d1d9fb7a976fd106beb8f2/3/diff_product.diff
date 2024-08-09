@@ -1,0 +1,76 @@
+diff --git a/old_product.java b/new_product.java
+index acf8071..8761083 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,26 +1,56 @@
+ public void applyDeltaToMatchingLaterStockCandidates(
+-			@NonNull final Candidate stockWithDelta)
++			@NonNull final SaveResult stockWithDelta)
+ 	{
+-		final CandidatesQuery query = createStockQueryBuilderWithDateOperator(
+-				stockWithDelta,
+-				DateOperator.AT_OR_AFTER);
++		final CandidatesQuery query = createStockQueryBetweenDates(stockWithDelta);
+ 
+-		final List<Candidate> candidatesToUpdate = candidateRepositoryRetrieval.retrieveOrderedByDateAndSeqNo(query);
+-		for (final Candidate candidate : candidatesToUpdate)
++		final BigDecimal deltaUntilRangeEnd;
++		final BigDecimal deltaAfterRangeEnd;
++		if (stockWithDelta.isDateMoved())
+ 		{
+-			final boolean sameDateButLowerSeqNo = //
+-					candidate.getDate().equals(stockWithDelta.getDate())
+-							&& candidate.getSeqNo() <= stockWithDelta.getSeqNo();
+-			if (sameDateButLowerSeqNo)
++			if (stockWithDelta.isDateMovedForwards())
+ 			{
+-				continue;
++				deltaUntilRangeEnd = stockWithDelta.getCandidate().getQuantity().negate();
++				deltaAfterRangeEnd = stockWithDelta.getQtyDelta();
+ 			}
++			else
++			{
++				deltaUntilRangeEnd = stockWithDelta.getCandidate().getQuantity();
++				deltaAfterRangeEnd = stockWithDelta.getQtyDelta();
++			}
++		}
++		else
++		{
++			deltaUntilRangeEnd = stockWithDelta.getQtyDelta();
++			deltaAfterRangeEnd = null;
++		}
++
++		final List<Candidate> candidatesToUpdateWithinRange = candidateRepositoryRetrieval.retrieveOrderedByDateAndSeqNo(query);
++		for (final Candidate candidate : candidatesToUpdateWithinRange)
++		{
++			final BigDecimal newQty = candidate.getQuantity().add(deltaUntilRangeEnd);
+ 
+-			final BigDecimal delta = stockWithDelta.getQuantity();
+-			final BigDecimal newQty = candidate.getQuantity().add(delta);
++			candidateRepositoryWriteService.updateCandidateById(candidate
++					.withQuantity(newQty)
++					.withGroupId(stockWithDelta.getCandidate().getGroupId()));
++		}
++		if (deltaAfterRangeEnd == null || deltaAfterRangeEnd.signum() == 0)
++		{
++			return; // we are done
++		}
++
++		final MaterialDescriptorQuery materialDescriptorQuery = query.getMaterialDescriptorQuery();
++		final MaterialDescriptorQuery materialDescriptToQueryAfterRange = materialDescriptorQuery.toBuilder()
++				.timeRangeStart(materialDescriptorQuery.getTimeRangeEnd())
++				.timeRangeEnd(null)
++				.build();
++		final CandidatesQuery queryAfterRange = query.withMaterialDescriptorQuery(materialDescriptToQueryAfterRange);
++		final List<Candidate> candidatesToUpdateAfterRange = candidateRepositoryRetrieval.retrieveOrderedByDateAndSeqNo(queryAfterRange);
++		for (final Candidate candidate : candidatesToUpdateAfterRange)
++		{
++			final BigDecimal newQty = candidate.getQuantity().add(deltaAfterRangeEnd);
+ 
+ 			candidateRepositoryWriteService.updateCandidateById(candidate
+ 					.withQuantity(newQty)
+-					.withGroupId(stockWithDelta.getGroupId()));
++					.withGroupId(stockWithDelta.getCandidate().getGroupId()));
+ 		}
+ 	}
+\ No newline at end of file

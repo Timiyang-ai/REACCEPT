@@ -1,0 +1,990 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.5955882352941176
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 0
+----------------------------------------------------------------
+old description: 编译报错
+----------------------------------------------------------------
+old message
+COMPILATION ERROR : 
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[312,38] 找不到符号
+  符号:   方法 contains(byte[])
+  位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[325,38] 找不到符号
+  符号:   方法 contains(byte[])
+  位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[344,39] 找不到符号
+  符号:   方法 contains(byte[])
+  位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[351,39] 找不到符号
+  符号:   方法 contains(byte[])
+  位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.2:testCompile (default-testCompile) on project basex: Compilation failure: Compilation failure:
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[312,38] 找不到符号
+符号:   方法 contains(byte[])
+位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[325,38] 找不到符号
+符号:   方法 contains(byte[])
+位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[344,39] 找不到符号
+符号:   方法 contains(byte[])
+位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[351,39] 找不到符号
+符号:   方法 contains(byte[])
+位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :basex
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+public void delete(final String pkg) throws QueryException {
+    boolean found = false;
+    final Repo repo = context.repo;
+    final TokenMap dict = repo.pkgDict();
+    final byte[] pp = token(pkg);
+    for(final byte[] nextPkg : dict) {
+      if(nextPkg == null) continue;
+      // a package can be deleted by its name or the name suffixed with its version
+      if(eq(nextPkg, pp) || eq(Package.name(nextPkg), pp)) {
+        // check if package to be deleted participates in a dependency
+        final byte[] primPkg = primary(nextPkg);
+        if(primPkg != null) throw BXRE_DEP_X_X.get(info, string(primPkg), pkg);
+
+        // clean package repository
+        final IOFile f = repo.path(string(dict.get(nextPkg)));
+        repo.delete(new PkgParser(info).parse(new IOFile(f, DESCRIPTOR)));
+        // package does not participate in a dependency => delete it
+        if(!f.delete()) throw BXRE_DELETE_X.get(info, f);
+        found = true;
+      }
+    }
+
+    // traverse all files
+    final IOFile file = file(pkg, repo);
+    if(file != null) {
+      if(!file.delete()) throw BXRE_DELETE_X.get(info, file);
+      return;
+    }
+
+    if(!found) throw BXRE_WHICH_X.get(info, pkg);
+  }
+----------------------------------------------------------------
+old test
+@Test
+  public void delete() {
+    // try to delete a package which is not installed
+    try {
+      new RepoManager(context).delete("xyz");
+      fail("Not installed package not detected.");
+    } catch(final QueryException ex) {
+      check(null, ex, BXRE_WHICH_X);
+    }
+    // install a package without dependencies (pkg3)
+    execute(new RepoInstall(REPO + "pkg3.xar", null));
+
+    // check if pkg3 is registered in the repo
+    assertTrue(context.repo.pkgDict().contains(token(PKG3ID)));
+
+    // check if pkg3 was correctly unzipped
+    final String pkg3Dir = normalize(PKG3ID);
+    assertTrue(isDir(pkg3Dir));
+    assertTrue(isFile(pkg3Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg3Dir + "/pkg3"));
+    assertTrue(isDir(pkg3Dir + "/pkg3/mod"));
+    assertTrue(isFile(pkg3Dir + "/pkg3/mod/pkg3mod1.xql"));
+
+    // install another package (pkg4) with a dependency to pkg3
+    execute(new RepoInstall(REPO + "pkg4.xar", null));
+    // check if pkg4 is registered in the repo
+    assertTrue(context.repo.pkgDict().contains(token(PKG4ID)));
+    // check if pkg4 was correctly unzipped
+    final String pkg4Dir = normalize(PKG4ID);
+    assertTrue(isDir(pkg4Dir));
+    assertTrue(isFile(pkg4Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg4Dir + "/pkg4"));
+    assertTrue(isDir(pkg4Dir + "/pkg4/mod"));
+    assertTrue(isFile(pkg4Dir + "/pkg4/mod/pkg4mod1.xql"));
+
+    // try to delete pkg3
+    try {
+      new RepoManager(context).delete(PKG3ID);
+      fail("Package involved in a dependency was deleted.");
+    } catch(final QueryException ex) {
+      check(null, ex, BXRE_DEP_X_X);
+    }
+    // try to delete pkg4 (use package name)
+    execute(new RepoDelete(PKG4, null));
+    // check if pkg4 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().contains(token(PKG4ID)));
+
+    // check if pkg4 directory was deleted
+    assertFalse(isDir(pkg4Dir));
+    // try to delete pkg3 (use package dir)
+    execute(new RepoDelete(PKG3ID, null));
+    // check if pkg3 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().contains(token(PKG3ID)));
+    // check if pkg3 directory was deleted
+    assertFalse(isDir(pkg3Dir));
+  }
+----------------------------------------------------------------
+new product
+public void delete(final String name) throws QueryException {
+    // find registered packages to be deleted
+    final EXPathRepo repo = context.repo;
+    final ArrayList<Pkg> delete = new ArrayList<>();
+    for(final Pkg pkg : repo.pkgDict().values()) {
+      // a package can be deleted by its name or the name suffixed with its version
+      if(pkg.name().equals(name) || pkg.id().equals(name)) {
+        // check if package to be deleted participates in a dependency
+        final String dep = primary(pkg);
+        if(dep != null) throw BXRE_DEP_X_X.get(info, dep, name);
+        delete.add(pkg);
+      }
+    }
+
+    // delete registered packages
+    for(final Pkg pkg : delete) {
+      repo.delete(pkg);
+      // delete files on disk
+      final IOFile dir = repo.path(pkg.dir());
+      if(!dir.delete()) throw BXRE_DELETE_X.get(info, dir);
+    }
+
+    // delete internal package
+    final IOFile file = find(name);
+    if(file != null) {
+      if(!file.delete()) throw BXRE_DELETE_X.get(info, file);
+      return;
+    }
+
+    if(delete.isEmpty()) throw BXRE_WHICH_X.get(info, name);
+  }
+----------------------------------------------------------------
+new test
+@Test
+  public void delete() {
+    // try to delete a package which is not installed
+    try {
+      new RepoManager(context).delete("xyz");
+      fail("Not installed package not detected.");
+    } catch(final QueryException ex) {
+      check(null, ex, BXRE_WHICH_X);
+    }
+    // install a package without dependencies (pkg3)
+    execute(new RepoInstall(REPO + "pkg3.xar", null));
+
+    // check if pkg3 is registered in the repo
+    assertTrue(context.repo.pkgDict().containsKey(PKG3ID));
+
+    // check if pkg3 was correctly unzipped
+    final String pkg3Dir = normalize(PKG3ID);
+    assertTrue(isDir(pkg3Dir));
+    assertTrue(isFile(pkg3Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg3Dir + "/pkg3"));
+    assertTrue(isDir(pkg3Dir + "/pkg3/mod"));
+    assertTrue(isFile(pkg3Dir + "/pkg3/mod/pkg3mod1.xql"));
+
+    // install another package (pkg4) with a dependency to pkg3
+    execute(new RepoInstall(REPO + "pkg4.xar", null));
+    // check if pkg4 is registered in the repo
+    assertTrue(context.repo.pkgDict().containsKey(PKG4ID));
+    // check if pkg4 was correctly unzipped
+    final String pkg4Dir = normalize(PKG4ID);
+    assertTrue(isDir(pkg4Dir));
+    assertTrue(isFile(pkg4Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg4Dir + "/pkg4"));
+    assertTrue(isDir(pkg4Dir + "/pkg4/mod"));
+    assertTrue(isFile(pkg4Dir + "/pkg4/mod/pkg4mod1.xql"));
+
+    // try to delete pkg3
+    try {
+      new RepoManager(context).delete(PKG3ID);
+      fail("Package involved in a dependency was deleted.");
+    } catch(final QueryException ex) {
+      check(null, ex, BXRE_DEP_X_X);
+    }
+    // try to delete pkg4 (use package name)
+    execute(new RepoDelete(PKG4, null));
+    // check if pkg4 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().containsKey(PKG4ID));
+
+    // check if pkg4 directory was deleted
+    assertFalse(isDir(pkg4Dir));
+    // try to delete pkg3 (use package dir)
+    execute(new RepoDelete(PKG3ID, null));
+    // check if pkg3 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().containsKey(PKG3ID));
+    // check if pkg3 directory was deleted
+    assertFalse(isDir(pkg3Dir));
+  }
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index aa40d05..ffbb8b6 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,31 +1,31 @@
+-public void delete(final String pkg) throws QueryException {
+-    boolean found = false;
+-    final Repo repo = context.repo;
+-    final TokenMap dict = repo.pkgDict();
+-    final byte[] pp = token(pkg);
+-    for(final byte[] nextPkg : dict) {
+-      if(nextPkg == null) continue;
++public void delete(final String name) throws QueryException {
++    // find registered packages to be deleted
++    final EXPathRepo repo = context.repo;
++    final ArrayList<Pkg> delete = new ArrayList<>();
++    for(final Pkg pkg : repo.pkgDict().values()) {
+       // a package can be deleted by its name or the name suffixed with its version
+-      if(eq(nextPkg, pp) || eq(Package.name(nextPkg), pp)) {
++      if(pkg.name().equals(name) || pkg.id().equals(name)) {
+         // check if package to be deleted participates in a dependency
+-        final byte[] primPkg = primary(nextPkg);
+-        if(primPkg != null) throw BXRE_DEP_X_X.get(info, string(primPkg), pkg);
+-
+-        // clean package repository
+-        final IOFile f = repo.path(string(dict.get(nextPkg)));
+-        repo.delete(new PkgParser(info).parse(new IOFile(f, DESCRIPTOR)));
+-        // package does not participate in a dependency => delete it
+-        if(!f.delete()) throw BXRE_DELETE_X.get(info, f);
+-        found = true;
++        final String dep = primary(pkg);
++        if(dep != null) throw BXRE_DEP_X_X.get(info, dep, name);
++        delete.add(pkg);
+       }
+     }
+ 
+-    // traverse all files
+-    final IOFile file = file(pkg, repo);
++    // delete registered packages
++    for(final Pkg pkg : delete) {
++      repo.delete(pkg);
++      // delete files on disk
++      final IOFile dir = repo.path(pkg.dir());
++      if(!dir.delete()) throw BXRE_DELETE_X.get(info, dir);
++    }
++
++    // delete internal package
++    final IOFile file = find(name);
+     if(file != null) {
+       if(!file.delete()) throw BXRE_DELETE_X.get(info, file);
+       return;
+     }
+ 
+-    if(!found) throw BXRE_WHICH_X.get(info, pkg);
++    if(delete.isEmpty()) throw BXRE_WHICH_X.get(info, name);
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index ba35f60..814b535 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -11,7 +11,7 @@
+     execute(new RepoInstall(REPO + "pkg3.xar", null));
+ 
+     // check if pkg3 is registered in the repo
+-    assertTrue(context.repo.pkgDict().contains(token(PKG3ID)));
++    assertTrue(context.repo.pkgDict().containsKey(PKG3ID));
+ 
+     // check if pkg3 was correctly unzipped
+     final String pkg3Dir = normalize(PKG3ID);
+@@ -24,7 +24,7 @@
+     // install another package (pkg4) with a dependency to pkg3
+     execute(new RepoInstall(REPO + "pkg4.xar", null));
+     // check if pkg4 is registered in the repo
+-    assertTrue(context.repo.pkgDict().contains(token(PKG4ID)));
++    assertTrue(context.repo.pkgDict().containsKey(PKG4ID));
+     // check if pkg4 was correctly unzipped
+     final String pkg4Dir = normalize(PKG4ID);
+     assertTrue(isDir(pkg4Dir));
+@@ -43,14 +43,14 @@
+     // try to delete pkg4 (use package name)
+     execute(new RepoDelete(PKG4, null));
+     // check if pkg4 is unregistered from the repo
+-    assertFalse(context.repo.pkgDict().contains(token(PKG4ID)));
++    assertFalse(context.repo.pkgDict().containsKey(PKG4ID));
+ 
+     // check if pkg4 directory was deleted
+     assertFalse(isDir(pkg4Dir));
+     // try to delete pkg3 (use package dir)
+     execute(new RepoDelete(PKG3ID, null));
+     // check if pkg3 is unregistered from the repo
+-    assertFalse(context.repo.pkgDict().contains(token(PKG3ID)));
++    assertFalse(context.repo.pkgDict().containsKey(PKG3ID));
+     // check if pkg3 directory was deleted
+     assertFalse(isDir(pkg3Dir));
+   }
+\ No newline at end of file
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index cd9098f..7f0f5df 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -8,7 +8,7 @@ public void delete(final String name) throws QueryException {
+         if(pkg.type() == PkgType.EXPATH) {
+           // check if package to be deleted participates in a dependency
+           final String dep = dependency(pkg);
+-          if(dep != null) throw BXRE_DEP_X_X.get(info, dep, name);
++          if(dep != null) throw REPO_DELETE_X_X.get(info, dep, name);
+           // delete files in main-memory repository
+           repo.delete(pkg);
+         }
+@@ -16,18 +16,18 @@ public void delete(final String name) throws QueryException {
+         if(pkg.type() == PkgType.COMBINED) {
+           // delete associated JAR file
+           final IOFile pkgFile = repo.path(pkgPath.replaceAll("\\.[^.]+$", IO.JARSUFFIX));
+-          if(!pkgFile.delete()) throw BXRE_DELETE_X.get(info, pkgPath);
++          if(!pkgFile.delete()) throw REPO_DELETE_X.get(info, pkgPath);
+         }
+ 
+         // delete package directory or file
+         final IOFile pkgFile = repo.path(pkgPath);
+-        if(!pkgFile.delete()) throw BXRE_DELETE_X.get(info, pkgPath);
++        if(!pkgFile.delete()) throw REPO_DELETE_X.get(info, pkgPath);
+ 
+         // delete directory with extracted jars
+         final IOFile extDir = pkgFile.parent().resolve('.' + pkg.name().replaceAll("^.*\\.", ""));
+-        if(!extDir.delete()) throw BXRE_DELETE_X.get(info, extDir);
++        if(!extDir.delete()) throw REPO_DELETE_X.get(info, extDir);
+         deleted = true;
+       }
+     }
+-    if(!deleted) throw BXRE_WHICH_X.get(info, name);
++    if(!deleted) throw REPO_NOTFOUND_X.get(info, name);
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index 9a0031e..afcd8e7 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -5,7 +5,7 @@
+       new RepoManager(context).delete("xyz");
+       fail("Not installed package not detected.");
+     } catch(final QueryException ex) {
+-      error(null, ex, BXRE_WHICH_X);
++      error(null, ex, REPO_NOTFOUND_X);
+     }
+     // install a package without dependencies (pkg3)
+     execute(new RepoInstall(REPO + "pkg3.xar", null));
+@@ -38,7 +38,7 @@
+       new RepoManager(context).delete(PKG3ID);
+       fail("Package involved in a dependency was deleted.");
+     } catch(final QueryException ex) {
+-      error(null, ex, BXRE_DEP_X_X);
++      error(null, ex, REPO_DELETE_X_X);
+     }
+     // try to delete pkg4 (use package name)
+     execute(new RepoDelete(PKG4, null));
+
+----------------------------------------------------------------
+coverage: 0.5955882352941176
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void delete() {
+    // try to delete a package which is not installed
+    try {
+        new RepoManager(context).delete("xyz");
+        fail("Not installed package not detected.");
+    } catch(final QueryException ex) {
+        check(null, ex, REPO_NOTFOUND_X);
+    }
+    // install a package without dependencies (pkg3)
+    execute(new RepoInstall(REPO + "pkg3.xar", null));
+
+    // check if pkg3 is registered in the repo
+    assertTrue(context.repo.pkgDict().contains(token(PKG3ID)));
+
+    // check if pkg3 was correctly unzipped
+    final String pkg3Dir = normalize(PKG3ID);
+    assertTrue(isDir(pkg3Dir));
+    assertTrue(isFile(pkg3Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg3Dir + "/pkg3"));
+    assertTrue(isDir(pkg3Dir + "/pkg3/mod"));
+    assertTrue(isFile(pkg3Dir + "/pkg3/mod/pkg3mod1.xql"));
+
+    // install another package (pkg4) with a dependency to pkg3
+    execute(new RepoInstall(REPO + "pkg4.xar", null));
+    // check if pkg4 is registered in the repo
+    assertTrue(context.repo.pkgDict().contains(token(PKG4ID)));
+    // check if pkg4 was correctly unzipped
+    final String pkg4Dir = normalize(PKG4ID);
+    assertTrue(isDir(pkg4Dir));
+    assertTrue(isFile(pkg4Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg4Dir + "/pkg4"));
+    assertTrue(isDir(pkg4Dir + "/pkg4/mod"));
+    assertTrue(isFile(pkg4Dir + "/pkg4/mod/pkg4mod1.xql"));
+
+    // try to delete pkg3
+    try {
+        new RepoManager(context).delete(PKG3ID);
+        fail("Package involved in a dependency was deleted.");
+    } catch(final QueryException ex) {
+        check(null, ex, REPO_DELETE_X_X);
+    }
+    // try to delete pkg4 (use package name)
+    execute(new RepoDelete(PKG4, null));
+    // check if pkg4 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().contains(token(PKG4ID)));
+
+    // check if pkg4 directory was deleted
+    assertFalse(isDir(pkg4Dir));
+    // try to delete pkg3 (use package dir)
+    execute(new RepoDelete(PKG3ID, null));
+    // check if pkg3 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().contains(token(PKG3ID)));
+    // check if pkg3 directory was deleted
+    assertFalse(isDir(pkg3Dir));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void delete() {
+    // try to delete a package which is not installed
+    try {
+        new RepoManager(context).delete("xyz");
+        fail("Not installed package not detected.");
+    } catch(final QueryException ex) {
+        check(null, ex, REPO_NOTFOUND_X);
+    }
+    // install a package without dependencies (pkg3)
+    execute(new RepoInstall(REPO + "pkg3.xar", null));
+
+    // check if pkg3 is registered in the repo
+    assertTrue(context.repo.pkgDict().contains(token(PKG3ID)));
+
+    // check if pkg3 was correctly unzipped
+    final String pkg3Dir = normalize(PKG3ID);
+    assertTrue(isDir(pkg3Dir));
+    assertTrue(isFile(pkg3Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg3Dir + "/pkg3"));
+    assertTrue(isDir(pkg3Dir + "/pkg3/mod"));
+    assertTrue(isFile(pkg3Dir + "/pkg3/mod/pkg3mod1.xql"));
+
+    // install another package (pkg4) with a dependency to pkg3
+    execute(new RepoInstall(REPO + "pkg4.xar", null));
+    // check if pkg4 is registered in the repo
+    assertTrue(context.repo.pkgDict().contains(token(PKG4ID)));
+    // check if pkg4 was correctly unzipped
+    final String pkg4Dir = normalize(PKG4ID);
+    assertTrue(isDir(pkg4Dir));
+    assertTrue(isFile(pkg4Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg4Dir + "/pkg4"));
+    assertTrue(isDir(pkg4Dir + "/pkg4/mod"));
+    assertTrue(isFile(pkg4Dir + "/pkg4/mod/pkg4mod1.xql"));
+
+    // try to delete pkg3
+    try {
+        new RepoManager(context).delete(PKG3ID);
+        fail("Package involved in a dependency was deleted.");
+    } catch(final QueryException ex) {
+        check(null, ex, REPO_DELETE_X_X);
+    }
+    // try to delete pkg4 (use package name)
+    execute(new RepoDelete(PKG4, null));
+    // check if pkg4 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().contains(token(PKG4ID)));
+
+    // check if pkg4 directory was deleted
+    assertFalse(isDir(pkg4Dir));
+    // try to delete pkg3 (use package dir)
+    execute(new RepoDelete(PKG3ID, null));
+    // check if pkg3 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().contains(token(PKG3ID)));
+    // check if pkg3 directory was deleted
+    assertFalse(isDir(pkg3Dir));
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,11 +1,11 @@
+
+ @Test
+-  public void delete() {
++public void delete() {
+     // try to delete a package which is not installed
+     try {
+-      new RepoManager(context).delete("xyz");
+-      fail("Not installed package not detected.");
++        new RepoManager(context).delete("xyz");
++        fail("Not installed package not detected.");
+     } catch(final QueryException ex) {
+-      check(null, ex, BXRE_WHICH_X);
++        check(null, ex, REPO_NOTFOUND_X);
+     }
+     // install a package without dependencies (pkg3)
+     execute(new RepoInstall(REPO + "pkg3.xar", null));
+@@ -35,10 +35,10 @@
+
+ 
+     // try to delete pkg3
+     try {
+-      new RepoManager(context).delete(PKG3ID);
+-      fail("Package involved in a dependency was deleted.");
++        new RepoManager(context).delete(PKG3ID);
++        fail("Package involved in a dependency was deleted.");
+     } catch(final QueryException ex) {
+-      check(null, ex, BXRE_DEP_X_X);
++        check(null, ex, REPO_DELETE_X_X);
+     }
+     // try to delete pkg4 (use package name)
+     execute(new RepoDelete(PKG4, null));
+@@ -53,4 +53,4 @@
+
+     assertFalse(context.repo.pkgDict().contains(token(PKG3ID)));
+     // check if pkg3 directory was deleted
+     assertFalse(isDir(pkg3Dir));
+-  }
++}
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[306,25] 找不到符号
+  符号:   变量 REPO_NOTFOUND_X
+  位置: 类 org.basex.query.expr.PackageAPITest
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[312,38] 找不到符号
+  符号:   方法 contains(byte[])
+  位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[325,38] 找不到符号
+  符号:   方法 contains(byte[])
+  位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[339,25] 找不到符号
+  符号:   变量 REPO_DELETE_X_X
+  位置: 类 org.basex.query.expr.PackageAPITest
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[344,39] 找不到符号
+  符号:   方法 contains(byte[])
+  位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[351,39] 找不到符号
+  符号:   方法 contains(byte[])
+  位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.2:testCompile (default-testCompile) on project basex: Compilation failure: Compilation failure:
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[306,25] 找不到符号
+符号:   变量 REPO_NOTFOUND_X
+位置: 类 org.basex.query.expr.PackageAPITest
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[312,38] 找不到符号
+符号:   方法 contains(byte[])
+位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[325,38] 找不到符号
+符号:   方法 contains(byte[])
+位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[339,25] 找不到符号
+符号:   变量 REPO_DELETE_X_X
+位置: 类 org.basex.query.expr.PackageAPITest
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[344,39] 找不到符号
+符号:   方法 contains(byte[])
+位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[351,39] 找不到符号
+符号:   方法 contains(byte[])
+位置: 类 java.util.HashMap<java.lang.String,org.basex.query.util.pkg.Pkg>
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :basex
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 2
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void delete() {
+    // try to delete a package which is not installed
+    try {
+        new RepoManager(context).delete("xyz");
+        fail("Not installed package not detected.");
+    } catch(final QueryException ex) {
+        check(null, ex, BXRE_WHICH_X);
+    }
+    // install a package without dependencies (pkg3)
+    execute(new RepoInstall(REPO + "pkg3.xar", null));
+
+    // check if pkg3 is registered in the repo
+    assertTrue(context.repo.pkgDict().containsKey(PKG3ID));
+
+    // check if pkg3 was correctly unzipped
+    final String pkg3Dir = normalize(PKG3ID);
+    assertTrue(isDir(pkg3Dir));
+    assertTrue(isFile(pkg3Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg3Dir + "/pkg3"));
+    assertTrue(isDir(pkg3Dir + "/pkg3/mod"));
+    assertTrue(isFile(pkg3Dir + "/pkg3/mod/pkg3mod1.xql"));
+
+    // install another package (pkg4) with a dependency to pkg3
+    execute(new RepoInstall(REPO + "pkg4.xar", null));
+    // check if pkg4 is registered in the repo
+    assertTrue(context.repo.pkgDict().containsKey(PKG4ID));
+    // check if pkg4 was correctly unzipped
+    final String pkg4Dir = normalize(PKG4ID);
+    assertTrue(isDir(pkg4Dir));
+    assertTrue(isFile(pkg4Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg4Dir + "/pkg4"));
+    assertTrue(isDir(pkg4Dir + "/pkg4/mod"));
+    assertTrue(isFile(pkg4Dir + "/pkg4/mod/pkg4mod1.xql"));
+
+    // try to delete pkg3
+    try {
+        new RepoManager(context).delete(PKG3ID);
+        fail("Package involved in a dependency was deleted.");
+    } catch(final QueryException ex) {
+        check(null, ex, BXRE_DEP_X_X);
+    }
+    // try to delete pkg4 (use package name)
+    execute(new RepoDelete(PKG4, null));
+    // check if pkg4 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().containsKey(PKG4ID));
+
+    // check if pkg4 directory was deleted
+    assertFalse(isDir(pkg4Dir));
+    // try to delete pkg3 (use package dir)
+    execute(new RepoDelete(PKG3ID, null));
+    // check if pkg3 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().containsKey(PKG3ID));
+    // check if pkg3 directory was deleted
+    assertFalse(isDir(pkg3Dir));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void delete() {
+    // try to delete a package which is not installed
+    try {
+        new RepoManager(context).delete("xyz");
+        fail("Not installed package not detected.");
+    } catch(final QueryException ex) {
+        check(null, ex, BXRE_WHICH_X);
+    }
+    // install a package without dependencies (pkg3)
+    execute(new RepoInstall(REPO + "pkg3.xar", null));
+
+    // check if pkg3 is registered in the repo
+    assertTrue(context.repo.pkgDict().containsKey(PKG3ID));
+
+    // check if pkg3 was correctly unzipped
+    final String pkg3Dir = normalize(PKG3ID);
+    assertTrue(isDir(pkg3Dir));
+    assertTrue(isFile(pkg3Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg3Dir + "/pkg3"));
+    assertTrue(isDir(pkg3Dir + "/pkg3/mod"));
+    assertTrue(isFile(pkg3Dir + "/pkg3/mod/pkg3mod1.xql"));
+
+    // install another package (pkg4) with a dependency to pkg3
+    execute(new RepoInstall(REPO + "pkg4.xar", null));
+    // check if pkg4 is registered in the repo
+    assertTrue(context.repo.pkgDict().containsKey(PKG4ID));
+    // check if pkg4 was correctly unzipped
+    final String pkg4Dir = normalize(PKG4ID);
+    assertTrue(isDir(pkg4Dir));
+    assertTrue(isFile(pkg4Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg4Dir + "/pkg4"));
+    assertTrue(isDir(pkg4Dir + "/pkg4/mod"));
+    assertTrue(isFile(pkg4Dir + "/pkg4/mod/pkg4mod1.xql"));
+
+    // try to delete pkg3
+    try {
+        new RepoManager(context).delete(PKG3ID);
+        fail("Package involved in a dependency was deleted.");
+    } catch(final QueryException ex) {
+        check(null, ex, BXRE_DEP_X_X);
+    }
+    // try to delete pkg4 (use package name)
+    execute(new RepoDelete(PKG4, null));
+    // check if pkg4 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().containsKey(PKG4ID));
+
+    // check if pkg4 directory was deleted
+    assertFalse(isDir(pkg4Dir));
+    // try to delete pkg3 (use package dir)
+    execute(new RepoDelete(PKG3ID, null));
+    // check if pkg3 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().containsKey(PKG3ID));
+    // check if pkg3 directory was deleted
+    assertFalse(isDir(pkg3Dir));
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -5,13 +5,13 @@
+
+         new RepoManager(context).delete("xyz");
+         fail("Not installed package not detected.");
+     } catch(final QueryException ex) {
+-        check(null, ex, REPO_NOTFOUND_X);
++        check(null, ex, BXRE_WHICH_X);
+     }
+     // install a package without dependencies (pkg3)
+     execute(new RepoInstall(REPO + "pkg3.xar", null));
+ 
+     // check if pkg3 is registered in the repo
+-    assertTrue(context.repo.pkgDict().contains(token(PKG3ID)));
++    assertTrue(context.repo.pkgDict().containsKey(PKG3ID));
+ 
+     // check if pkg3 was correctly unzipped
+     final String pkg3Dir = normalize(PKG3ID);
+@@ -24,7 +24,7 @@
+
+     // install another package (pkg4) with a dependency to pkg3
+     execute(new RepoInstall(REPO + "pkg4.xar", null));
+     // check if pkg4 is registered in the repo
+-    assertTrue(context.repo.pkgDict().contains(token(PKG4ID)));
++    assertTrue(context.repo.pkgDict().containsKey(PKG4ID));
+     // check if pkg4 was correctly unzipped
+     final String pkg4Dir = normalize(PKG4ID);
+     assertTrue(isDir(pkg4Dir));
+@@ -38,19 +38,19 @@
+
+         new RepoManager(context).delete(PKG3ID);
+         fail("Package involved in a dependency was deleted.");
+     } catch(final QueryException ex) {
+-        check(null, ex, REPO_DELETE_X_X);
++        check(null, ex, BXRE_DEP_X_X);
+     }
+     // try to delete pkg4 (use package name)
+     execute(new RepoDelete(PKG4, null));
+     // check if pkg4 is unregistered from the repo
+-    assertFalse(context.repo.pkgDict().contains(token(PKG4ID)));
++    assertFalse(context.repo.pkgDict().containsKey(PKG4ID));
+ 
+     // check if pkg4 directory was deleted
+     assertFalse(isDir(pkg4Dir));
+     // try to delete pkg3 (use package dir)
+     execute(new RepoDelete(PKG3ID, null));
+     // check if pkg3 is unregistered from the repo
+-    assertFalse(context.repo.pkgDict().contains(token(PKG3ID)));
++    assertFalse(context.repo.pkgDict().containsKey(PKG3ID));
+     // check if pkg3 directory was deleted
+     assertFalse(isDir(pkg3Dir));
+ }
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.5955882352941176
+----------------------------------------------------------------
+message
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 2
+----------------------------------------------------------------
+generated test
+@Test
+public void delete() {
+    // try to delete a package which is not installed
+    try {
+        new RepoManager(context).delete("xyz");
+        fail("Not installed package not detected.");
+    } catch(final QueryException ex) {
+        check(null, ex, BXRE_WHICH_X);
+    }
+    // install a package without dependencies (pkg3)
+    execute(new RepoInstall(REPO + "pkg3.xar", null));
+
+    // check if pkg3 is registered in the repo
+    assertTrue(context.repo.pkgDict().containsKey(PKG3ID));
+
+    // check if pkg3 was correctly unzipped
+    final String pkg3Dir = normalize(PKG3ID);
+    assertTrue(isDir(pkg3Dir));
+    assertTrue(isFile(pkg3Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg3Dir + "/pkg3"));
+    assertTrue(isDir(pkg3Dir + "/pkg3/mod"));
+    assertTrue(isFile(pkg3Dir + "/pkg3/mod/pkg3mod1.xql"));
+
+    // install another package (pkg4) with a dependency to pkg3
+    execute(new RepoInstall(REPO + "pkg4.xar", null));
+    // check if pkg4 is registered in the repo
+    assertTrue(context.repo.pkgDict().containsKey(PKG4ID));
+    // check if pkg4 was correctly unzipped
+    final String pkg4Dir = normalize(PKG4ID);
+    assertTrue(isDir(pkg4Dir));
+    assertTrue(isFile(pkg4Dir + "/expath-pkg.xml"));
+    assertTrue(isDir(pkg4Dir + "/pkg4"));
+    assertTrue(isDir(pkg4Dir + "/pkg4/mod"));
+    assertTrue(isFile(pkg4Dir + "/pkg4/mod/pkg4mod1.xql"));
+
+    // try to delete pkg3
+    try {
+        new RepoManager(context).delete(PKG3ID);
+        fail("Package involved in a dependency was deleted.");
+    } catch(final QueryException ex) {
+        check(null, ex, BXRE_DEP_X_X);
+    }
+    // try to delete pkg4 (use package name)
+    execute(new RepoDelete(PKG4, null));
+    // check if pkg4 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().containsKey(PKG4ID));
+
+    // check if pkg4 directory was deleted
+    assertFalse(isDir(pkg4Dir));
+    // try to delete pkg3 (use package dir)
+    execute(new RepoDelete(PKG3ID, null));
+    // check if pkg3 is unregistered from the repo
+    assertFalse(context.repo.pkgDict().containsKey(PKG3ID));
+    // check if pkg3 directory was deleted
+    assertFalse(isDir(pkg3Dir));
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,17 +1,17 @@
+
+ @Test
+-  public void delete() {
++public void delete() {
+     // try to delete a package which is not installed
+     try {
+-      new RepoManager(context).delete("xyz");
+-      fail("Not installed package not detected.");
++        new RepoManager(context).delete("xyz");
++        fail("Not installed package not detected.");
+     } catch(final QueryException ex) {
+-      check(null, ex, BXRE_WHICH_X);
++        check(null, ex, BXRE_WHICH_X);
+     }
+     // install a package without dependencies (pkg3)
+     execute(new RepoInstall(REPO + "pkg3.xar", null));
+ 
+     // check if pkg3 is registered in the repo
+-    assertTrue(context.repo.pkgDict().contains(token(PKG3ID)));
++    assertTrue(context.repo.pkgDict().containsKey(PKG3ID));
+ 
+     // check if pkg3 was correctly unzipped
+     final String pkg3Dir = normalize(PKG3ID);
+@@ -24,7 +24,7 @@
+
+     // install another package (pkg4) with a dependency to pkg3
+     execute(new RepoInstall(REPO + "pkg4.xar", null));
+     // check if pkg4 is registered in the repo
+-    assertTrue(context.repo.pkgDict().contains(token(PKG4ID)));
++    assertTrue(context.repo.pkgDict().containsKey(PKG4ID));
+     // check if pkg4 was correctly unzipped
+     final String pkg4Dir = normalize(PKG4ID);
+     assertTrue(isDir(pkg4Dir));
+@@ -35,22 +35,22 @@
+
+ 
+     // try to delete pkg3
+     try {
+-      new RepoManager(context).delete(PKG3ID);
+-      fail("Package involved in a dependency was deleted.");
++        new RepoManager(context).delete(PKG3ID);
++        fail("Package involved in a dependency was deleted.");
+     } catch(final QueryException ex) {
+-      check(null, ex, BXRE_DEP_X_X);
++        check(null, ex, BXRE_DEP_X_X);
+     }
+     // try to delete pkg4 (use package name)
+     execute(new RepoDelete(PKG4, null));
+     // check if pkg4 is unregistered from the repo
+-    assertFalse(context.repo.pkgDict().contains(token(PKG4ID)));
++    assertFalse(context.repo.pkgDict().containsKey(PKG4ID));
+ 
+     // check if pkg4 directory was deleted
+     assertFalse(isDir(pkg4Dir));
+     // try to delete pkg3 (use package dir)
+     execute(new RepoDelete(PKG3ID, null));
+     // check if pkg3 is unregistered from the repo
+-    assertFalse(context.repo.pkgDict().contains(token(PKG3ID)));
++    assertFalse(context.repo.pkgDict().containsKey(PKG3ID));
+     // check if pkg3 directory was deleted
+     assertFalse(isDir(pkg3Dir));
+-  }
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,11 +1,11 @@
+
+ @Test
+-public void delete() {
++  public void delete() {
+     // try to delete a package which is not installed
+     try {
+-        new RepoManager(context).delete("xyz");
+-        fail("Not installed package not detected.");
++      new RepoManager(context).delete("xyz");
++      fail("Not installed package not detected.");
+     } catch(final QueryException ex) {
+-        check(null, ex, BXRE_WHICH_X);
++      check(null, ex, BXRE_WHICH_X);
+     }
+     // install a package without dependencies (pkg3)
+     execute(new RepoInstall(REPO + "pkg3.xar", null));
+@@ -35,10 +35,10 @@
+
+ 
+     // try to delete pkg3
+     try {
+-        new RepoManager(context).delete(PKG3ID);
+-        fail("Package involved in a dependency was deleted.");
++      new RepoManager(context).delete(PKG3ID);
++      fail("Package involved in a dependency was deleted.");
+     } catch(final QueryException ex) {
+-        check(null, ex, BXRE_DEP_X_X);
++      check(null, ex, BXRE_DEP_X_X);
+     }
+     // try to delete pkg4 (use package name)
+     execute(new RepoDelete(PKG4, null));
+@@ -53,4 +53,4 @@
+
+     assertFalse(context.repo.pkgDict().containsKey(PKG3ID));
+     // check if pkg3 directory was deleted
+     assertFalse(isDir(pkg3Dir));
+-}
++  }
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.5955882352941176
+--------------------------------------------------------------------------------------------------------------------------------

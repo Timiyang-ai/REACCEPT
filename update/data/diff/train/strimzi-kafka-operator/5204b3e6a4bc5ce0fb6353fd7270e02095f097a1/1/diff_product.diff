@@ -1,0 +1,37 @@
+diff --git a/old_product.java b/new_product.java
+index 85cf233..11dc4ef 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,18 +1,19 @@
+-public void onConfigMapAdded(ConfigMap configMap, Handler<AsyncResult<Void>> resultHandler) {
++void onConfigMapAdded(ConfigMap configMap, Handler<AsyncResult<Void>> resultHandler) {
+         if (cmPredicate.test(configMap)) {
+-            TopicName topicName = new TopicName(configMap);
+-            if (inFlight.shouldProcessConfigMapAdded(topicName)) {
+-                Topic topic = TopicSerialization.fromConfigMap(configMap);
+-                enqueue(new CreateKafkaTopic(topic, configMap, ar -> {
+-                    if (ar.succeeded()) {
+-                        enqueue(new CreateInTopicStore(topic, configMap, resultHandler));
+-                    } else {
+-                        resultHandler.handle(Future.failedFuture(ar.cause()));
+-                    }
+-                }));
+-            } else {
+-                resultHandler.handle(Future.succeededFuture());
++            final Topic k8sTopic;
++            try {
++                k8sTopic = TopicSerialization.fromConfigMap(configMap);
++            } catch (InvalidConfigMapException e) {
++                resultHandler.handle(Future.failedFuture(e));
++                return;
+             }
++            Handler<Future<Void>> action = new Reconciliation("onConfigMapAdded") {
++                @Override
++                public void handle(Future<Void> fut) {
++                    Controller.this.reconcileOnCmChange(configMap, k8sTopic, fut);
++                }
++            };
++            inFlight.enqueue(new TopicName(configMap), resultHandler, action);
+         } else {
+             resultHandler.handle(Future.succeededFuture());
+         }

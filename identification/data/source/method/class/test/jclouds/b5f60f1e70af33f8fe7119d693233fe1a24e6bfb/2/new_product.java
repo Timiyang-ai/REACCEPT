@@ -1,0 +1,1 @@
+PagedIterable<? extends Flavor> listInDetail();

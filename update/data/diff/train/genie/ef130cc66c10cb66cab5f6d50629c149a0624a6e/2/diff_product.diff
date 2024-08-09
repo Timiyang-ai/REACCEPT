@@ -1,0 +1,21 @@
+diff --git a/old_product.java b/new_product.java
+index a4a40b5..d381ee2 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -36,8 +36,15 @@ public String coordinateJob(
+             jobBuilder
+                 .withStatus(JobStatus.INIT)
+                 .withStatusMsg("Job Accepted and in initialization phase.");
++            // TODO: if this throws exception the job will never be marked failed
+             this.jobPersistenceService.createJob(jobBuilder.build());
+-            this.jobSubmitterService.submitJob(jobRequest);
++            try {
++                this.taskExecutor.execute(new JobLauncher(this.jobSubmitterService, jobRequest, this.registry));
++            } catch (final TaskRejectedException e) {
++                final String errorMsg = "Unable to launch job due to exception: " + e.getMessage();
++                this.jobPersistenceService.updateJobStatus(jobRequest.getId(), JobStatus.FAILED, errorMsg);
++                throw new GenieServerException(errorMsg, e);
++            }
+             return jobRequest.getId();
+         } else {
+             jobBuilder

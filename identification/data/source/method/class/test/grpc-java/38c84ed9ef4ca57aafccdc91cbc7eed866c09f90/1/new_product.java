@@ -1,0 +1,27 @@
+@VisibleForTesting
+  final List<ClientInterceptor> getEffectiveInterceptors() {
+    List<ClientInterceptor> effectiveInterceptors =
+        new ArrayList<ClientInterceptor>(this.interceptors);
+    if (statsEnabled) {
+      retryDisabled = true;
+      CensusStatsModule censusStats = this.censusStatsOverride;
+      if (censusStats == null) {
+        censusStats = new CensusStatsModule(GrpcUtil.STOPWATCH_SUPPLIER, true);
+      }
+      // First interceptor runs last (see ClientInterceptors.intercept()), so that no
+      // other interceptor can override the tracer factory we set in CallOptions.
+      effectiveInterceptors.add(
+          0, censusStats.getClientInterceptor(recordStartedRpcs, recordFinishedRpcs));
+    }
+    if (tracingEnabled) {
+      retryDisabled = true;
+      CensusTracingModule censusTracing =
+          new CensusTracingModule(Tracing.getTracer(),
+              Tracing.getPropagationComponent().getBinaryFormat());
+      effectiveInterceptors.add(0, censusTracing.getClientInterceptor());
+    }
+    if (binlogProvider != null) {
+      effectiveInterceptors.add(0, binlogProvider.getClientCallIdSetter());
+    }
+    return effectiveInterceptors;
+  }

@@ -1,0 +1,1 @@
+public abstract double relativeYearFraction(LocalDate firstDate, LocalDate secondDate, ScheduleInfo scheduleInfo);

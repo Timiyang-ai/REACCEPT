@@ -1,0 +1,1 @@
+<T> T getById(String id, Class<T> clazz);

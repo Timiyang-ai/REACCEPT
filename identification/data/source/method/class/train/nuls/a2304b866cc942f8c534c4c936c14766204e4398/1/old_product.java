@@ -1,0 +1,1 @@
+Result<AccountKeyStore> exportAccountToKeyStore(String accountAddress, String password);

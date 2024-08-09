@@ -1,0 +1,46 @@
+diff --git a/old_product.java b/new_product.java
+index 87dfb48..0e9867f 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -2,20 +2,33 @@ private synchronized Item writeBinary(final boolean append, final QueryContext c
+       throws QueryException, IOException {
+ 
+     final File path = check(checkFile(0, ctx));
+-    final Iter ir = expr[1].iter(ctx);
+-    final BufferOutput out = new BufferOutput(new FileOutputStream(path, append));
+-    try {
+-      for(Item it; (it = ir.next()) != null;) {
+-        if(!(it instanceof Bin)) BINARYTYPE.thrw(info, it.type);
+-        final InputStream is = it.input(info);
++    final Bin bin = checkBinary(expr[1], ctx);
++    final long off = expr.length > 2 ? checkItr(expr[2], ctx) : 0;
++
++    // write full file
++    if(expr.length == 2) {
++      final BufferOutput out = new BufferOutput(new FileOutputStream(path, append));
++      try {
++        final InputStream is = bin.input(info);
+         try {
+           for(int i; (i = is.read()) != -1;)  out.write(i);
+         } finally {
+           is.close();
+         }
++      } finally {
++        out.close();
+       }
++    }
++
++    // write file chunk
++    final RandomAccessFile raf = new RandomAccessFile(path, "rw");
++    try {
++      final long dlen = raf.length();
++      if(off < 0 || off > dlen) FILE_BOUNDS.thrw(info, off, dlen);
++      raf.seek(off);
++      raf.write(bin.binary(info));
+     } finally {
+-      out.close();
++      raf.close();
+     }
+     return null;
+   }
+\ No newline at end of file

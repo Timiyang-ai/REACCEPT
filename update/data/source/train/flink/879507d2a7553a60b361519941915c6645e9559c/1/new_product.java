@@ -1,0 +1,1 @@
+void restore(R state) throws Exception;

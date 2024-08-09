@@ -1,0 +1,1 @@
+public void process( T input , FastQueue<Desc> descriptions , FastQueue<Point2D_I32> locations );

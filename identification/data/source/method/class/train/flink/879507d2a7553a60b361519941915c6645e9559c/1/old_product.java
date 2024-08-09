@@ -1,0 +1,1 @@
+void restore(@Nullable R state) throws Exception;

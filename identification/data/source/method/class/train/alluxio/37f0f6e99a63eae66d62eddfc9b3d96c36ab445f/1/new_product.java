@@ -1,0 +1,1 @@
+void sessionHeartbeat(long sessionId);

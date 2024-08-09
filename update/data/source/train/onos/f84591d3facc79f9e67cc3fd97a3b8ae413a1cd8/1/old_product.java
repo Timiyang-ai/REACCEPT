@@ -1,0 +1,1 @@
+boolean known(Ip4Address addr);

@@ -1,0 +1,1 @@
+GetUserResponse getUser(@WebParam(name = "id") Long id);

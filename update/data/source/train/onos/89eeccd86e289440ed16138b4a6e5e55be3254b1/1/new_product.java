@@ -1,0 +1,1 @@
+CompletableFuture<Set<String>> availableResources(NodeId nodeId, Type resourceType);

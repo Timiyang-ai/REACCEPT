@@ -1,0 +1,1 @@
+ClassesShouldConjunction notImplement(DescribedPredicate<? super JavaClass> predicate);

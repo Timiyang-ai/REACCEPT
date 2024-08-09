@@ -1,0 +1,1 @@
+public List<StoredEvent> findStoredEventsSince(Date occurredFrom);

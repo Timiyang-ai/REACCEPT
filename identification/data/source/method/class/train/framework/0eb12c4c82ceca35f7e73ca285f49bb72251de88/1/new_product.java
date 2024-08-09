@@ -1,0 +1,1 @@
+void render(RendererCellReference cell, T data);

@@ -1,0 +1,48 @@
+diff --git a/old_product.java b/new_product.java
+index 95f462e..7ab4c31 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,14 +1,31 @@
+-public static List<Point> SpatialKnnQueryUsingIndex(PointRDD pointRDD, Point queryCenter, Integer k) {
++public static List<Polygon> SpatialKnnQuery(PolygonRDD spatialRDD, Point queryCenter, Integer k, boolean useIndex) {
+ 		// For each partation, build a priority queue that holds the topk
+ 		//@SuppressWarnings("serial")
+-
+-        if(pointRDD.indexedRDDNoId == null) {
+-            throw new NullPointerException("Need to invoke buildIndex() first, indexedRDDNoId is null");
+-        }
+-		JavaRDD<Point> tmp = pointRDD.indexedRDDNoId.mapPartitions(new PointKnnJudgementUsingIndex(queryCenter,k));
+-
+-		// Take the top k
+-
+-		return tmp.takeOrdered(k, new PointDistanceComparator(queryCenter));
+-
++		if(useIndex)
++		{
++	        if(spatialRDD.indexedRawRDD == null) {
++	            throw new NullPointerException("Need to invoke buildIndex() first, indexedRDDNoId is null");
++	        }
++			JavaRDD<Object> tmp = spatialRDD.indexedRawRDD.mapPartitions(new KnnJudgementUsingIndex(queryCenter,k));
++			List<Object> result = tmp.takeOrdered(k, new GeometryDistanceComparator(queryCenter));
++			List<Polygon> geometryResult = new ArrayList<Polygon>();
++			for(Object spatialObject:result)
++			{
++				geometryResult.add((Polygon)spatialObject);
++			}
++			// Take the top k
++			return geometryResult;
++		}
++		else
++		{
++			JavaRDD<Object> tmp = spatialRDD.getRawSpatialRDD().mapPartitions(new GeometryKnnJudgement(queryCenter,k));
++			List<Object> result = tmp.takeOrdered(k, new GeometryDistanceComparator(queryCenter));
++			List<Polygon> geometryResult = new ArrayList<Polygon>();
++			for(Object spatialObject:result)
++			{
++				geometryResult.add((Polygon)spatialObject);
++			}
++			// Take the top k
++			return geometryResult;
++		}
+ 	}
+\ No newline at end of file

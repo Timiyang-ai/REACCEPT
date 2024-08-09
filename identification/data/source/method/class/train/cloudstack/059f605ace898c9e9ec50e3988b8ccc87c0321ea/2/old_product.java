@@ -1,0 +1,1 @@
+VolumeInfo createVolume(VolumeInfo volume, long dataStoreId, VolumeDiskType diskType);

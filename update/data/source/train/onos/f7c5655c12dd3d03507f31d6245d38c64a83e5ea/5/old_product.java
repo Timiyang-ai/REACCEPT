@@ -1,0 +1,1 @@
+public void updateConfig(List<OspfProcess> processes);

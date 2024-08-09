@@ -1,0 +1,1 @@
+VisitType retireVisitType(VisitType visitType, String reason);

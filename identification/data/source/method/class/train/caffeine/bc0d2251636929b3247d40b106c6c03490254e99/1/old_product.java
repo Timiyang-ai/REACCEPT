@@ -1,0 +1,1 @@
+V get(K key, Function<? super K, ? extends V> mappingFunction);

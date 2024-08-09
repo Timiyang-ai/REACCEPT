@@ -1,0 +1,1 @@
+DistributedMetaStorageHistoryItem[] localFullData() throws IgniteCheckedException;

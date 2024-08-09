@@ -1,0 +1,68 @@
+diff --git a/old_product.java b/new_product.java
+index 0507421..67ad522 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -6,11 +6,11 @@ public void process(Dependency dependency) {
+             return;
+         }
+         if (gav != null) {
+-            final Iterator<Identifier> itr = dependency.getIdentifiers().iterator();
++            final Iterator<Identifier> itr = dependency.getSoftwareIdentifiers().iterator();
+             boolean gavFound = false;
+             while (itr.hasNext()) {
+                 final Identifier i = itr.next();
+-                if (identifierMatches("maven", this.gav, i)) {
++                if (identifierMatches(this.gav, i)) {
+                     gavFound = true;
+                     break;
+                 }
+@@ -22,9 +22,9 @@ public void process(Dependency dependency) {
+ 
+         if (this.hasCpe()) {
+             final Set<Identifier> removalList = new HashSet<>();
+-            for (Identifier i : dependency.getIdentifiers()) {
++            for (Identifier i : dependency.getVulnerableSoftwareIdentifiers()) {
+                 for (PropertyType c : this.cpe) {
+-                    if (identifierMatches("cpe", c, i)) {
++                    if (identifierMatches(c, i)) {
+                         if (!isBase()) {
+                             if (this.notes != null) {
+                                 i.setNotes(this.notes);
+@@ -36,9 +36,9 @@ public void process(Dependency dependency) {
+                     }
+                 }
+             }
+-            for (Identifier i : removalList) {
+-                dependency.removeIdentifier(i);
+-            }
++            removalList.forEach((i) -> {
++                dependency.removeVulnerableSoftwareIdentifier(i);
++            });
+         }
+         if (hasCve() || hasCwe() || hasCvssBelow()) {
+             final Set<Vulnerability> removeVulns = new HashSet<>();
+@@ -53,13 +53,9 @@ public void process(Dependency dependency) {
+                 }
+                 if (!remove) {
+                     for (String entry : this.cwe) {
+-                        if (v.getCwe() != null) {
++                        if (v.getCwes() != null) {
+                             final String toMatch = String.format("CWE-%s", entry);
+-                            String toTest = v.getCwe();
+-                            if (toTest.contains(" ")) {
+-                                toTest = toTest.substring(0, toTest.indexOf(" ")).toUpperCase();
+-                            }
+-                            if (toTest.equals(toMatch)) {
++                            if (v.getCwes().stream().anyMatch(toTest -> toMatch.regionMatches(0, toTest, 0, toMatch.length()))) {
+                                 remove = true;
+                                 removeVulns.add(v);
+                                 break;
+@@ -69,7 +65,7 @@ public void process(Dependency dependency) {
+                 }
+                 if (!remove) {
+                     for (float cvss : this.cvssBelow) {
+-                        if (v.getCvssScore() < cvss) {
++                        if (v.getCvssV2().getScore() < cvss) {
+                             remove = true;
+                             removeVulns.add(v);
+                             break;

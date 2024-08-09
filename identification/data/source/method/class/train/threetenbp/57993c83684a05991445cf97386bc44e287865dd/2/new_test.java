@@ -1,0 +1,6 @@
+@Test(groups={"tck"})
+    public void test_parseBest_firstOption() throws Exception {
+        DateTimeFormatter test = DateTimeFormatters.pattern("yyyy-MM-dd[ZZZ]");
+        DateTimeCalendrical result = test.parseBest("2011-06-30+03:00", OffsetDate.class, LocalDate.class);
+        assertEquals(result, OffsetDate.of(2011, 6, 30, ZoneOffset.ofHours(3)));
+    }

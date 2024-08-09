@@ -1,0 +1,1 @@
+public static boolean endsWithIgnoreCase(String a, char[] b) {return matchesIgnoreCase(a, b, a.length());}

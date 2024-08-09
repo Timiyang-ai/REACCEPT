@@ -1,0 +1,1 @@
+List<SchemaDto> getUserNotificationSchemasByAppId(String applicationId) throws ControlServiceException;

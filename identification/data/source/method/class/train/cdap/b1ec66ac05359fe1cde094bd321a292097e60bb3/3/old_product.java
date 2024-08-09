@@ -1,0 +1,1 @@
+List<SecureStoreMetadata> list() throws IOException;

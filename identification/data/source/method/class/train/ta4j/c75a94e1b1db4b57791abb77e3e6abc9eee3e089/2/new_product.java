@@ -1,0 +1,1 @@
+boolean inPeriod(long timestamp);

@@ -1,0 +1,1 @@
+public <T> void register(String name, Supplier<T> supplier, Class<T> type, @Nullable String description);

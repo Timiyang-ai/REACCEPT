@@ -1,0 +1,1 @@
+Result createAccount(int count);

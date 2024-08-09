@@ -1,0 +1,7 @@
+public static TraceId fromLowerBase16(CharSequence src) {
+    Utils.checkArgument(
+        src.length() == 2 * SIZE,
+        String.format("Invalid size: expected %s, got %s", 2 * SIZE, src.length()));
+    byte[] bytes = BaseEncoding.base16().lowerCase().decode(src);
+    return new TraceId(bytes);
+  }

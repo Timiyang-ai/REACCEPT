@@ -1,0 +1,1 @@
+public abstract ZoneRules getRules(String regionId, String versionId);

@@ -1,0 +1,1 @@
+CompletableFuture<Void> write(String streamSegmentName, long offset, InputStream data, int length, Duration timeout);

@@ -1,0 +1,22 @@
+diff --git a/old_product.java b/new_product.java
+index e9de091..ee9a800 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,4 +1,4 @@
+-public CompletableFuture<Void> createNewStreamSegment(String streamSegmentName, Duration timeout) {
++public CompletableFuture<Void> createNewStreamSegment(String streamSegmentName, Collection<AttributeUpdate> attributes, Duration timeout) {
+         long traceId = LoggerHelpers.traceEnter(log, traceObjectId, "createNewStreamSegment", streamSegmentName);
+         long streamId = this.containerMetadata.getStreamSegmentId(streamSegmentName);
+         if (isValidStreamSegmentId(streamId)) {
+@@ -11,6 +11,9 @@ public CompletableFuture<Void> createNewStreamSegment(String streamSegmentName,
+         TimeoutTimer timer = new TimeoutTimer(timeout);
+         return this.storage
+                 .create(streamSegmentName, timer.getRemaining())
+-                .thenCompose(si -> getOrAssignStreamSegmentId(si.getName(), timer.getRemaining()))
++                .thenComposeAsync(si -> {
++                    si = attachAttributes(si, attributes);
++                    return persistInDurableLog(si, timeout);
++                }, this.executor)
+                 .thenAccept(id -> LoggerHelpers.traceLeave(log, traceObjectId, "createNewStreamSegment", traceId, streamSegmentName, id));
+     }
+\ No newline at end of file

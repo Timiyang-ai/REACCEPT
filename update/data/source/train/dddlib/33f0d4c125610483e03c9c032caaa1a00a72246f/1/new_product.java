@@ -1,0 +1,1 @@
+<T extends Entity> List<T> findByProperties(Class<T> clazz, NamedParameters properties);

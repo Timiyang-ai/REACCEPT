@@ -1,0 +1,94 @@
+diff --git a/old_product.java b/new_product.java
+index e493956..22cbef9 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -126,10 +126,6 @@ public static GridCoverage2D reproject(GridCoverage2D            sourceCoverage,
+          * is available as a source of the source coverage (i.e. the floating-point image
+          * is derived from the integer image, not the converse).
+          */
+-        final ViewType processingView = CoverageUtilities.preferredViewForOperation(
+-                                        sourceCoverage, interpolation, false, hints);
+-        final ViewType finalView = CoverageUtilities.preferredViewAfterOperation(sourceCoverage);
+-        sourceCoverage = sourceCoverage.view(processingView);
+         PlanarImage sourceImage = PlanarImage.wrapRenderedImage(sourceCoverage.getRenderedImage());
+         assert sourceCoverage.getCoordinateReferenceSystem() == sourceCRS : sourceCoverage;
+         // From this point, consider 'sourceCoverage' as final.
+@@ -263,7 +259,15 @@ public static GridCoverage2D reproject(GridCoverage2D            sourceCoverage,
+         ////                                                                                ////
+         ////////////////////////////////////////////////////////////////////////////////////////
+ 
+-        final RenderingHints targetHints = processingView.getRenderingHints(sourceImage);
++        RenderingHints targetHints = ImageUtilities.getRenderingHints(sourceImage);
++        if (targetHints == null) {
++            targetHints = new RenderingHints(JAI.KEY_INTERPOLATION, Interpolation.getInstance(Interpolation.INTERP_NEAREST));
++        } else {
++            targetHints.put(JAI.KEY_INTERPOLATION, Interpolation.getInstance(Interpolation.INTERP_NEAREST));
++        }
++        targetHints.put(JAI.KEY_REPLACE_INDEX_COLOR_MODEL, false);
++        targetHints.put(JAI.KEY_TRANSFORM_ON_COLORMAP, false);
++        
+         if (hints != null) {
+             targetHints.add(hints);
+         }
+@@ -306,9 +310,7 @@ public static GridCoverage2D reproject(GridCoverage2D            sourceCoverage,
+          * provide an ImageLayout built with the source image where the CM and the SM are valid.
+          * those will be employed overriding a the possibility to expand the color model.
+          */
+-        if (ViewType.PHOTOGRAPHIC.equals(processingView)) {
+-            layout.unsetValid(ImageLayout.COLOR_MODEL_MASK | ImageLayout.SAMPLE_MODEL_MASK);
+-        }
++        
+         targetHints.put(JAI.KEY_IMAGE_LAYOUT, layout);
+ 
+         ////////////////////////////////////////////////////////////////////////////////////////
+@@ -331,11 +333,6 @@ public static GridCoverage2D reproject(GridCoverage2D            sourceCoverage,
+         if (allSteps.isIdentity() || (allSteps instanceof AffineTransform &&
+                 XAffineTransform.isIdentity((AffineTransform) allSteps, EPS)))
+         {
+-            /*
+-             * Since there is no interpolation to perform, use the native view (which may be
+-             * packed or geophysics - it is just the view which is closest to original data).
+-             */
+-            sourceCoverage = sourceCoverage.view(ViewType.NATIVE);
+             sourceImage = PlanarImage.wrapRenderedImage(sourceCoverage.getRenderedImage());
+             paramBlk.removeSources();
+             paramBlk.addSource(sourceImage);
+@@ -347,9 +344,9 @@ public static GridCoverage2D reproject(GridCoverage2D            sourceCoverage,
+                  * to create a new coverage) otherwise this condition would have been detected
+                  * sooner in this method.
+                  */
+-                sourceCoverage = sourceCoverage.view(finalView);
++                
+                 sourceImage = PlanarImage.wrapRenderedImage(sourceCoverage.getRenderedImage());
+-                return create(sourceCoverage, sourceImage, targetGG, ViewType.SAME, null, null, hints);
++                return create(sourceCoverage, sourceImage, targetGG, null, null, hints);
+             }
+             if (sourceBB.contains(targetBB)) {
+                 operation = "Crop";
+@@ -393,7 +390,7 @@ public static GridCoverage2D reproject(GridCoverage2D            sourceCoverage,
+                      * using heuristic rules. Only the constructor with a MathTransform argument
+                      * is fully accurate.
+                      */
+-                    return create(sourceCoverage, sourceImage, targetGG, finalView, null, null, hints);
++                    return create(sourceCoverage, sourceImage, targetGG, null, null, hints);
+                 }
+                 // More general approach: apply the affine transform.
+                 operation = "Affine";
+@@ -486,7 +483,7 @@ public static GridCoverage2D reproject(GridCoverage2D            sourceCoverage,
+          *     is "Warp" with "Nearest" interpolation on geophysics pixels values. Background
+          *     value is 255.
+          */
+-        targetCoverage = create(sourceCoverage, targetImage, targetGG, finalView, operation, warp, hints);
++        targetCoverage = create(sourceCoverage, targetImage, targetGG, operation, warp, hints);
+         assert CRS.equalsIgnoreMetadata(targetCoverage.getCoordinateReferenceSystem(), targetCRS) : targetGG;
+         assert targetCoverage.getGridGeometry().getGridRange2D().equals(targetImage.getBounds())  : targetGG;
+         if (CoverageProcessor.LOGGER.isLoggable(LOGGING_LEVEL)) {
+@@ -500,7 +497,7 @@ public static GridCoverage2D reproject(GridCoverage2D            sourceCoverage,
+                 /*  {5} */ targetImage.getWidth(),
+                 /*  {6} */ targetImage.getHeight(),
+                 /*  {7} */ targetImage.getOperationName(),
+-                /*  {8} */ Integer.valueOf(sourceCoverage == sourceCoverage.view(ViewType.GEOPHYSICS) ? 1 : 0),
++                /*  {8} */ Integer.valueOf(1),
+                 /*  {9} */ ImageUtilities.getInterpolationName(interpolation),
+                 /* {10} */ (background != null) ? background.length == 1 ? (Double.isNaN(background[0]) ? (Object) "NaN"
+                                  : (Object) Double.valueOf(background[0]))

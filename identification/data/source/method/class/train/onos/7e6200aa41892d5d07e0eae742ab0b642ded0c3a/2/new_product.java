@@ -1,0 +1,1 @@
+void disconnectDevice(DeviceId deviceId, boolean remove);

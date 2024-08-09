@@ -1,0 +1,2 @@
+SegmentOutputStream createOutputStreamForSegment(Segment segment, Consumer<Segment> segmentSealedCallback,
+                                                     EventWriterConfig config, DelegationTokenProvider tokenProvider);

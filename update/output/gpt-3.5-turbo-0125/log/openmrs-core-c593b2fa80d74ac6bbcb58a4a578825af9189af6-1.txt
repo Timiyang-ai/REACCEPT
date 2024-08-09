@@ -1,0 +1,1327 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.9373040752351097
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 1
+----------------------------------------------------------------
+old description: 单元测试不通过
+----------------------------------------------------------------
+old message
+-------------------------------------------------------------------------------
+Test set: org.openmrs.api.OrderServiceTest
+-------------------------------------------------------------------------------
+Tests run: 147, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 18.565 sec <<< FAILURE!
+saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists(org.openmrs.api.OrderServiceTest)  Time elapsed: 0.057 sec  <<< FAILURE!
+java.lang.AssertionError: Expected test to throw (an instance of org.openmrs.api.APIException and exception with message a string containing "Order.cannot.have.more.than.one")
+	at org.junit.Assert.fail(Assert.java:88)
+	at org.junit.rules.ExpectedException.failDueToMissingException(ExpectedException.java:184)
+	at org.junit.rules.ExpectedException.access$100(ExpectedException.java:85)
+	at org.junit.rules.ExpectedException$ExpectedExceptionStatement.evaluate(ExpectedException.java:170)
+	at org.junit.rules.RunRules.evaluate(RunRules.java:20)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:73)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:271)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:217)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:83)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:238)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:63)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:236)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:53)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:229)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:68)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:309)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:163)
+	at org.apache.maven.surefire.junit4.JUnit4TestSet.execute(JUnit4TestSet.java:59)
+	at org.apache.maven.surefire.suite.AbstractDirectoryTestSuite.executeTestSet(AbstractDirectoryTestSuite.java:115)
+	at org.apache.maven.surefire.suite.AbstractDirectoryTestSuite.execute(AbstractDirectoryTestSuite.java:102)
+	at org.apache.maven.surefire.Surefire.run(Surefire.java:180)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.apache.maven.surefire.booter.SurefireBooter.runSuitesInProcess(SurefireBooter.java:350)
+	at org.apache.maven.surefire.booter.SurefireBooter.main(SurefireBooter.java:1021)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+public synchronized Order saveOrder(Order order, OrderContext orderContext) throws APIException {
+		if (order.getOrderId() != null) {
+			throw new APIException("Order.cannot.edit.existing", (Object[]) null);
+		}
+		if (order.getDateActivated() == null) {
+			order.setDateActivated(new Date());
+		}
+		//Reject if there is an active order for the same orderable with overlapping schedule
+		boolean isDrugOrder = DrugOrder.class.isAssignableFrom(getActualType(order));
+		Concept concept = order.getConcept();
+		if (concept == null && isDrugOrder) {
+			DrugOrder drugOrder = (DrugOrder) order;
+			if (drugOrder.getDrug() != null) {
+				concept = drugOrder.getDrug().getConcept();
+				drugOrder.setConcept(concept);
+			}
+		}
+		if (isDrugOrder) {
+			((DrugOrder) order).setAutoExpireDateBasedOnDuration();
+		}
+		
+		if (concept == null) {
+			throw new APIException("Order.concept.required", (Object[]) null);
+		}
+		
+		Order previousOrder = order.getPreviousOrder();
+		if (order.getOrderType() == null) {
+			OrderType orderType = null;
+			if (orderContext != null) {
+				orderType = orderContext.getOrderType();
+			}
+			if (orderType == null) {
+				orderType = getOrderTypeByConcept(concept);
+			}
+			//Check if it is instance of DrugOrder
+			if (orderType == null && order instanceof DrugOrder) {
+				orderType = Context.getOrderService().getOrderTypeByUuid(OrderType.DRUG_ORDER_TYPE_UUID);
+			}
+			//Check if it is an instance of TestOrder
+			if (orderType == null && order instanceof TestOrder) {
+				orderType = Context.getOrderService().getOrderTypeByUuid(OrderType.TEST_ORDER_TYPE_UUID);
+			}
+			
+			//this order's order type should match that of the previous
+			if (orderType == null || (previousOrder != null && !orderType.equals(previousOrder.getOrderType()))) {
+				throw new APIException("Order.type.cannot.determine", (Object[]) null);
+			}
+			
+			order.setOrderType(orderType);
+		}
+		if (order.getCareSetting() == null) {
+			CareSetting careSetting = null;
+			if (orderContext != null) {
+				careSetting = orderContext.getCareSetting();
+			}
+			if (careSetting == null || (previousOrder != null && !careSetting.equals(previousOrder.getCareSetting()))) {
+				throw new APIException("Order.care.cannot.determine", (Object[]) null);
+			}
+			order.setCareSetting(careSetting);
+		}
+		
+		if (!order.getOrderType().getJavaClass().isAssignableFrom(order.getClass())) {
+			throw new APIException("Order.type.class.does.not.match", new Object[] { order.getOrderType().getJavaClass(),
+			        order.getClass().getName() });
+		}
+		
+		if (REVISE == order.getAction()) {
+			if (previousOrder == null) {
+				throw new APIException("Order.previous.required", (Object[]) null);
+			}
+			stopOrder(previousOrder, aMomentBefore(order.getDateActivated()));
+		} else if (DISCONTINUE == order.getAction()) {
+			discontinueExistingOrdersIfNecessary(order);
+		}
+		
+		if (previousOrder != null) {
+			//Check that patient, careSetting, concept and drug if is drug order have not changed
+			//we need to use a SQL query to by pass the hibernate cache
+			boolean isPreviousDrugOrder = DrugOrder.class.isAssignableFrom(previousOrder.getClass());
+			List<Object[]> rows = dao.getOrderFromDatabase(previousOrder, isPreviousDrugOrder);
+			Object[] rowData = rows.get(0);
+			if (!rowData[0].equals(previousOrder.getPatient().getPatientId())) {
+				throw new APIException("Order.cannot.change.patient", (Object[]) null);
+			} else if (!rowData[1].equals(previousOrder.getCareSetting().getCareSettingId())) {
+				throw new APIException("Order.cannot.change.careSetting", (Object[]) null);
+			} else if (!rowData[2].equals(previousOrder.getConcept().getConceptId())) {
+				throw new APIException("Order.cannot.change.concept", (Object[]) null);
+			} else if (isPreviousDrugOrder) {
+				Drug previousDrug = ((DrugOrder) previousOrder).getDrug();
+				if (previousDrug == null && rowData[3] != null) {
+					throw new APIException("Order.cannot.change.drug", (Object[]) null);
+				} else if (previousDrug != null && !OpenmrsUtil.nullSafeEquals(rowData[3], previousDrug.getDrugId())) {
+					throw new APIException("Order.cannot.change.drug", (Object[]) null);
+				}
+			}
+			
+			//concept should be the same as on previous order, same applies to drug for drug orders
+			boolean isDrugOrderAndHasADrug = isDrugOrder && ((DrugOrder) order).getDrug() != null;
+			if (!OpenmrsUtil.nullSafeEquals(order.getConcept(), previousOrder.getConcept())) {
+				throw new APIException("Order.previous.concept", (Object[]) null);
+			} else if (isDrugOrderAndHasADrug) {
+				DrugOrder drugOrder1 = (DrugOrder) order;
+				DrugOrder drugOrder2 = (DrugOrder) previousOrder;
+				if (!OpenmrsUtil.nullSafeEquals(drugOrder1.getDrug(), drugOrder2.getDrug())) {
+					throw new APIException("Order.previous.drug", (Object[]) null);
+				}
+			} else if (!order.getOrderType().equals(previousOrder.getOrderType())) {
+				throw new APIException("Order.type.does.not.match", (Object[]) null);
+			} else if (!order.getCareSetting().equals(previousOrder.getCareSetting())) {
+				throw new APIException("Order.care.setting.does.not.match", (Object[]) null);
+			} else if (!getActualType(order).equals(getActualType(previousOrder))) {
+				throw new APIException("Order.class.does.not.match", (Object[]) null);
+			}
+		}
+		
+		if (DISCONTINUE != order.getAction()) {
+			List<Order> activeOrders = getActiveOrders(order.getPatient(), null, order.getCareSetting(), null);
+			for (Order activeOrder : activeOrders) {
+				if (order.hasSameOrderableAs(activeOrder)
+				        && !OpenmrsUtil.nullSafeEquals(order.getPreviousOrder(), activeOrder)
+				        && OrderUtil.checkScheduleOverlap(order, activeOrder)) {
+					throw new APIException("Order.cannot.have.more.than.one", (Object[]) null);
+				}
+			}
+		}
+		
+		return saveOrderInternal(order, orderContext);
+	}
+----------------------------------------------------------------
+old test
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		expectedException.expect(APIException.class);
+		expectedException.expectMessage("Order.cannot.have.more.than.one");
+		orderService.saveOrder(order, null);
+	}
+----------------------------------------------------------------
+new product
+public synchronized Order saveOrder(Order order, OrderContext orderContext) throws APIException {
+		if (order.getOrderId() != null) {
+			throw new APIException("Order.cannot.edit.existing", (Object[]) null);
+		}
+		if (order.getDateActivated() == null) {
+			order.setDateActivated(new Date());
+		}
+		boolean isDrugOrder = DrugOrder.class.isAssignableFrom(getActualType(order));
+		Concept concept = order.getConcept();
+		if (concept == null && isDrugOrder) {
+			DrugOrder drugOrder = (DrugOrder) order;
+			if (drugOrder.getDrug() != null) {
+				concept = drugOrder.getDrug().getConcept();
+				drugOrder.setConcept(concept);
+			}
+		}
+		if (isDrugOrder) {
+			((DrugOrder) order).setAutoExpireDateBasedOnDuration();
+		}
+		
+		if (concept == null) {
+			throw new APIException("Order.concept.required", (Object[]) null);
+		}
+		
+		Order previousOrder = order.getPreviousOrder();
+		if (order.getOrderType() == null) {
+			OrderType orderType = null;
+			if (orderContext != null) {
+				orderType = orderContext.getOrderType();
+			}
+			if (orderType == null) {
+				orderType = getOrderTypeByConcept(concept);
+			}
+			//Check if it is instance of DrugOrder
+			if (orderType == null && order instanceof DrugOrder) {
+				orderType = Context.getOrderService().getOrderTypeByUuid(OrderType.DRUG_ORDER_TYPE_UUID);
+			}
+			//Check if it is an instance of TestOrder
+			if (orderType == null && order instanceof TestOrder) {
+				orderType = Context.getOrderService().getOrderTypeByUuid(OrderType.TEST_ORDER_TYPE_UUID);
+			}
+			
+			//this order's order type should match that of the previous
+			if (orderType == null || (previousOrder != null && !orderType.equals(previousOrder.getOrderType()))) {
+				throw new APIException("Order.type.cannot.determine", (Object[]) null);
+			}
+			
+			order.setOrderType(orderType);
+		}
+		if (order.getCareSetting() == null) {
+			CareSetting careSetting = null;
+			if (orderContext != null) {
+				careSetting = orderContext.getCareSetting();
+			}
+			if (careSetting == null || (previousOrder != null && !careSetting.equals(previousOrder.getCareSetting()))) {
+				throw new APIException("Order.care.cannot.determine", (Object[]) null);
+			}
+			order.setCareSetting(careSetting);
+		}
+		
+		if (!order.getOrderType().getJavaClass().isAssignableFrom(order.getClass())) {
+			throw new APIException("Order.type.class.does.not.match", new Object[] { order.getOrderType().getJavaClass(),
+			        order.getClass().getName() });
+		}
+		
+		if (REVISE == order.getAction()) {
+			if (previousOrder == null) {
+				throw new APIException("Order.previous.required", (Object[]) null);
+			}
+			stopOrder(previousOrder, aMomentBefore(order.getDateActivated()));
+		} else if (DISCONTINUE == order.getAction()) {
+			discontinueExistingOrdersIfNecessary(order);
+		}
+		
+		if (previousOrder != null) {
+			//Check that patient, careSetting, concept and drug if is drug order have not changed
+			//we need to use a SQL query to by pass the hibernate cache
+			boolean isPreviousDrugOrder = DrugOrder.class.isAssignableFrom(previousOrder.getClass());
+			List<Object[]> rows = dao.getOrderFromDatabase(previousOrder, isPreviousDrugOrder);
+			Object[] rowData = rows.get(0);
+			if (!rowData[0].equals(previousOrder.getPatient().getPatientId())) {
+				throw new APIException("Order.cannot.change.patient", (Object[]) null);
+			} else if (!rowData[1].equals(previousOrder.getCareSetting().getCareSettingId())) {
+				throw new APIException("Order.cannot.change.careSetting", (Object[]) null);
+			} else if (!rowData[2].equals(previousOrder.getConcept().getConceptId())) {
+				throw new APIException("Order.cannot.change.concept", (Object[]) null);
+			} else if (isPreviousDrugOrder) {
+				Drug previousDrug = ((DrugOrder) previousOrder).getDrug();
+				if (previousDrug == null && rowData[3] != null) {
+					throw new APIException("Order.cannot.change.drug", (Object[]) null);
+				} else if (previousDrug != null && !OpenmrsUtil.nullSafeEquals(rowData[3], previousDrug.getDrugId())) {
+					throw new APIException("Order.cannot.change.drug", (Object[]) null);
+				}
+			}
+			
+			//concept should be the same as on previous order, same applies to drug for drug orders
+			boolean isDrugOrderAndHasADrug = isDrugOrder && ((DrugOrder) order).getDrug() != null;
+			if (!OpenmrsUtil.nullSafeEquals(order.getConcept(), previousOrder.getConcept())) {
+				throw new APIException("Order.previous.concept", (Object[]) null);
+			} else if (isDrugOrderAndHasADrug) {
+				DrugOrder drugOrder1 = (DrugOrder) order;
+				DrugOrder drugOrder2 = (DrugOrder) previousOrder;
+				if (!OpenmrsUtil.nullSafeEquals(drugOrder1.getDrug(), drugOrder2.getDrug())) {
+					throw new APIException("Order.previous.drug", (Object[]) null);
+				}
+			} else if (!order.getOrderType().equals(previousOrder.getOrderType())) {
+				throw new APIException("Order.type.does.not.match", (Object[]) null);
+			} else if (!order.getCareSetting().equals(previousOrder.getCareSetting())) {
+				throw new APIException("Order.care.setting.does.not.match", (Object[]) null);
+			} else if (!getActualType(order).equals(getActualType(previousOrder))) {
+				throw new APIException("Order.class.does.not.match", (Object[]) null);
+			}
+		}
+		
+		if (DISCONTINUE != order.getAction()) {
+			List<Order> activeOrders = getActiveOrders(order.getPatient(), null, order.getCareSetting(), null);
+			for (Order activeOrder : activeOrders) {
+				//Reject if there is an active drug order for the same orderable with overlapping schedule
+				if (areDrugOrdersOfSameOrderableAndOverlappingSchedule(order, activeOrder)) {
+					throw new APIException("Order.cannot.have.more.than.one", (Object[]) null);
+				}
+			}
+		}
+		
+		return saveOrderInternal(order, orderContext);
+	}
+----------------------------------------------------------------
+new test
+@Test
+	public void saveOrder_shouldPassIfAnActiveTestOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+
+		Order savedOrder = orderService.saveOrder(order, null);
+
+		assertNotNull(orderService.getOrder(savedOrder.getOrderId()));
+	}
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index f2bff62..5f3cbe3 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -5,7 +5,6 @@ public synchronized Order saveOrder(Order order, OrderContext orderContext) thro
+ 		if (order.getDateActivated() == null) {
+ 			order.setDateActivated(new Date());
+ 		}
+-		//Reject if there is an active order for the same orderable with overlapping schedule
+ 		boolean isDrugOrder = DrugOrder.class.isAssignableFrom(getActualType(order));
+ 		Concept concept = order.getConcept();
+ 		if (concept == null && isDrugOrder) {
+@@ -116,9 +115,8 @@ public synchronized Order saveOrder(Order order, OrderContext orderContext) thro
+ 		if (DISCONTINUE != order.getAction()) {
+ 			List<Order> activeOrders = getActiveOrders(order.getPatient(), null, order.getCareSetting(), null);
+ 			for (Order activeOrder : activeOrders) {
+-				if (order.hasSameOrderableAs(activeOrder)
+-				        && !OpenmrsUtil.nullSafeEquals(order.getPreviousOrder(), activeOrder)
+-				        && OrderUtil.checkScheduleOverlap(order, activeOrder)) {
++				//Reject if there is an active drug order for the same orderable with overlapping schedule
++				if (areDrugOrdersOfSameOrderableAndOverlappingSchedule(order, activeOrder)) {
+ 					throw new APIException("Order.cannot.have.more.than.one", (Object[]) null);
+ 				}
+ 			}
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index 9a16932..cdd0bc6 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,5 +1,5 @@
+ @Test
+-	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
++	public void saveOrder_shouldPassIfAnActiveTestOrderForTheSameConceptAndCareSettingExists() throws Exception {
+ 		final Patient patient = patientService.getPatient(2);
+ 		final Concept cd4Count = conceptService.getConcept(5497);
+ 		//sanity check that we have an active order for the same concept
+@@ -14,8 +14,8 @@
+ 		order.setEncounter(encounterService.getEncounter(6));
+ 		order.setOrderer(providerService.getProvider(1));
+ 		order.setCareSetting(duplicateOrder.getCareSetting());
+-		
+-		expectedException.expect(APIException.class);
+-		expectedException.expectMessage("Order.cannot.have.more.than.one");
+-		orderService.saveOrder(order, null);
++
++		Order savedOrder = orderService.saveOrder(order, null);
++
++		assertNotNull(orderService.getOrder(savedOrder.getOrderId()));
+ 	}
+\ No newline at end of file
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index b9e4c24..cbc5ab7 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -5,7 +5,6 @@ public synchronized Order saveOrder(Order order, OrderContext orderContext) thro
+ 		if (order.getDateActivated() == null) {
+ 			order.setDateActivated(new Date());
+ 		}
+-		//Reject if there is an active order for the same orderable with overlapping schedule
+ 		boolean isDrugOrder = DrugOrder.class.isAssignableFrom(getActualType(order));
+ 		Concept concept = order.getConcept();
+ 		if (concept == null && isDrugOrder) {
+@@ -117,11 +116,9 @@ public synchronized Order saveOrder(Order order, OrderContext orderContext) thro
+ 		if (DISCONTINUE != order.getAction()) {
+ 			List<Order> activeOrders = getActiveOrders(order.getPatient(), null, order.getCareSetting(), null);
+ 			for (Order activeOrder : activeOrders) {
+-				if (order.hasSameOrderableAs(activeOrder)
+-				        && !OpenmrsUtil.nullSafeEquals(order.getPreviousOrder(), activeOrder)
+-				        && OrderUtil.checkScheduleOverlap(order, activeOrder)) {
+-					throw new APIException(
+-					        "Cannot have more than one active order for the same orderable and care setting at same time");
++				//Reject if there is an active drug order for the same orderable with overlapping schedule
++				if (areDrugOrdersOfSameOrderableAndOverlappingSchedule(order, activeOrder)) {
++					throw new APIException("Cannot have more than one active order for the same orderable and care setting");
+ 				}
+ 			}
+ 		}
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index a99d5eb..0265639 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,6 +1,6 @@
+ @Test
+-	public void saveOrder_shouldFailForRevisionOrderIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+-		//sanity check that we have an active order
++	public void saveOrder_shouldPassForRevisionOrderIfAnActiveTestOrderForTheSameConceptAndCareSettingsExists()
++	        throws Exception {
+ 		final Patient patient = patientService.getPatient(2);
+ 		final Concept cd4Count = conceptService.getConcept(5497);
+ 		TestOrder activeOrder = new TestOrder();
+@@ -13,7 +13,7 @@
+ 		activeOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 10));
+ 		orderService.saveOrder(activeOrder, null);
+ 		
+-		//New Drug order in future for same concept
++		//New order in future for same concept
+ 		TestOrder secondOrder = new TestOrder();
+ 		secondOrder.setPatient(activeOrder.getPatient());
+ 		secondOrder.setConcept(activeOrder.getConcept());
+@@ -25,13 +25,13 @@
+ 		secondOrder.setUrgency(Order.Urgency.ON_SCHEDULED_DATE);
+ 		orderService.saveOrder(secondOrder, null);
+ 		
+-		//Revise Second Order to have scheduled date overlapping with active order
++		//Revise second order to have scheduled date overlapping with active order
+ 		TestOrder revision = secondOrder.cloneForRevision();
+ 		revision.setScheduledDate(DateUtils.addDays(activeOrder.getEffectiveStartDate(), 2));
+ 		revision.setEncounter(encounterService.getEncounter(6));
+ 		revision.setOrderer(providerService.getProvider(1));
+ 		
+-		expectedException.expect(APIException.class);
+-		expectedException.expectMessage("Cannot have more than one active order for the same orderable and care setting");
+-		orderService.saveOrder(revision, null);
++		Order savedSecondOrder = orderService.saveOrder(revision, null);
++		
++		assertNotNull(orderService.getOrder(savedSecondOrder.getOrderId()));
+ 	}
+\ No newline at end of file
+
+----------------------------------------------------------------
+coverage: 0.9373040752351097
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		expectedException.expect(APIException.class);
+		expectedException.expectMessage("Order.cannot.have.more.than.one");
+		orderService.saveOrder(order, null);
+	}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		expectedException.expect(APIException.class);
+		expectedException.expectMessage("Order.cannot.have.more.than.one");
+		orderService.saveOrder(order, null);
+	}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.openmrs.api.OrderServiceTest
+-------------------------------------------------------------------------------
+Tests run: 147, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 18.921 sec <<< FAILURE!
+saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists(org.openmrs.api.OrderServiceTest)  Time elapsed: 0.031 sec  <<< FAILURE!
+java.lang.AssertionError: Expected test to throw (an instance of org.openmrs.api.APIException and exception with message a string containing "Order.cannot.have.more.than.one")
+	at org.junit.Assert.fail(Assert.java:88)
+	at org.junit.rules.ExpectedException.failDueToMissingException(ExpectedException.java:184)
+	at org.junit.rules.ExpectedException.access$100(ExpectedException.java:85)
+	at org.junit.rules.ExpectedException$ExpectedExceptionStatement.evaluate(ExpectedException.java:170)
+	at org.junit.rules.RunRules.evaluate(RunRules.java:20)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:73)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:271)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:217)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:83)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:238)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:63)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:236)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:53)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:229)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:68)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:309)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:163)
+	at org.apache.maven.surefire.junit4.JUnit4TestSet.execute(JUnit4TestSet.java:59)
+	at org.apache.maven.surefire.suite.AbstractDirectoryTestSuite.executeTestSet(AbstractDirectoryTestSuite.java:115)
+	at org.apache.maven.surefire.suite.AbstractDirectoryTestSuite.execute(AbstractDirectoryTestSuite.java:102)
+	at org.apache.maven.surefire.Surefire.run(Surefire.java:180)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.apache.maven.surefire.booter.SurefireBooter.runSuitesInProcess(SurefireBooter.java:350)
+	at org.apache.maven.surefire.booter.SurefireBooter.main(SurefireBooter.java:1021)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 2
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		try {
+			orderService.saveOrder(order, null);
+			fail("Expected test to throw APIException with message containing 'Order.cannot.have.more.than.one'");
+		} catch (APIException e) {
+			assertTrue(e.getMessage().contains("Order.cannot.have.more.than.one"));
+		}
+	}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		try {
+			orderService.saveOrder(order, null);
+			fail("Expected test to throw APIException with message containing 'Order.cannot.have.more.than.one'");
+		} catch (APIException e) {
+			assertTrue(e.getMessage().contains("Order.cannot.have.more.than.one"));
+		}
+	}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -15,7 +15,10 @@
+
+ 		order.setOrderer(providerService.getProvider(1));
+ 		order.setCareSetting(duplicateOrder.getCareSetting());
+ 		
+-		expectedException.expect(APIException.class);
+-		expectedException.expectMessage("Order.cannot.have.more.than.one");
+-		orderService.saveOrder(order, null);
++		try {
++			orderService.saveOrder(order, null);
++			fail("Expected test to throw APIException with message containing 'Order.cannot.have.more.than.one'");
++		} catch (APIException e) {
++			assertTrue(e.getMessage().contains("Order.cannot.have.more.than.one"));
++		}
+ 	}
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1579,3] 错误: 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1579,3] 错误: 找不到符号
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 3
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		try {
+			orderService.saveOrder(order, null);
+			fail("Expected test to throw APIException with message containing 'Order.cannot.have.more.than.one'");
+		} catch (APIException e) {
+			assertTrue(e.getMessage().contains("Order.cannot.have.more.than.one"));
+		}
+	}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		try {
+			orderService.saveOrder(order, null);
+			fail("Expected test to throw APIException with message containing 'Order.cannot.have.more.than.one'");
+		} catch (APIException e) {
+			assertTrue(e.getMessage().contains("Order.cannot.have.more.than.one"));
+		}
+	}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1579,3] 错误: 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1579,3] 错误: 找不到符号
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 4
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		try {
+			orderService.saveOrder(order, null);
+			fail("Expected test to throw APIException with message containing 'Order.cannot.have.more.than.one'");
+		} catch (APIException e) {
+			assertTrue(e.getMessage().contains("Order.cannot.have.more.than.one"));
+		}
+	}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		try {
+			orderService.saveOrder(order, null);
+			fail("Expected test to throw APIException with message containing 'Order.cannot.have.more.than.one'");
+		} catch (APIException e) {
+			assertTrue(e.getMessage().contains("Order.cannot.have.more.than.one"));
+		}
+	}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1579,3] 错误: 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1579,3] 错误: 找不到符号
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 5
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		try {
+			orderService.saveOrder(order, null);
+			fail("Expected test to throw APIException with message containing 'Order.cannot.have.more.than.one'");
+		} catch (APIException e) {
+			assertTrue(e.getMessage().contains("Order.cannot.have.more.than.one"));
+		}
+	}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		try {
+			orderService.saveOrder(order, null);
+			fail("Expected test to throw APIException with message containing 'Order.cannot.have.more.than.one'");
+		} catch (APIException e) {
+			assertTrue(e.getMessage().contains("Order.cannot.have.more.than.one"));
+		}
+	}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1579,3] 错误: 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1579,3] 错误: 找不到符号
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 6
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() {
+    Patient patient = new Patient();
+    patient.setId(2);
+    
+    Concept cd4Count = new Concept();
+    cd4Count.setId(5497);
+    
+    TestOrder duplicateOrder = new TestOrder();
+    duplicateOrder.setId(7);
+    duplicateOrder.setActive(true);
+    duplicateOrder.setConcept(cd4Count);
+    
+    when(orderService.getOrder(7)).thenReturn(duplicateOrder);
+    
+    Order order = new TestOrder();
+    order.setPatient(patient);
+    order.setCareSetting(new CareSetting(2));
+    order.setConcept(cd4Count);
+    order.setEncounter(new Encounter(6));
+    order.setOrderer(new Provider(1));
+    order.setCareSetting(duplicateOrder.getCareSetting());
+    
+    APIException exception = assertThrows(APIException.class, () -> orderService.saveOrder(order, null));
+    assertTrue(exception.getMessage().contains("Order.cannot.have.more.than.one"));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() {
+    Patient patient = new Patient();
+    patient.setId(2);
+    
+    Concept cd4Count = new Concept();
+    cd4Count.setId(5497);
+    
+    TestOrder duplicateOrder = new TestOrder();
+    duplicateOrder.setId(7);
+    duplicateOrder.setActive(true);
+    duplicateOrder.setConcept(cd4Count);
+    
+    when(orderService.getOrder(7)).thenReturn(duplicateOrder);
+    
+    Order order = new TestOrder();
+    order.setPatient(patient);
+    order.setCareSetting(new CareSetting(2));
+    order.setConcept(cd4Count);
+    order.setEncounter(new Encounter(6));
+    order.setOrderer(new Provider(1));
+    order.setCareSetting(duplicateOrder.getCareSetting());
+    
+    APIException exception = assertThrows(APIException.class, () -> orderService.saveOrder(order, null));
+    assertTrue(exception.getMessage().contains("Order.cannot.have.more.than.one"));
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,24 +1,26 @@
+
+ @Test
+-	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+-		final Patient patient = patientService.getPatient(2);
+-		final Concept cd4Count = conceptService.getConcept(5497);
+-		//sanity check that we have an active order for the same concept
+-		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+-		assertTrue(duplicateOrder.isActive());
+-		assertEquals(cd4Count, duplicateOrder.getConcept());
+-		
+-		Order order = new TestOrder();
+-		order.setPatient(patient);
+-		order.setCareSetting(orderService.getCareSetting(2));
+-		order.setConcept(cd4Count);
+-		order.setEncounter(encounterService.getEncounter(6));
+-		order.setOrderer(providerService.getProvider(1));
+-		order.setCareSetting(duplicateOrder.getCareSetting());
+-		
+-		try {
+-			orderService.saveOrder(order, null);
+-			fail("Expected test to throw APIException with message containing 'Order.cannot.have.more.than.one'");
+-		} catch (APIException e) {
+-			assertTrue(e.getMessage().contains("Order.cannot.have.more.than.one"));
+-		}
+-	}
++public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() {
++    Patient patient = new Patient();
++    patient.setId(2);
++    
++    Concept cd4Count = new Concept();
++    cd4Count.setId(5497);
++    
++    TestOrder duplicateOrder = new TestOrder();
++    duplicateOrder.setId(7);
++    duplicateOrder.setActive(true);
++    duplicateOrder.setConcept(cd4Count);
++    
++    when(orderService.getOrder(7)).thenReturn(duplicateOrder);
++    
++    Order order = new TestOrder();
++    order.setPatient(patient);
++    order.setCareSetting(new CareSetting(2));
++    order.setConcept(cd4Count);
++    order.setEncounter(new Encounter(6));
++    order.setOrderer(new Provider(1));
++    order.setCareSetting(duplicateOrder.getCareSetting());
++    
++    APIException exception = assertThrows(APIException.class, () -> orderService.saveOrder(order, null));
++    assertTrue(exception.getMessage().contains("Order.cannot.have.more.than.one"));
++}
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1570,18] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1573,4] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1577,25] 错误: 对于CareSetting(int), 找不到合适的构造器
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1583,29] 错误: 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure: Compilation failure:
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1570,18] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1573,4] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1577,25] 错误: 对于CareSetting(int), 找不到合适的构造器
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1583,29] 错误: 找不到符号
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 7
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() {
+    Patient patient = new Patient();
+    patient.setId(2);
+    
+    Concept cd4Count = new Concept();
+    cd4Count.setId(5497);
+    
+    TestOrder duplicateOrder = new TestOrder();
+    duplicateOrder.setId(7);
+    duplicateOrder.setActive(true);
+    duplicateOrder.setConcept(cd4Count);
+    
+    when(orderService.getOrder(7)).thenReturn(duplicateOrder);
+    
+    Order order = new TestOrder();
+    order.setPatient(patient);
+    order.setCareSetting(new CareSetting(2, "Test Care Setting"));
+    order.setConcept(cd4Count);
+    order.setEncounter(new Encounter(6));
+    order.setOrderer(new Provider(1));
+    order.setCareSetting(duplicateOrder.getCareSetting());
+    
+    APIException exception = assertThrows(APIException.class, () -> orderService.saveOrder(order, null));
+    assertTrue(exception.getMessage().contains("Order.cannot.have.more.than.one"));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() {
+    Patient patient = new Patient();
+    patient.setId(2);
+    
+    Concept cd4Count = new Concept();
+    cd4Count.setId(5497);
+    
+    TestOrder duplicateOrder = new TestOrder();
+    duplicateOrder.setId(7);
+    duplicateOrder.setActive(true);
+    duplicateOrder.setConcept(cd4Count);
+    
+    when(orderService.getOrder(7)).thenReturn(duplicateOrder);
+    
+    Order order = new TestOrder();
+    order.setPatient(patient);
+    order.setCareSetting(new CareSetting(2, "Test Care Setting"));
+    order.setConcept(cd4Count);
+    order.setEncounter(new Encounter(6));
+    order.setOrderer(new Provider(1));
+    order.setCareSetting(duplicateOrder.getCareSetting());
+    
+    APIException exception = assertThrows(APIException.class, () -> orderService.saveOrder(order, null));
+    assertTrue(exception.getMessage().contains("Order.cannot.have.more.than.one"));
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -15,7 +15,7 @@
+
+     
+     Order order = new TestOrder();
+     order.setPatient(patient);
+-    order.setCareSetting(new CareSetting(2));
++    order.setCareSetting(new CareSetting(2, "Test Care Setting"));
+     order.setConcept(cd4Count);
+     order.setEncounter(new Encounter(6));
+     order.setOrderer(new Provider(1));
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1570,18] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1573,4] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1577,25] 错误: 对于CareSetting(int,String), 找不到合适的构造器
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1583,29] 错误: 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure: Compilation failure:
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1570,18] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1573,4] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1577,25] 错误: 对于CareSetting(int,String), 找不到合适的构造器
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1583,29] 错误: 找不到符号
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 8
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() {
+    Patient patient = new Patient();
+    patient.setId(2);
+    
+    Concept cd4Count = new Concept();
+    cd4Count.setId(5497);
+    
+    TestOrder duplicateOrder = new TestOrder();
+    duplicateOrder.setId(7);
+    duplicateOrder.setActive(true);
+    duplicateOrder.setConcept(cd4Count);
+    
+    when(orderService.getOrder(7)).thenReturn(duplicateOrder);
+    
+    Order order = new TestOrder();
+    order.setPatient(patient);
+    order.setCareSetting(new CareSetting(2, "Test Care Setting"));
+    order.setConcept(cd4Count);
+    order.setEncounter(new Encounter(6));
+    order.setOrderer(new Provider(1));
+    order.setCareSetting(duplicateOrder.getCareSetting());
+    
+    APIException exception = assertThrows(APIException.class, () -> orderService.saveOrder(order, null));
+    assertTrue(exception.getMessage().contains("Order.cannot.have.more.than.one"));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() {
+    Patient patient = new Patient();
+    patient.setId(2);
+    
+    Concept cd4Count = new Concept();
+    cd4Count.setId(5497);
+    
+    TestOrder duplicateOrder = new TestOrder();
+    duplicateOrder.setId(7);
+    duplicateOrder.setActive(true);
+    duplicateOrder.setConcept(cd4Count);
+    
+    when(orderService.getOrder(7)).thenReturn(duplicateOrder);
+    
+    Order order = new TestOrder();
+    order.setPatient(patient);
+    order.setCareSetting(new CareSetting(2, "Test Care Setting"));
+    order.setConcept(cd4Count);
+    order.setEncounter(new Encounter(6));
+    order.setOrderer(new Provider(1));
+    order.setCareSetting(duplicateOrder.getCareSetting());
+    
+    APIException exception = assertThrows(APIException.class, () -> orderService.saveOrder(order, null));
+    assertTrue(exception.getMessage().contains("Order.cannot.have.more.than.one"));
+}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1570,18] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1573,4] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1577,25] 错误: 对于CareSetting(int,String), 找不到合适的构造器
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1583,29] 错误: 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure: Compilation failure:
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1570,18] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1573,4] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1577,25] 错误: 对于CareSetting(int,String), 找不到合适的构造器
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1583,29] 错误: 找不到符号
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 1
+----------------------------------------------------------------
+generated test
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		expectedException.expect(APIException.class);
+		expectedException.expectMessage("Order.cannot.have.more.than.one");
+		orderService.saveOrder(order, null);
+	}
+----------------------------------------------------------------
+old generated diff test
+
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,5 +1,5 @@
+
+ @Test
+-	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
++	public void saveOrder_shouldPassIfAnActiveTestOrderForTheSameConceptAndCareSettingExists() throws Exception {
+ 		final Patient patient = patientService.getPatient(2);
+ 		final Concept cd4Count = conceptService.getConcept(5497);
+ 		//sanity check that we have an active order for the same concept
+@@ -14,8 +14,8 @@
+
+ 		order.setEncounter(encounterService.getEncounter(6));
+ 		order.setOrderer(providerService.getProvider(1));
+ 		order.setCareSetting(duplicateOrder.getCareSetting());
+-		
+-		expectedException.expect(APIException.class);
+-		expectedException.expectMessage("Order.cannot.have.more.than.one");
+-		orderService.saveOrder(order, null);
++
++		Order savedOrder = orderService.saveOrder(order, null);
++
++		assertNotNull(orderService.getOrder(savedOrder.getOrderId()));
+ 	}
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+--------------------------------------------------------------------------------------------------------------------------------

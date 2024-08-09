@@ -1,0 +1,1817 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：1.0
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 0
+----------------------------------------------------------------
+old description: 编译报错
+----------------------------------------------------------------
+old message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[64,25] 无法将 org.openmrs.api.OrderService 中的 getOrders(org.openmrs.OrderType,java.util.List<org.openmrs.Patient>,java.util.List<org.openmrs.Concept>,java.util.List<org.openmrs.User>,java.util.List<org.openmrs.Encounter>) 应用于 (java.lang.Class<org.openmrs.Order>,java.util.List<org.openmrs.Patient>,<nulltype>,<nulltype>,<nulltype>)
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.1:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[64,25] 无法将 org.openmrs.api.OrderService 中的 getOrders(org.openmrs.OrderType,java.util.List<org.openmrs.Patient>,java.util.List<org.openmrs.Concept>,java.util.List<org.openmrs.User>,java.util.List<org.openmrs.Encounter>) 应用于 (java.lang.Class<org.openmrs.Order>,java.util.List<org.openmrs.Patient>,<nulltype>,<nulltype>,<nulltype>)
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+@Override
+	public void handle(Patient patient, User voidingUser, Date voidedDate, String voidReason) {
+		//void all the encounters associated with this patient
+		EncounterService es = Context.getEncounterService();
+		List<Encounter> encounters = es.getEncountersByPatient(patient);
+		if (CollectionUtils.isNotEmpty(encounters)) {
+			for (Encounter encounter : encounters) {
+				if (!encounter.isVoided()) {
+					// EncounterServiceImpl.voidEncounter and the requiredDataAdvice will set dateVoided to current date 
+					//if it is null, we need to set it now to match the patient's date voided so that the unvoid 
+					//handler's logic doesn't fail when comparing dates while unvoiding encounters that were voided 
+					//with the patient
+					encounter.setDateVoided(patient.getDateVoided());
+					es.voidEncounter(encounter, voidReason);
+				}
+			}
+		}
+		//void all the orders associated with this patient
+		OrderService os = Context.getOrderService();
+		List<Patient> patients = new ArrayList<Patient>();
+		patients.add(patient);
+		List<Order> orders = os.getOrders(Order.class, patients, null, null, null);
+		if (CollectionUtils.isNotEmpty(orders)) {
+			for (Order order : orders) {
+				if (!order.isVoided()) {
+					order.setDateVoided(patient.getDateVoided());
+					os.voidOrder(order, voidReason);
+				}
+			}
+		}
+	}
+----------------------------------------------------------------
+old test
+@Test
+	@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+	public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+		Patient patient = Context.getPatientService().getPatient(7);
+		patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+		Assert.assertTrue(patient.isVoided());
+		
+		EncounterService es = Context.getEncounterService();
+		List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+		Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+		//all encounters void related fields should be null
+		for (Encounter encounter : encounters) {
+			Assert.assertTrue(encounter.isVoided());
+			Assert.assertNotNull(encounter.getDateVoided());
+			Assert.assertNotNull(encounter.getVoidedBy());
+			Assert.assertNotNull(encounter.getVoidReason());
+		}
+		
+		OrderService os = Context.getOrderService();
+		List<Patient> patients = new ArrayList<Patient>();
+		patients.add(patient);
+		List<Order> orders = os.getOrders(Order.class, patients, null, null, null);
+		Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+		//all order void related fields should be null
+		for (Order order : orders) {
+			Assert.assertTrue(order.isVoided());
+			Assert.assertNotNull(order.getDateVoided());
+			Assert.assertNotNull(order.getVoidedBy());
+			Assert.assertNotNull(order.getVoidReason());
+		}
+		
+		User user = Context.getUserService().getUser(1);
+		new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+		
+		//check that the voided related fields were set null 
+		for (Encounter encounter : encounters) {
+			Assert.assertFalse(encounter.isVoided());
+			Assert.assertNull(encounter.getDateVoided());
+			Assert.assertNull(encounter.getVoidedBy());
+			Assert.assertNull(encounter.getVoidReason());
+		}
+		for (Order order : orders) {
+			Assert.assertFalse(order.isVoided());
+			Assert.assertNull(order.getDateVoided());
+			Assert.assertNull(order.getVoidedBy());
+			Assert.assertNull(order.getVoidReason());
+		}
+	}
+----------------------------------------------------------------
+new product
+@Override
+	public void handle(Patient patient, User voidingUser, Date voidedDate, String voidReason) {
+		//void all the encounters associated with this patient
+		EncounterService es = Context.getEncounterService();
+		List<Encounter> encounters = es.getEncountersByPatient(patient);
+		if (CollectionUtils.isNotEmpty(encounters)) {
+			for (Encounter encounter : encounters) {
+				if (!encounter.isVoided()) {
+					// EncounterServiceImpl.voidEncounter and the requiredDataAdvice will set dateVoided to current date 
+					//if it is null, we need to set it now to match the patient's date voided so that the unvoid 
+					//handler's logic doesn't fail when comparing dates while unvoiding encounters that were voided 
+					//with the patient
+					encounter.setDateVoided(patient.getDateVoided());
+					es.voidEncounter(encounter, voidReason);
+				}
+			}
+		}
+		//void all the orders associated with this patient
+		OrderService os = Context.getOrderService();
+		List<Patient> patients = new ArrayList<Patient>();
+		patients.add(patient);
+		List<Order> orders = os.getOrders(null, patients, null, null, null);
+		if (CollectionUtils.isNotEmpty(orders)) {
+			for (Order order : orders) {
+				if (!order.isVoided()) {
+					order.setDateVoided(patient.getDateVoided());
+					os.voidOrder(order, voidReason);
+				}
+			}
+		}
+	}
+----------------------------------------------------------------
+new test
+@Test
+	@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+	public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+		Patient patient = Context.getPatientService().getPatient(7);
+		patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+		Assert.assertTrue(patient.isVoided());
+		
+		EncounterService es = Context.getEncounterService();
+		List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+		Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+		//all encounters void related fields should be null
+		for (Encounter encounter : encounters) {
+			Assert.assertTrue(encounter.isVoided());
+			Assert.assertNotNull(encounter.getDateVoided());
+			Assert.assertNotNull(encounter.getVoidedBy());
+			Assert.assertNotNull(encounter.getVoidReason());
+		}
+		
+		OrderService os = Context.getOrderService();
+		List<Patient> patients = new ArrayList<Patient>();
+		patients.add(patient);
+		List<Order> orders = os.getOrders(null, patients, null, null, null);
+		Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+		//all order void related fields should be null
+		for (Order order : orders) {
+			Assert.assertTrue(order.isVoided());
+			Assert.assertNotNull(order.getDateVoided());
+			Assert.assertNotNull(order.getVoidedBy());
+			Assert.assertNotNull(order.getVoidReason());
+		}
+		
+		User user = Context.getUserService().getUser(1);
+		new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+		
+		//check that the voided related fields were set null 
+		for (Encounter encounter : encounters) {
+			Assert.assertFalse(encounter.isVoided());
+			Assert.assertNull(encounter.getDateVoided());
+			Assert.assertNull(encounter.getVoidedBy());
+			Assert.assertNull(encounter.getVoidReason());
+		}
+		for (Order order : orders) {
+			Assert.assertFalse(order.isVoided());
+			Assert.assertNull(order.getDateVoided());
+			Assert.assertNull(order.getVoidedBy());
+			Assert.assertNull(order.getVoidReason());
+		}
+	}
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index 86efa88..bf560dd 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -19,7 +19,7 @@
+ 		OrderService os = Context.getOrderService();
+ 		List<Patient> patients = new ArrayList<Patient>();
+ 		patients.add(patient);
+-		List<Order> orders = os.getOrders(Order.class, patients, null, null, null);
++		List<Order> orders = os.getOrders(null, patients, null, null, null);
+ 		if (CollectionUtils.isNotEmpty(orders)) {
+ 			for (Order order : orders) {
+ 				if (!order.isVoided()) {
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index 1b21872..4222445 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -19,7 +19,7 @@
+ 		OrderService os = Context.getOrderService();
+ 		List<Patient> patients = new ArrayList<Patient>();
+ 		patients.add(patient);
+-		List<Order> orders = os.getOrders(Order.class, patients, null, null, null);
++		List<Order> orders = os.getOrders(null, patients, null, null, null);
+ 		Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+ 		//all order void related fields should be null
+ 		for (Order order : orders) {
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index bf560dd..59f05c3 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -17,9 +17,7 @@
+ 		}
+ 		//void all the orders associated with this patient
+ 		OrderService os = Context.getOrderService();
+-		List<Patient> patients = new ArrayList<Patient>();
+-		patients.add(patient);
+-		List<Order> orders = os.getOrders(null, patients, null, null, null);
++		List<Order> orders = os.getAllOrdersByPatient(patient);
+ 		if (CollectionUtils.isNotEmpty(orders)) {
+ 			for (Order order : orders) {
+ 				if (!order.isVoided()) {
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index d8b13f3..85d0f83 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -17,9 +17,7 @@
+ 		}
+ 		
+ 		OrderService os = Context.getOrderService();
+-		List<Patient> patients = new ArrayList<Patient>();
+-		patients.add(patient);
+-		List<Order> orders = os.getOrders(null, patients, null, null, null);
++		List<Order> orders = os.getAllOrdersByPatient(patient);
+ 		Assert.assertFalse(orders.isEmpty());
+ 		//all order void related fields should be null
+ 		for (Order order : orders) {
+
+----------------------------------------------------------------
+coverage: 1.0
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getAllOrdersByPatient(patient);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.assertNull(order.getVoidReason());
+    }
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getAllOrdersByPatient(patient);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.assertNull(order.getVoidReason());
+    }
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,48 +1,46 @@
+
+ @Test
+-	@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+-	public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+-		Patient patient = Context.getPatientService().getPatient(7);
+-		patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+-		Assert.assertTrue(patient.isVoided());
+-		
+-		EncounterService es = Context.getEncounterService();
+-		List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+-		Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+-		//all encounters void related fields should be null
+-		for (Encounter encounter : encounters) {
+-			Assert.assertTrue(encounter.isVoided());
+-			Assert.assertNotNull(encounter.getDateVoided());
+-			Assert.assertNotNull(encounter.getVoidedBy());
+-			Assert.assertNotNull(encounter.getVoidReason());
+-		}
+-		
+-		OrderService os = Context.getOrderService();
+-		List<Patient> patients = new ArrayList<Patient>();
+-		patients.add(patient);
+-		List<Order> orders = os.getOrders(Order.class, patients, null, null, null);
+-		Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+-		//all order void related fields should be null
+-		for (Order order : orders) {
+-			Assert.assertTrue(order.isVoided());
+-			Assert.assertNotNull(order.getDateVoided());
+-			Assert.assertNotNull(order.getVoidedBy());
+-			Assert.assertNotNull(order.getVoidReason());
+-		}
+-		
+-		User user = Context.getUserService().getUser(1);
+-		new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+-		
+-		//check that the voided related fields were set null 
+-		for (Encounter encounter : encounters) {
+-			Assert.assertFalse(encounter.isVoided());
+-			Assert.assertNull(encounter.getDateVoided());
+-			Assert.assertNull(encounter.getVoidedBy());
+-			Assert.assertNull(encounter.getVoidReason());
+-		}
+-		for (Order order : orders) {
+-			Assert.assertFalse(order.isVoided());
+-			Assert.assertNull(order.getDateVoided());
+-			Assert.assertNull(order.getVoidedBy());
+-			Assert.assertNull(order.getVoidReason());
+-		}
+-	}
++@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
++public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
++    Patient patient = Context.getPatientService().getPatient(7);
++    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
++    Assert.assertTrue(patient.isVoided());
++    
++    EncounterService es = Context.getEncounterService();
++    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
++    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
++    //all encounters void related fields should be null
++    for (Encounter encounter : encounters) {
++        Assert.assertTrue(encounter.isVoided());
++        Assert.assertNotNull(encounter.getDateVoided());
++        Assert.assertNotNull(encounter.getVoidedBy());
++        Assert.assertNotNull(encounter.getVoidReason());
++    }
++    
++    OrderService os = Context.getOrderService();
++    List<Order> orders = os.getAllOrdersByPatient(patient);
++    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
++    //all order void related fields should be null
++    for (Order order : orders) {
++        Assert.assertTrue(order.isVoided());
++        Assert.assertNotNull(order.getDateVoided());
++        Assert.assertNotNull(order.getVoidedBy());
++        Assert.assertNotNull(order.getVoidReason());
++    }
++    
++    User user = Context.getUserService().getUser(1);
++    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
++    
++    //check that the voided related fields were set null 
++    for (Encounter encounter : encounters) {
++        Assert.assertFalse(encounter.isVoided());
++        Assert.assertNull(encounter.getDateVoided());
++        Assert.assertNull(encounter.getVoidedBy());
++        Assert.assertNull(encounter.getVoidReason());
++    }
++    for (Order order : orders) {
++        Assert.assertFalse(order.isVoided());
++        Assert.assertNull(order.getDateVoided());
++        Assert.assertNull(order.getVoidedBy());
++        Assert.assertNull(order.getVoidReason());
++    }
++}
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.1:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+符号： 方法 getAllOrdersByPatient(org.openmrs.Patient)
+位置： 接口 org.openmrs.api.OrderService
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 2
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrders(null, Collections.singletonList(patient), null, null, null);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.null(order.getDateVoided());
+        Assert.null(order.getVoidedBy());
+        Assert.null(order.getVoidReason());
+    }
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrders(null, Collections.singletonList(patient), null, null, null);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.null(order.getDateVoided());
+        Assert.null(order.getVoidedBy());
+        Assert.null(order.getVoidReason());
+    }
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -17,7 +17,7 @@
+
+     }
+     
+     OrderService os = Context.getOrderService();
+-    List<Order> orders = os.getAllOrdersByPatient(patient);
++    List<Order> orders = os.getOrders(null, Collections.singletonList(patient), null, null, null);
+     Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+     //all order void related fields should be null
+     for (Order order : orders) {
+@@ -39,8 +39,8 @@
+
+     }
+     for (Order order : orders) {
+         Assert.assertFalse(order.isVoided());
+-        Assert.assertNull(order.getDateVoided());
+-        Assert.assertNull(order.getVoidedBy());
+-        Assert.assertNull(order.getVoidReason());
++        Assert.null(order.getDateVoided());
++        Assert.null(order.getVoidedBy());
++        Assert.null(order.getVoidReason());
+     }
+ }
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.1:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+符号： 方法 getAllOrdersByPatient(org.openmrs.Patient)
+位置： 接口 org.openmrs.api.OrderService
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 3
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrders(Order.class, Collections.singletonList(patient), null, true, false);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.null(order.getVoidReason());
+    }
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrders(Order.class, Collections.singletonList(patient), null, true, false);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.null(order.getVoidReason());
+    }
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -17,7 +17,7 @@
+
+     }
+     
+     OrderService os = Context.getOrderService();
+-    List<Order> orders = os.getOrders(null, Collections.singletonList(patient), null, null, null);
++    List<Order> orders = os.getOrders(Order.class, Collections.singletonList(patient), null, true, false);
+     Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+     //all order void related fields should be null
+     for (Order order : orders) {
+@@ -39,8 +39,8 @@
+
+     }
+     for (Order order : orders) {
+         Assert.assertFalse(order.isVoided());
+-        Assert.null(order.getDateVoided());
+-        Assert.null(order.getVoidedBy());
++        Assert.assertNull(order.getDateVoided());
++        Assert.assertNull(order.getVoidedBy());
+         Assert.null(order.getVoidReason());
+     }
+ }
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.1:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+符号： 方法 getAllOrdersByPatient(org.openmrs.Patient)
+位置： 接口 org.openmrs.api.OrderService
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 4
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrders(null, Collections.singletonList(patient), null, null, null);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.assertNull(order.getVoidReason());
+    }
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrders(null, Collections.singletonList(patient), null, null, null);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.assertNull(order.getVoidReason());
+    }
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -17,7 +17,7 @@
+
+     }
+     
+     OrderService os = Context.getOrderService();
+-    List<Order> orders = os.getOrders(Order.class, Collections.singletonList(patient), null, true, false);
++    List<Order> orders = os.getOrders(null, Collections.singletonList(patient), null, null, null);
+     Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+     //all order void related fields should be null
+     for (Order order : orders) {
+@@ -41,6 +41,6 @@
+
+         Assert.assertFalse(order.isVoided());
+         Assert.assertNull(order.getDateVoided());
+         Assert.assertNull(order.getVoidedBy());
+-        Assert.null(order.getVoidReason());
++        Assert.assertNull(order.getVoidReason());
+     }
+ }
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.1:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+符号： 方法 getAllOrdersByPatient(org.openmrs.Patient)
+位置： 接口 org.openmrs.api.OrderService
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 5
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncountersByPatient(patient);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrdersByPatient(patient);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.assertNull(order.getVoidReason());
+    }
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncountersByPatient(patient);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrdersByPatient(patient);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.assertNull(order.getVoidReason());
+    }
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -6,7 +6,7 @@
+
+     Assert.assertTrue(patient.isVoided());
+     
+     EncounterService es = Context.getEncounterService();
+-    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
++    List<Encounter> encounters = es.getEncountersByPatient(patient);
+     Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+     //all encounters void related fields should be null
+     for (Encounter encounter : encounters) {
+@@ -17,7 +17,7 @@
+
+     }
+     
+     OrderService os = Context.getOrderService();
+-    List<Order> orders = os.getOrders(null, Collections.singletonList(patient), null, null, null);
++    List<Order> orders = os.getOrdersByPatient(patient);
+     Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+     //all order void related fields should be null
+     for (Order order : orders) {
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.1:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+符号： 方法 getAllOrdersByPatient(org.openmrs.Patient)
+位置： 接口 org.openmrs.api.OrderService
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 6
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncountersByPatient(patient, false);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrdersByPatient(patient, false);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.null(order.getDateVoided());
+        Assert.null(order.getVoidedBy());
+        Assert.null(order.getVoidReason());
+    }
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncountersByPatient(patient, false);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrdersByPatient(patient, false);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.null(order.getDateVoided());
+        Assert.null(order.getVoidedBy());
+        Assert.null(order.getVoidReason());
+    }
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -6,7 +6,7 @@
+
+     Assert.assertTrue(patient.isVoided());
+     
+     EncounterService es = Context.getEncounterService();
+-    List<Encounter> encounters = es.getEncountersByPatient(patient);
++    List<Encounter> encounters = es.getEncountersByPatient(patient, false);
+     Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+     //all encounters void related fields should be null
+     for (Encounter encounter : encounters) {
+@@ -17,7 +17,7 @@
+
+     }
+     
+     OrderService os = Context.getOrderService();
+-    List<Order> orders = os.getOrdersByPatient(patient);
++    List<Order> orders = os.getOrdersByPatient(patient, false);
+     Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+     //all order void related fields should be null
+     for (Order order : orders) {
+@@ -39,8 +39,8 @@
+
+     }
+     for (Order order : orders) {
+         Assert.assertFalse(order.isVoided());
+-        Assert.assertNull(order.getDateVoided());
+-        Assert.assertNull(order.getVoidedBy());
+-        Assert.assertNull(order.getVoidReason());
++        Assert.null(order.getDateVoided());
++        Assert.null(order.getVoidedBy());
++        Assert.null(order.getVoidReason());
+     }
+ }
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.1:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+符号： 方法 getAllOrdersByPatient(org.openmrs.Patient)
+位置： 接口 org.openmrs.api.OrderService
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 7
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncountersByPatient(patient, false);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrdersByPatient(patient, false);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.assertNull(order.getVoidReason());
+    }
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncountersByPatient(patient, false);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrdersByPatient(patient, false);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.assertNull(order.getVoidReason());
+    }
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -39,8 +39,8 @@
+
+     }
+     for (Order order : orders) {
+         Assert.assertFalse(order.isVoided());
+-        Assert.null(order.getDateVoided());
+-        Assert.null(order.getVoidedBy());
+-        Assert.null(order.getVoidReason());
++        Assert.assertNull(order.getDateVoided());
++        Assert.assertNull(order.getVoidedBy());
++        Assert.assertNull(order.getVoidReason());
+     }
+ }
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.1:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+符号： 方法 getAllOrdersByPatient(org.openmrs.Patient)
+位置： 接口 org.openmrs.api.OrderService
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 8
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncountersByPatient(patient);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrdersByPatient(patient);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.null(order.getVoidReason());
+    }
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncountersByPatient(patient);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getOrdersByPatient(patient);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.null(order.getVoidReason());
+    }
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -6,7 +6,7 @@
+
+     Assert.assertTrue(patient.isVoided());
+     
+     EncounterService es = Context.getEncounterService();
+-    List<Encounter> encounters = es.getEncountersByPatient(patient, false);
++    List<Encounter> encounters = es.getEncountersByPatient(patient);
+     Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+     //all encounters void related fields should be null
+     for (Encounter encounter : encounters) {
+@@ -17,7 +17,7 @@
+
+     }
+     
+     OrderService os = Context.getOrderService();
+-    List<Order> orders = os.getOrdersByPatient(patient, false);
++    List<Order> orders = os.getOrdersByPatient(patient);
+     Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+     //all order void related fields should be null
+     for (Order order : orders) {
+@@ -41,6 +41,6 @@
+
+         Assert.assertFalse(order.isVoided());
+         Assert.assertNull(order.getDateVoided());
+         Assert.assertNull(order.getVoidedBy());
+-        Assert.assertNull(order.getVoidReason());
++        Assert.null(order.getVoidReason());
+     }
+ }
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.1:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\handler\PatientDataUnvoidHandlerTest.java:[62,25] 找不到符号
+符号： 方法 getAllOrdersByPatient(org.openmrs.Patient)
+位置： 接口 org.openmrs.api.OrderService
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 1
+----------------------------------------------------------------
+generated test
+@Test
+@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+    Patient patient = Context.getPatientService().getPatient(7);
+    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+    Assert.assertTrue(patient.isVoided());
+    
+    EncounterService es = Context.getEncounterService();
+    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+    //all encounters void related fields should be null
+    for (Encounter encounter : encounters) {
+        Assert.assertTrue(encounter.isVoided());
+        Assert.assertNotNull(encounter.getDateVoided());
+        Assert.assertNotNull(encounter.getVoidedBy());
+        Assert.assertNotNull(encounter.getVoidReason());
+    }
+    
+    OrderService os = Context.getOrderService();
+    List<Order> orders = os.getAllOrdersByPatient(patient);
+    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+    //all order void related fields should be null
+    for (Order order : orders) {
+        Assert.assertTrue(order.isVoided());
+        Assert.assertNotNull(order.getDateVoided());
+        Assert.assertNotNull(order.getVoidedBy());
+        Assert.assertNotNull(order.getVoidReason());
+    }
+    
+    User user = Context.getUserService().getUser(1);
+    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+    
+    //check that the voided related fields were set null 
+    for (Encounter encounter : encounters) {
+        Assert.assertFalse(encounter.isVoided());
+        Assert.assertNull(encounter.getDateVoided());
+        Assert.assertNull(encounter.getVoidedBy());
+        Assert.assertNull(encounter.getVoidReason());
+    }
+    for (Order order : orders) {
+        Assert.assertFalse(order.isVoided());
+        Assert.assertNull(order.getDateVoided());
+        Assert.assertNull(order.getVoidedBy());
+        Assert.assertNull(order.getVoidReason());
+    }
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,48 +1,46 @@
+
+ @Test
+-	@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+-	public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+-		Patient patient = Context.getPatientService().getPatient(7);
+-		patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+-		Assert.assertTrue(patient.isVoided());
+-		
+-		EncounterService es = Context.getEncounterService();
+-		List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+-		Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+-		//all encounters void related fields should be null
+-		for (Encounter encounter : encounters) {
+-			Assert.assertTrue(encounter.isVoided());
+-			Assert.assertNotNull(encounter.getDateVoided());
+-			Assert.assertNotNull(encounter.getVoidedBy());
+-			Assert.assertNotNull(encounter.getVoidReason());
+-		}
+-		
+-		OrderService os = Context.getOrderService();
+-		List<Patient> patients = new ArrayList<Patient>();
+-		patients.add(patient);
+-		List<Order> orders = os.getOrders(Order.class, patients, null, null, null);
+-		Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+-		//all order void related fields should be null
+-		for (Order order : orders) {
+-			Assert.assertTrue(order.isVoided());
+-			Assert.assertNotNull(order.getDateVoided());
+-			Assert.assertNotNull(order.getVoidedBy());
+-			Assert.assertNotNull(order.getVoidReason());
+-		}
+-		
+-		User user = Context.getUserService().getUser(1);
+-		new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+-		
+-		//check that the voided related fields were set null 
+-		for (Encounter encounter : encounters) {
+-			Assert.assertFalse(encounter.isVoided());
+-			Assert.assertNull(encounter.getDateVoided());
+-			Assert.assertNull(encounter.getVoidedBy());
+-			Assert.assertNull(encounter.getVoidReason());
+-		}
+-		for (Order order : orders) {
+-			Assert.assertFalse(order.isVoided());
+-			Assert.assertNull(order.getDateVoided());
+-			Assert.assertNull(order.getVoidedBy());
+-			Assert.assertNull(order.getVoidReason());
+-		}
+-	}
++@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
++public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
++    Patient patient = Context.getPatientService().getPatient(7);
++    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
++    Assert.assertTrue(patient.isVoided());
++    
++    EncounterService es = Context.getEncounterService();
++    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
++    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
++    //all encounters void related fields should be null
++    for (Encounter encounter : encounters) {
++        Assert.assertTrue(encounter.isVoided());
++        Assert.assertNotNull(encounter.getDateVoided());
++        Assert.assertNotNull(encounter.getVoidedBy());
++        Assert.assertNotNull(encounter.getVoidReason());
++    }
++    
++    OrderService os = Context.getOrderService();
++    List<Order> orders = os.getAllOrdersByPatient(patient);
++    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
++    //all order void related fields should be null
++    for (Order order : orders) {
++        Assert.assertTrue(order.isVoided());
++        Assert.assertNotNull(order.getDateVoided());
++        Assert.assertNotNull(order.getVoidedBy());
++        Assert.assertNotNull(order.getVoidReason());
++    }
++    
++    User user = Context.getUserService().getUser(1);
++    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
++    
++    //check that the voided related fields were set null 
++    for (Encounter encounter : encounters) {
++        Assert.assertFalse(encounter.isVoided());
++        Assert.assertNull(encounter.getDateVoided());
++        Assert.assertNull(encounter.getVoidedBy());
++        Assert.assertNull(encounter.getVoidReason());
++    }
++    for (Order order : orders) {
++        Assert.assertFalse(order.isVoided());
++        Assert.assertNull(order.getDateVoided());
++        Assert.assertNull(order.getVoidedBy());
++        Assert.assertNull(order.getVoidReason());
++    }
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,46 +1,48 @@
+
+ @Test
+-@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
+-public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
+-    Patient patient = Context.getPatientService().getPatient(7);
+-    patient = Context.getPatientService().voidPatient(patient, "Void Reason");
+-    Assert.assertTrue(patient.isVoided());
+-    
+-    EncounterService es = Context.getEncounterService();
+-    List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
+-    Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
+-    //all encounters void related fields should be null
+-    for (Encounter encounter : encounters) {
+-        Assert.assertTrue(encounter.isVoided());
+-        Assert.assertNotNull(encounter.getDateVoided());
+-        Assert.assertNotNull(encounter.getVoidedBy());
+-        Assert.assertNotNull(encounter.getVoidReason());
+-    }
+-    
+-    OrderService os = Context.getOrderService();
+-    List<Order> orders = os.getAllOrdersByPatient(patient);
+-    Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
+-    //all order void related fields should be null
+-    for (Order order : orders) {
+-        Assert.assertTrue(order.isVoided());
+-        Assert.assertNotNull(order.getDateVoided());
+-        Assert.assertNotNull(order.getVoidedBy());
+-        Assert.assertNotNull(order.getVoidReason());
+-    }
+-    
+-    User user = Context.getUserService().getUser(1);
+-    new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
+-    
+-    //check that the voided related fields were set null 
+-    for (Encounter encounter : encounters) {
+-        Assert.assertFalse(encounter.isVoided());
+-        Assert.assertNull(encounter.getDateVoided());
+-        Assert.assertNull(encounter.getVoidedBy());
+-        Assert.assertNull(encounter.getVoidReason());
+-    }
+-    for (Order order : orders) {
+-        Assert.assertFalse(order.isVoided());
+-        Assert.assertNull(order.getDateVoided());
+-        Assert.assertNull(order.getVoidedBy());
+-        Assert.assertNull(order.getVoidReason());
+-    }
+-}
++	@Verifies(value = "should unvoid the orders and encounters associated with the patient", method = "handle(Patient,User,Date,String)")
++	public void handle_shouldUnvoidTheOrdersAndEncountersAssociatedWithThePatient() throws Exception {
++		Patient patient = Context.getPatientService().getPatient(7);
++		patient = Context.getPatientService().voidPatient(patient, "Void Reason");
++		Assert.assertTrue(patient.isVoided());
++		
++		EncounterService es = Context.getEncounterService();
++		List<Encounter> encounters = es.getEncounters(patient, null, null, null, null, null, null, true);
++		Assert.assertTrue(CollectionUtils.isNotEmpty(encounters));
++		//all encounters void related fields should be null
++		for (Encounter encounter : encounters) {
++			Assert.assertTrue(encounter.isVoided());
++			Assert.assertNotNull(encounter.getDateVoided());
++			Assert.assertNotNull(encounter.getVoidedBy());
++			Assert.assertNotNull(encounter.getVoidReason());
++		}
++		
++		OrderService os = Context.getOrderService();
++		List<Patient> patients = new ArrayList<Patient>();
++		patients.add(patient);
++		List<Order> orders = os.getOrders(null, patients, null, null, null);
++		Assert.assertTrue(CollectionUtils.isNotEmpty(orders));
++		//all order void related fields should be null
++		for (Order order : orders) {
++			Assert.assertTrue(order.isVoided());
++			Assert.assertNotNull(order.getDateVoided());
++			Assert.assertNotNull(order.getVoidedBy());
++			Assert.assertNotNull(order.getVoidReason());
++		}
++		
++		User user = Context.getUserService().getUser(1);
++		new PatientDataUnvoidHandler().handle(patient, user, patient.getDateVoided(), null);
++		
++		//check that the voided related fields were set null 
++		for (Encounter encounter : encounters) {
++			Assert.assertFalse(encounter.isVoided());
++			Assert.assertNull(encounter.getDateVoided());
++			Assert.assertNull(encounter.getVoidedBy());
++			Assert.assertNull(encounter.getVoidReason());
++		}
++		for (Order order : orders) {
++			Assert.assertFalse(order.isVoided());
++			Assert.assertNull(order.getDateVoided());
++			Assert.assertNull(order.getVoidedBy());
++			Assert.assertNull(order.getVoidReason());
++		}
++	}
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+--------------------------------------------------------------------------------------------------------------------------------

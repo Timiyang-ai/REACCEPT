@@ -1,0 +1,1 @@
+void accessBlock(long sessionId, long blockId) throws BlockDoesNotExistException;

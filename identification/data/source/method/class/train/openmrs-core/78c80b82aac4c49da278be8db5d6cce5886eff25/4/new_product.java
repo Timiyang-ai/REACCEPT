@@ -1,0 +1,1 @@
+public EncounterType getEncounterType(Integer encounterTypeId) throws APIException;

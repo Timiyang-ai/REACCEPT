@@ -1,0 +1,35 @@
+diff --git a/old_product.java b/new_product.java
+index c2e0abf..47a0ac2 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,9 +1,22 @@
+-public Map<String, File> identifyWorkerLogDirs(Set<File> logDirs) {
++public SortedSet<File> getLogDirs(Set<File> logDirs, Predicate<String> predicate) {
+         // we could also make this static, but not to do it due to mock
+-        return logDirs.stream().map(Unchecked.function(logDir -> {
+-            Optional<File> metaFile = getMetadataFileForWorkerLogDir(logDir);
+-
+-            return metaFile.map(Unchecked.function(m -> new Tuple2<>(getWorkerIdFromMetadataFile(m.getCanonicalPath()), logDir)))
+-                    .orElse(new Tuple2<>("", logDir));
+-        })).collect(toMap(Tuple2::v1, Tuple2::v2));
++        TreeSet<File> ret = new TreeSet<>();
++        for (File logDir: logDirs) {
++            String workerId = "";
++            try {
++                Optional<File> metaFile = getMetadataFileForWorkerLogDir(logDir);
++                if (metaFile.isPresent()) {
++                    workerId = getWorkerIdFromMetadataFile(metaFile.get().getCanonicalPath());
++                    if (workerId == null) {
++                        workerId = "";
++                    }
++                }
++            } catch (IOException e) {
++                LOG.warn("Error trying to find worker.yaml in {}", logDir, e);
++            }
++            if (predicate.test(workerId)) {
++                ret.add(logDir);
++            }
++        }
++        return ret;
+     }
+\ No newline at end of file

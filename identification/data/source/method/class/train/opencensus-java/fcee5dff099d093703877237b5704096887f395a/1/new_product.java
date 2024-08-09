@@ -1,0 +1,1 @@
+public abstract Builder setStatus(Status status);

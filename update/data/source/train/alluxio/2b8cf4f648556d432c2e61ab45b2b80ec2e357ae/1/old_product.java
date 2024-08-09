@@ -1,0 +1,1 @@
+LockBlockResult lockBlock(final long blockId) throws IOException, AlluxioException;

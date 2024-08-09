@@ -1,0 +1,345 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.9446153846153846
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 1
+----------------------------------------------------------------
+old description: 单元测试不通过
+----------------------------------------------------------------
+old message
+-------------------------------------------------------------------------------
+Test set: org.basex.query.func.FNDbTest
+-------------------------------------------------------------------------------
+Tests run: 37, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 4.207 sec <<< FAILURE! - in org.basex.query.func.FNDbTest
+backup(org.basex.query.func.FNDbTest)  Time elapsed: 0.031 sec  <<< FAILURE!
+java.lang.AssertionError: 
+Query: db:backup("SandboxTest1946375588")
+Error(s): BXDB_OPEN
+Result: BXDB_WHICH (Q{http://basex.org/errors}BXDB0002)
+	at org.junit.Assert.fail(Assert.java:91)
+	at org.basex.query.AdvancedQueryTest.check(AdvancedQueryTest.java:143)
+	at org.basex.query.AdvancedQueryTest.error(AdvancedQueryTest.java:116)
+	at org.basex.query.func.FNDbTest.backup(FNDbTest.java:665)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+private Item backup(final QueryContext ctx) throws QueryException {
+    checkCreate(ctx);
+    final Data data = checkData(ctx);
+    ctx.updates.add(new DBBackup(data, info, ctx), ctx);
+    return null;
+  }
+----------------------------------------------------------------
+old test
+@Test
+  public void backup() throws BaseXException {
+    query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+    query(_DB_BACKUP.args(NAME));
+    query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
+
+    // try to backup non existing database
+    error(_DB_BACKUP.args(NAME + new Object().hashCode()), Err.BXDB_OPEN);
+
+    // cleanup
+    new DropBackup(NAME).execute(context);
+    query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+  }
+----------------------------------------------------------------
+new product
+private Item backup(final QueryContext ctx) throws QueryException {
+    checkCreate(ctx);
+    final String name = string(checkStr(expr[0], ctx));
+    if(!Databases.validName(name)) throw BXDB_NAME.get(info, name);
+    if(!ctx.context.globalopts.dbexists(name)) throw BXDB_WHICH.get(info, name);
+
+    ctx.updates.add(new DBBackup(name, info, ctx), ctx);
+    return null;
+  }
+----------------------------------------------------------------
+new test
+@Test
+  public void backup() throws BaseXException {
+    query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+    query(_DB_BACKUP.args(NAME));
+    query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
+
+    // try to backup non-existing database
+    error(_DB_BACKUP.args(NAME + 'x'), Err.BXDB_WHICH);
+    // cleanup
+    new DropBackup(NAME).execute(context);
+    query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+  }
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index 0436adc..97d8cff 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,6 +1,9 @@
+ private Item backup(final QueryContext ctx) throws QueryException {
+     checkCreate(ctx);
+-    final Data data = checkData(ctx);
+-    ctx.updates.add(new DBBackup(data, info, ctx), ctx);
++    final String name = string(checkStr(expr[0], ctx));
++    if(!Databases.validName(name)) throw BXDB_NAME.get(info, name);
++    if(!ctx.context.globalopts.dbexists(name)) throw BXDB_WHICH.get(info, name);
++
++    ctx.updates.add(new DBBackup(name, info, ctx), ctx);
+     return null;
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index 3a056d1..a3f3109 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -4,9 +4,8 @@
+     query(_DB_BACKUP.args(NAME));
+     query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
+ 
+-    // try to backup non existing database
+-    error(_DB_BACKUP.args(NAME + new Object().hashCode()), Err.BXDB_OPEN);
+-
++    // try to backup non-existing database
++    error(_DB_BACKUP.args(NAME + 'x'), Err.BXDB_WHICH);
+     // cleanup
+     new DropBackup(NAME).execute(context);
+     query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index 97d8cff..8d32e93 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,9 +1,12 @@
+-private Item backup(final QueryContext ctx) throws QueryException {
+-    checkCreate(ctx);
++private Item dropBackup(final QueryContext ctx) throws QueryException {
+     final String name = string(checkStr(expr[0], ctx));
+     if(!Databases.validName(name)) throw BXDB_NAME.get(info, name);
+-    if(!ctx.context.globalopts.dbexists(name)) throw BXDB_WHICH.get(info, name);
+ 
+-    ctx.updates.add(new DBBackup(name, info, ctx), ctx);
++    final StringList files = DropBackup.backups(name, ctx.context);
++    if(files.isEmpty()) throw BXDB_WHICHBACK.get(info, name);
++
++    for(final String file : files) {
++      ctx.updates.add(new BackupDrop(file, info, ctx), ctx);
++    }
+     return null;
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index a3f3109..d5cd371 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,11 +1,11 @@
+ @Test
+-  public void backup() throws BaseXException {
++  public void createBackup() throws BaseXException {
+     query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+-    query(_DB_BACKUP.args(NAME));
++    query(_DB_CREATE_BACKUP.args(NAME));
+     query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
+ 
+     // try to backup non-existing database
+-    error(_DB_BACKUP.args(NAME + 'x'), Err.BXDB_WHICH);
++    error(_DB_CREATE_BACKUP.args(NAME + 'x'), Err.BXDB_WHICH);
+     // cleanup
+     new DropBackup(NAME).execute(context);
+     query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+
+----------------------------------------------------------------
+coverage: 0.9446153846153846
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+<new_test>
+```java
+@Test
+public void backup() throws BaseXException {
+  query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+  query(_DB_BACKUP.args(NAME));
+  query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
+
+  // try to backup non-existing database
+  error(_DB_BACKUP.args(NAME + new Object().hashCode()), Err.BXDB_WHICH);
+
+  // invalid name
+  error(_DB_BACKUP.args(" ''"), Err.BXDB_NAME);
+
+  // cleanup
+  new DropBackup(NAME).execute(context);
+  query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+}
+```
+</new_test>
+
+This updated test method incorporates the changes in the production method, specifically the addition of checks for valid database names and the existence of the database before proceeding with the backup. It adds a test case for attempting to backup with an invalid name, expecting the `BXDB_NAME` error, aligning with the new validation logic introduced in the production code.
+----------------------------------------------------------------
+generated test
+@Test
+public void backup() throws BaseXException {
+  query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+  query(_DB_BACKUP.args(NAME));
+  query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
+
+  // try to backup non-existing database
+  error(_DB_BACKUP.args(NAME + new Object().hashCode()), Err.BXDB_WHICH);
+
+  // invalid name
+  error(_DB_BACKUP.args(" ''"), Err.BXDB_NAME);
+
+  // cleanup
+  new DropBackup(NAME).execute(context);
+  query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,13 +1,16 @@
+
+ @Test
+-  public void backup() throws BaseXException {
+-    query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+-    query(_DB_BACKUP.args(NAME));
+-    query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
++public void backup() throws BaseXException {
++  query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
++  query(_DB_BACKUP.args(NAME));
++  query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
+ 
+-    // try to backup non existing database
+-    error(_DB_BACKUP.args(NAME + new Object().hashCode()), Err.BXDB_OPEN);
++  // try to backup non-existing database
++  error(_DB_BACKUP.args(NAME + new Object().hashCode()), Err.BXDB_WHICH);
+ 
+-    // cleanup
+-    new DropBackup(NAME).execute(context);
+-    query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+-  }
++  // invalid name
++  error(_DB_BACKUP.args(" ''"), Err.BXDB_NAME);
++
++  // cleanup
++  new DropBackup(NAME).execute(context);
++  query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
++}
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.9446153846153846
+----------------------------------------------------------------
+message
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 1
+----------------------------------------------------------------
+generated test
+@Test
+public void backup() throws BaseXException {
+  query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+  query(_DB_BACKUP.args(NAME));
+  query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
+
+  // try to backup non-existing database
+  error(_DB_BACKUP.args(NAME + new Object().hashCode()), Err.BXDB_WHICH);
+
+  // invalid name
+  error(_DB_BACKUP.args(" ''"), Err.BXDB_NAME);
+
+  // cleanup
+  new DropBackup(NAME).execute(context);
+  query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,13 +1,16 @@
+
+ @Test
+-  public void backup() throws BaseXException {
+-    query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+-    query(_DB_BACKUP.args(NAME));
+-    query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
++public void backup() throws BaseXException {
++  query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
++  query(_DB_BACKUP.args(NAME));
++  query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
+ 
+-    // try to backup non existing database
+-    error(_DB_BACKUP.args(NAME + new Object().hashCode()), Err.BXDB_OPEN);
++  // try to backup non-existing database
++  error(_DB_BACKUP.args(NAME + new Object().hashCode()), Err.BXDB_WHICH);
+ 
+-    // cleanup
+-    new DropBackup(NAME).execute(context);
+-    query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+-  }
++  // invalid name
++  error(_DB_BACKUP.args(" ''"), Err.BXDB_NAME);
++
++  // cleanup
++  new DropBackup(NAME).execute(context);
++  query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,16 +1,12 @@
+
+ @Test
+-public void backup() throws BaseXException {
+-  query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+-  query(_DB_BACKUP.args(NAME));
+-  query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
++  public void backup() throws BaseXException {
++    query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
++    query(_DB_BACKUP.args(NAME));
++    query(COUNT.args(_DB_BACKUPS.args(NAME)), "1");
+ 
+-  // try to backup non-existing database
+-  error(_DB_BACKUP.args(NAME + new Object().hashCode()), Err.BXDB_WHICH);
+-
+-  // invalid name
+-  error(_DB_BACKUP.args(" ''"), Err.BXDB_NAME);
+-
+-  // cleanup
+-  new DropBackup(NAME).execute(context);
+-  query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
+-}
++    // try to backup non-existing database
++    error(_DB_BACKUP.args(NAME + 'x'), Err.BXDB_WHICH);
++    // cleanup
++    new DropBackup(NAME).execute(context);
++    query(COUNT.args(_DB_BACKUPS.args(NAME)), "0");
++  }
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.9446153846153846
+--------------------------------------------------------------------------------------------------------------------------------

@@ -1,0 +1,68 @@
+diff --git a/old_product.java b/new_product.java
+index 56b5937..fa95a69 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -2,10 +2,11 @@ public V get(int size) {
+     ensurePoolSizeInvariant();
+ 
+     int bucketedSize = getBucketedSize(size);
+-    Bucket<V> bucket = getBucket(bucketedSize);
+     int sizeInBytes = -1;
+ 
+     synchronized (this) {
++      Bucket<V> bucket = getBucket(bucketedSize);
++
+       if (bucket != null) {
+         // find an existing value that we can reuse
+         V value = bucket.get();
+@@ -40,9 +41,12 @@ public V get(int size) {
+             mFree.mNumBytes,
+             sizeInBytes);
+       }
+-      // the allocation can succeed. So reserve the bytes to prevent another
+-      // call to get() to not succeed by mistake.
+-      mReservedBytes += sizeInBytes;
++
++      // Optimistically assume that allocation succeeds - if it fails, we need to undo those changes
++      mUsed.increment(sizeInBytes);
++      if (bucket != null) {
++        bucket.incrementInUseCount();
++      }
+     }
+ 
+     V value = null;
+@@ -51,13 +55,15 @@ public V get(int size) {
+       // we could have done the allocation inside the synchronized block,
+       // but that would have blocked out other operations on the pool
+       value = alloc(bucketedSize);
+-
+     } catch (Throwable e) {
+-      // Remove this from reserved byte count if this alloc failed,
+-      // without altering the code flow
++      // Assumption we made previously is not valid - allocation failed. We need to fix internal
++      // counters.
+       synchronized (this) {
+-        Preconditions.checkArgument(mReservedBytes >= sizeInBytes);
+-        mReservedBytes -= sizeInBytes;
++        mUsed.decrement(sizeInBytes);
++        Bucket<V> bucket = getBucket(bucketedSize);
++        if (bucket != null) {
++          bucket.decrementInUseCount();
++        }
+       }
+       Throwables.propagateIfPossible(e);
+     }
+@@ -69,13 +75,6 @@ public V get(int size) {
+     // be able to trim back memory usage.
+     synchronized(this) {
+       Preconditions.checkState(mInUseValues.add(value));
+-      Preconditions.checkArgument(mReservedBytes >= sizeInBytes);
+-      mUsed.increment(sizeInBytes);
+-      mReservedBytes -= sizeInBytes;
+-
+-      if (bucket != null) {
+-        bucket.incrementInUseCount();
+-      }
+       // If we're over the pool's max size, try to trim the pool appropriately
+       trimToSoftCap();
+       mPoolStatsTracker.onAlloc(sizeInBytes);

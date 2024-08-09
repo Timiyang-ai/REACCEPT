@@ -1,0 +1,4 @@
+Stream<String> writeGauge(TimeGauge gauge, long wallTime) {
+        Double value = gauge.value();
+        return value.isNaN() ? Stream.empty() : Stream.of(index(gauge, wallTime).field("value", gauge.value(getBaseTimeUnit())).build());
+    }

@@ -1,0 +1,1 @@
+public abstract Builder minDuration(@Nullable Long minDuration);

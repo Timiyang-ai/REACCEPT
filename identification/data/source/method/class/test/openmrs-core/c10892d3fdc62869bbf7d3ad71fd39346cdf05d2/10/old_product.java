@@ -1,0 +1,2 @@
+@Authorized(PrivilegeConstants.PURGE_GLOBAL_PROPERTIES)
+	public void purgeGlobalProperty(GlobalProperty globalProperty) throws APIException;

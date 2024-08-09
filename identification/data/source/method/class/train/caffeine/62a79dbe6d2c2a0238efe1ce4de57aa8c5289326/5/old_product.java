@@ -1,0 +1,1 @@
+void invalidate(@NonNull Object key);

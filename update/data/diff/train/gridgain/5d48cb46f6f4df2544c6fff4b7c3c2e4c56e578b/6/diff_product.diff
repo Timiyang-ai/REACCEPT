@@ -1,0 +1,71 @@
+diff --git a/old_product.java b/new_product.java
+index dd5e4b8..f51762e 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,5 +1,7 @@
+-private void activateCachesRestore(int srvs, boolean withNewCaches) throws Exception {
+-        Map<Integer, Integer> cacheData = startGridsAndLoadData(srvs);
++private void activateCachesRestore(int srvs, boolean withNewCaches, ClusterState activationMode) throws Exception {
++        assertActive(activationMode);
++
++        Map<Integer, Integer> cacheData = startGridsAndLoadData(srvs, activationMode);
+ 
+         stopAllGrids();
+ 
+@@ -14,14 +16,12 @@ private void activateCachesRestore(int srvs, boolean withNewCaches) throws Excep
+ 
+         checkNoCaches(srvs);
+ 
+-        srv.cluster().active(true);
++        srv.cluster().state(activationMode);
+ 
+         final int CACHES = withNewCaches ? 4 : 2;
+ 
+-        for (int i = 0; i < srvs; i++) {
+-            for (int c = 0; c < CACHES; c++)
+-                checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
+-        }
++        for (int i = 0; i < srvs; i++)
++            checkCachesOnNode(i, CACHES);
+ 
+         DataStorageConfiguration dsCfg = srv.configuration().getDataStorageConfiguration();
+ 
+@@ -31,30 +31,21 @@ private void activateCachesRestore(int srvs, boolean withNewCaches) throws Excep
+ 
+         int nodes = srvs;
+ 
+-        client = false;
++        startGrid(nodes++, false);
+ 
+-        startGrid(nodes++);
+-
+-        for (int i = 0; i < nodes; i++) {
+-            for (int c = 0; c < CACHES; c++)
+-                checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
+-        }
++        for (int i = 0; i < nodes; i++)
++            checkCachesOnNode(i, CACHES);
+ 
+         checkCaches(nodes, CACHES);
+ 
+-        client = true;
+-
+-        startGrid(nodes++);
++        startGrid(nodes++, true);
+ 
+-        for (int c = 0; c < CACHES; c++)
+-            checkCache(ignite(nodes - 1), CACHE_NAME_PREFIX + c, false);
++        checkCachesOnNode(nodes - 1, CACHES, false);
+ 
+         checkCaches(nodes, CACHES);
+ 
+-        for (int i = 0; i < nodes; i++) {
+-            for (int c = 0; c < CACHES; c++)
+-                checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
+-        }
++        for (int i = 0; i < nodes; i++)
++            checkCachesOnNode(i, CACHES);
+ 
+         checkCachesData(cacheData, dsCfg);
+     }
+\ No newline at end of file

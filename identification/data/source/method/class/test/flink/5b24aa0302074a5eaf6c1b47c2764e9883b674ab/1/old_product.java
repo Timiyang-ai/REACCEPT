@@ -1,0 +1,1 @@
+void clearAndPut(@Nonnull Runnable priorityAction);

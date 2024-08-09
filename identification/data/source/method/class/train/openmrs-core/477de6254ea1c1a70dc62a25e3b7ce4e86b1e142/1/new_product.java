@@ -1,0 +1,1 @@
+public List<Locale> getSearchLocales(Locale currentLocale, User user);

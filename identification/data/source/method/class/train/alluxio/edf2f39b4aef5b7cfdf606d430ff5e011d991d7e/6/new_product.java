@@ -1,0 +1,1 @@
+FileInfo getFileInfo(long fileId) throws IOException;

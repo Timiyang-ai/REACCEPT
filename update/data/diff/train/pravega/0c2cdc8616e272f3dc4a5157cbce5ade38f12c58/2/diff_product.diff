@@ -1,0 +1,29 @@
+diff --git a/old_product.java b/new_product.java
+index 927afd1..9f5c19c 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,17 +1,21 @@
+-synchronized boolean removeFinishedWrites() {
++synchronized EnumSet<CleanupStatus> removeFinishedWrites() {
++        Exceptions.checkNotClosed(this.closed, this);
+         long currentTime = this.timeSupplier.get();
+         long totalElapsed = 0;
+         int removedCount = 0;
++        boolean failedWrite = false;
+         while (!this.writes.isEmpty() && this.writes.peekFirst().isDone()) {
+             Write w = this.writes.removeFirst();
+             this.totalLength = Math.max(0, this.totalLength - w.data.getLength());
+             removedCount++;
+             totalElapsed += currentTime - w.getTimestamp();
++            failedWrite |= w.getFailureCause() != null;
+         }
+ 
+         if (removedCount > 0) {
+             this.lastDurationMillis = (int) (totalElapsed / removedCount / AbstractTimer.NANOS_TO_MILLIS);
+         }
+ 
+-        return !this.writes.isEmpty();
++        CleanupStatus empty = this.writes.isEmpty() ? CleanupStatus.QueueEmpty : CleanupStatus.QueueNotEmpty;
++        return failedWrite ? EnumSet.of(CleanupStatus.WriteFailed, empty) : EnumSet.of(empty);
+     }
+\ No newline at end of file

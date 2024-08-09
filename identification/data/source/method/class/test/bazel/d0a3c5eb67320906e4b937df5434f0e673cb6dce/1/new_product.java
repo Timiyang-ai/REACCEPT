@@ -1,0 +1,1 @@
+Collection<DepEdge> visitLabels() throws InterruptedException;

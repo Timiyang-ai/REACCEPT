@@ -1,0 +1,56 @@
+diff --git a/old_product.java b/new_product.java
+index 6ed2f22..3dec34f 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,5 +1,5 @@
+ public OFPacketOut handleDHCPDiscover(@Nonnull IOFSwitch sw, @Nonnull OFPort inPort, @Nonnull DHCPInstance instance,
+-                                          @Nonnull IPv4Address clientIP, @Nonnull DHCP payload) {
++                                          @Nonnull IPv4Address clientIP, @Nonnull DHCP payload, @Nonnull Boolean dynamicLease) {
+         /**  DHCP Discover Message
+          * -- UDP src port = 68
+          * -- UDP dst port = 67
+@@ -23,6 +23,9 @@ public OFPacketOut handleDHCPDiscover(@Nonnull IOFSwitch sw, @Nonnull OFPort inP
+          * --		(15) Domain Name
+          * --		(6)  DNS
+          **/
++
++        DHCPReturnMessage returnMessage = new DHCPReturnMessage();
++
+         int xid = payload.getTransactionId();
+         IPv4Address giaddr = payload.getGatewayIPAddress();    // Will have GW IP if a relay agent was used
+         IPv4Address yiaddr = payload.getYourIPAddress();
+@@ -43,16 +46,25 @@ public OFPacketOut handleDHCPDiscover(@Nonnull IOFSwitch sw, @Nonnull OFPort inP
+         DHCPPool dhcpPool = instance.getDHCPPool();
+         long leaseTime = instance.getLeaseTimeSec();
+         IPv4Address ipLease = null;
+-        if (requestIP == null) {
+-            ipLease = dhcpPool.assignLeaseToClient(chaddr, leaseTime).get();
+-        } else {
+-            ipLease = dhcpPool.assignLeaseToClientWithRequestIP(requestIP,
+-                    chaddr, leaseTime).orElse(dhcpPool.assignLeaseToClient(chaddr, leaseTime).get());
++
++        if (!dynamicLease) {
++            if (requestIP == null) {
++                ipLease = dhcpPool.assignLeaseToClient(chaddr, leaseTime).get();
++            } else {
++                ipLease = dhcpPool.assignLeaseToClientWithRequestIP(requestIP, chaddr, leaseTime, false).get();
++            }
++        }else {
++            if (requestIP == null) {
++                ipLease = dhcpPool.assignDynamicLeaseToClient(chaddr, leaseTime).get();
++            } else {
++                ipLease = dhcpPool.assignLeaseToClientWithRequestIP(requestIP, chaddr, leaseTime, true).get();
++            }
++
+         }
+-        yiaddr = ipLease;
+ 
++        yiaddr = ipLease;
+         DHCP dhcpOffer = buildDHCPOfferMessage(instance, chaddr, yiaddr, giaddr, xid, requestOrder);
+-
+-        return buildDHCPOfferPacketOut(instance, sw, inPort, clientIP, dhcpOffer);
++        OFPacketOut dhcpPacketOut = buildDHCPOfferPacketOut(instance, sw, inPort, clientIP, dhcpOffer);
++        return dhcpPacketOut;
+ 
+     }
+\ No newline at end of file

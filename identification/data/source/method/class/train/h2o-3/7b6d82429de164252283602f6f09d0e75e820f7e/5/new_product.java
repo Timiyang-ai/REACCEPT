@@ -1,0 +1,1 @@
+public Vec makeCopy(String[] domain){ return makeCopy(domain,_type); }

@@ -1,0 +1,2 @@
+void notifyCreditAvailable(RemoteInputChannel inputChannel) {
+	}

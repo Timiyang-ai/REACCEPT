@@ -1,0 +1,1 @@
+public Future<Stream> syn(SynInfo synInfo, StreamFrameListener listener);

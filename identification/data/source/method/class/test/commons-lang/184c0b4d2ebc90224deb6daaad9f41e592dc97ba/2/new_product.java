@@ -1,0 +1,23 @@
+public static List getAllInterfaces(Class cls) {
+        if (cls == null) {
+            return null;
+        }
+        List list = new ArrayList();
+        while (cls != null) {
+            Class[] interfaces = cls.getInterfaces();
+            for (int i = 0; i < interfaces.length; i++) {
+                if (list.contains(interfaces[i]) == false) {
+                    list.add(interfaces[i]);
+                }
+                List superInterfaces = getAllInterfaces(interfaces[i]);
+                for (Iterator it = superInterfaces.iterator(); it.hasNext();) {
+                    Class intface = (Class) it.next();
+                    if (list.contains(intface) == false) {
+                        list.add(intface);
+                    }
+                }
+            }
+            cls = cls.getSuperclass();
+        }
+        return list;
+    }

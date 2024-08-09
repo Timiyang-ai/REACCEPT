@@ -1,0 +1,1 @@
+void unmount(AlluxioURI path, UnmountPOptions options) throws IOException, AlluxioException;

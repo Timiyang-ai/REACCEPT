@@ -1,0 +1,1 @@
+public Privilege getPrivilegeByUuid(String uuid) throws APIException;

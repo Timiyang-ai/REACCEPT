@@ -1,0 +1,1 @@
+void clearStorage() throws BackendException;

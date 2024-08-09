@@ -1,0 +1,64 @@
+diff --git a/old_product.java b/new_product.java
+index 972fc24..429cf54 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,43 +1,16 @@
+ @Nonnull
+     public TransformResponse execute(@Nonnull final TransformRequest request) throws ScriptException {
+-        log.trace("entry params({})", request);
++        log.entry(request);
+ 
+-        // Build bindings list
+-        final List<NamedParam> bindings = new ArrayList<>();
+-        bindings.add(new NamedParamClass("sparkContextService", SparkContextService.class.getName(), sparkContextService));
+-
+-        if (request.getDatasources() != null && !request.getDatasources().isEmpty()) {
+-            if (datasourceProviderFactory != null) {
+-                final DatasourceProvider datasourceProvider = datasourceProviderFactory.getDatasourceProvider(request.getDatasources());
+-                bindings.add(new NamedParamClass("datasourceProvider", DatasourceProvider.class.getName() + "[org.apache.spark.sql.DataFrame]", datasourceProvider));
+-            } else {
+-                final ScriptException e = new ScriptException("Script cannot be executed because no data source provider factory is available.");
+-                log.error("Throwing {}", e);
+-                throw e;
+-            }
++        // Handle async request
++        if (request.isAsync()) {
++            return cacheTransform(request);
+         }
+ 
+         // Execute script
+-        final Object result;
+-        try {
+-            result = this.engine.eval(toScript(request), bindings);
+-        } catch (final Exception cause) {
+-            final ScriptException e = new ScriptException(cause);
+-            log.error("Throwing {}", e);
+-            throw e;
+-        }
+-
+-        TransformResponse response;
+-        StructType schema;
+-        if (result instanceof DataSet) {
+-            final DataSet dataSet = (DataSet) result;
+-            schema = dataSet.schema();
+-            response = submitJob(new ShellTransformStage(dataSet), getPolicies(request));
+-        } else {
+-            final IllegalStateException e = new IllegalStateException("Unexpected script result type: " + (result != null ? result.getClass() : null));
+-            log.error("Throwing {}", e);
+-            throw e;
+-        }
++        final DataSet dataSet = createShellTask(request);
++        final StructType schema = dataSet.schema();
++        TransformResponse response = submitTransformJob(new ShellTransformStage(dataSet), getPolicies(request));
+ 
+         // Build response
+         if (response.getStatus() != TransformResponse.Status.SUCCESS) {
+@@ -52,6 +25,5 @@
+             response.setTable(table);
+         }
+ 
+-        log.trace("exit with({})", response);
+-        return response;
++        return log.exit(response);
+     }
+\ No newline at end of file

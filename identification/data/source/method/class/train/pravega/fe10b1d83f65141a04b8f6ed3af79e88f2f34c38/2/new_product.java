@@ -1,0 +1,1 @@
+SegmentMetadata deleteStreamSegment(String streamSegmentName);

@@ -1,0 +1,1 @@
+AttributeHandler<?> getHandler(String datatype, String handlerConfig);

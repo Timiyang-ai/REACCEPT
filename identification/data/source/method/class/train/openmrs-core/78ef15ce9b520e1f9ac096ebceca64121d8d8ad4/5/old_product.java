@@ -1,0 +1,1 @@
+public void voidObs(Obs obs);

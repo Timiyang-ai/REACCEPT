@@ -1,0 +1,66 @@
+diff --git a/old_product.java b/new_product.java
+index 1708856..78290dd 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,6 +1,4 @@
+ private void joinTransactional(boolean singleNode, final boolean distributedJoin) throws Exception {
+-        fail("https://issues.apache.org/jira/browse/IGNITE-9470");
+-
+         final int KEYS = 100;
+ 
+         final int writers = 4;
+@@ -20,31 +18,38 @@ private void joinTransactional(boolean singleNode, final boolean distributedJoin
+                         IgniteTransactions txs = cache.cache.unwrap(Ignite.class).transactions();
+ 
+                         try {
+-                            try (Transaction tx = txs.txStart(PESSIMISTIC, REPEATABLE_READ)) {
+-                                Integer key = rnd.nextInt(KEYS);
++                            while (true) {
++                                try (Transaction tx = txs.txStart(PESSIMISTIC, REPEATABLE_READ)) {
++                                    Integer key = rnd.nextInt(KEYS);
+ 
+-                                JoinTestChildKey childKey = new JoinTestChildKey(key);
++                                    JoinTestChildKey childKey = new JoinTestChildKey(key);
+ 
+-                                JoinTestChild child = (JoinTestChild)cache.cache.get(childKey);
++                                    JoinTestChild child = (JoinTestChild)cache.cache.get(childKey);
+ 
+-                                if (child == null) {
+-                                    Integer parentKey = distributedJoin ? key + 100 : key;
++                                    if (child == null) {
++                                        int parentKey = distributedJoin ? key + 100 : key;
+ 
+-                                    child = new JoinTestChild(parentKey);
++                                        child = new JoinTestChild(parentKey);
+ 
+-                                    cache.cache.put(childKey, child);
++                                        cache.cache.put(childKey, child);
+ 
+-                                    JoinTestParent parent = new JoinTestParent(parentKey);
++                                        JoinTestParent parent = new JoinTestParent(parentKey);
+ 
+-                                    cache.cache.put(new JoinTestParentKey(parentKey), parent);
+-                                }
+-                                else {
+-                                    cache.cache.remove(childKey);
++                                        cache.cache.put(new JoinTestParentKey(parentKey), parent);
++                                    }
++                                    else {
++                                        cache.cache.remove(childKey);
+ 
+-                                    cache.cache.remove(new JoinTestParentKey(child.parentId));
+-                                }
++                                        cache.cache.remove(new JoinTestParentKey(child.parentId));
++                                    }
++
++                                    tx.commit();
+ 
+-                                tx.commit();
++                                    break;
++                                }
++                                catch (CacheException e) {
++                                    MvccFeatureChecker.assertMvccWriteConflict(e);
++                                }
+                             }
+ 
+                             cnt++;

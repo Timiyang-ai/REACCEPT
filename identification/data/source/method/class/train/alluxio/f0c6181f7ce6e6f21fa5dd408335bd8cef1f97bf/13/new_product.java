@@ -1,0 +1,1 @@
+long getFileId(AlluxioURI path) throws AccessControlException, UnavailableException;

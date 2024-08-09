@@ -1,0 +1,13 @@
+public final Flux<@NonNull T> sorted(Comparator<? super @NonNull T> comparator, int capacityHint) {
+		int ch = capacityHint / parallelism() + 1;
+		ParallelFlux<List<T>> railReduced = reduce(() -> new ArrayList<>(ch), (a, b) -> {
+					a.add(b);
+					return a;
+				});
+		ParallelFlux<List<T>> railSorted = railReduced.map(list -> {
+			list.sort(comparator);
+			return list;
+		});
+
+		return Flux.onAssembly(new ParallelMergeSort<>(railSorted, comparator));
+	}

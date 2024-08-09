@@ -1,0 +1,1 @@
+public abstract LwM2mInstanceEnabler create();

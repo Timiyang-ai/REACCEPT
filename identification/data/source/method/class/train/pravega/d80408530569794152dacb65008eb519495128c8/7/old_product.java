@@ -1,0 +1,1 @@
+SegmentOutputStream createOutputStreamForSegment(SegmentId segment, SegmentOutputConfiguration config) throws SegmentSealedException;

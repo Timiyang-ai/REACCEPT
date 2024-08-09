@@ -1,0 +1,1 @@
+Result rollbackTx(Transaction tx, Object secondaryData);

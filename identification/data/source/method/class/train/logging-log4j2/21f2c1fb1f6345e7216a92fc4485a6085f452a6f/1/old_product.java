@@ -1,0 +1,1 @@
+ConfigurationBuilder<T> add(LoggerComponentBuilder assembler);

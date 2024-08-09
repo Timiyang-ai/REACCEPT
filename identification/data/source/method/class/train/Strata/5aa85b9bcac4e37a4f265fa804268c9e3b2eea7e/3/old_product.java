@@ -1,0 +1,1 @@
+public double yearFraction(LocalDate firstDate, LocalDate secondDate, ScheduleInfo scheduleInfo);

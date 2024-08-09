@@ -1,0 +1,1 @@
+void log(Level level, Throwable t, String format, Object... arguments);

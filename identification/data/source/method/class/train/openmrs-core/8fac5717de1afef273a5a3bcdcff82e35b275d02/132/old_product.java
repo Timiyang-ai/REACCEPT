@@ -1,0 +1,1 @@
+public void removeUserProperty(User user, String key);

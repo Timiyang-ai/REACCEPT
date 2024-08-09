@@ -1,0 +1,1 @@
+GlobalMemory getMemory();

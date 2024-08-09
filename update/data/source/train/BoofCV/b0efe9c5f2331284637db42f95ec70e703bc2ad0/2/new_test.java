@@ -1,0 +1,35 @@
+@Test
+	public void convert() {
+		List<Point2D_F64> points = UtilPoint2D_F64.random(-2,2,4,rand);
+		points = UtilPoint2D_F64.orderCCW(points);
+
+		List<LineGeneral2D_F64> lines = new ArrayList<LineGeneral2D_F64>();
+		for (int j = 0; j < 4; j++) {
+			Point2D_F64 a = points.get(j);
+			Point2D_F64 b = points.get((j+1)%4);
+
+			lines.add(line(a.x,a.y,b.x,b.y));
+		}
+
+		Quadrilateral_F64 quad = new Quadrilateral_F64();
+		FitQuadrilaterialEM.convert(lines.toArray(new LineGeneral2D_F64[4]),quad);
+
+		assertTrue(findMatch(quad.a,points));
+		assertTrue(findMatch(quad.b,points));
+		assertTrue(findMatch(quad.c,points));
+		assertTrue(findMatch(quad.d,points));
+
+		// see what happens if the order is reversed
+		List<LineGeneral2D_F64> alt = new ArrayList<LineGeneral2D_F64>();
+		for (int j = 0; j < 4; j++) {
+			alt.add( lines.get(4-j-1));
+		}
+		lines= alt;
+
+		FitQuadrilaterialEM.convert(lines.toArray(new LineGeneral2D_F64[4]),quad);
+
+		assertTrue(findMatch(quad.a,points));
+		assertTrue(findMatch(quad.b,points));
+		assertTrue(findMatch(quad.c,points));
+		assertTrue(findMatch(quad.d,points));
+	}

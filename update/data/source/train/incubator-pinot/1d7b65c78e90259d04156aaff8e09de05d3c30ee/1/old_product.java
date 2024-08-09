@@ -1,0 +1,1 @@
+void aggregateGroupBySV(int length, int[] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray);

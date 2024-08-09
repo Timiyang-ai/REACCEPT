@@ -1,0 +1,1 @@
+<R> R query(TemporalQuery<R> query);

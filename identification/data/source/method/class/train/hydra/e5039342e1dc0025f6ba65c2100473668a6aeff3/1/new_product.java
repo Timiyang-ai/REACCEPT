@@ -1,0 +1,1 @@
+abstract boolean filter(Bundle row);

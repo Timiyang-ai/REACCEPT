@@ -1,0 +1,1 @@
+public void completeUfsFile(long tempUfsFileId, CompleteUfsFileTOptions options) throws alluxio.thrift.AlluxioTException, alluxio.thrift.ThriftIOException, org.apache.thrift.TException;

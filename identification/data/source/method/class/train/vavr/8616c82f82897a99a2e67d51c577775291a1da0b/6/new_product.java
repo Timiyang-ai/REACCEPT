@@ -1,0 +1,1 @@
+<U> Try<U> flatMap(Function<? super T, ? extends Value<? extends U>> mapper);

@@ -1,0 +1,48 @@
+diff --git a/old_product.java b/new_product.java
+index 7928ed1..67e70d2 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,23 +1,32 @@
+-public void delete(final String pkg, final InputInfo ii) throws QueryException {
++public void delete(final String pkg) throws QueryException {
+     boolean found = false;
+-    for(final byte[] nextPkg : repo.pkgDict()) {
++    final TokenMap dict = repo.pkgDict();
++    for(final byte[] nextPkg : dict) {
+       if(nextPkg == null) continue;
++      final byte[] dir = dict.get(nextPkg);
+ 
+-      final byte[] dir = repo.pkgDict().get(nextPkg);
++      // a package can be deleted either by its name or by its directory name
+       if(eq(Package.name(nextPkg), token(pkg)) || eq(dir, token(pkg))) {
+-        // a package can be deleted either by its name or by its directory name
+-        found = true;
+         // check if package to be deleted participates in a dependency
+-        final byte[] primPkg = primary(nextPkg, ii);
+-        if(primPkg != null) PKGDEP.thrw(ii, string(primPkg), pkg);
++        final byte[] primPkg = primary(nextPkg);
++        if(primPkg != null) PKGDEP.thrw(info, string(primPkg), pkg);
+ 
+         // clean package repository
+         final IOFile f = repo.path(string(dir));
+         final IOFile desc = new IOFile(f, DESCRIPTOR);
+-        repo.remove(new PkgParser(repo, ii).parse(desc));
++        repo.remove(new PkgParser(repo, info).parse(desc));
+         // package does not participate in a dependency => delete it
+-        if(!f.delete()) CANNOTDELPKG.thrw(ii);
++        if(!f.delete()) PKGDEL.thrw(info, f);
++        found = true;
+       }
+     }
+-    if(!found) PKGNOTEXIST.thrw(ii, pkg);
++
++    // traverse all files
++    final IOFile file = file(pkg, repo);
++    if(file != null) {
++      if(!file.delete()) PKGDEL.thrw(info, file);
++      return;
++    }
++
++    if(!found) PKGNOTEXIST.thrw(info, pkg);
+   }
+\ No newline at end of file

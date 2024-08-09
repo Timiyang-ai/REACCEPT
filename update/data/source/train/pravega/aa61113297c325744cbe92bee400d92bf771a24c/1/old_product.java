@@ -1,0 +1,1 @@
+CompletableFuture<Void> truncate(long upToSequence, Duration timeout);

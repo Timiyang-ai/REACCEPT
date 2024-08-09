@@ -1,0 +1,1 @@
+public void voidCohort(Cohort cohort, String reason);

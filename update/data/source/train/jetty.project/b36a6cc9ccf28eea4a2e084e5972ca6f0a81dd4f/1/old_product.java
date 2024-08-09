@@ -1,0 +1,1 @@
+public void syn(SynInfo synInfo, StreamFrameListener listener, long timeout, TimeUnit unit, Callback<Stream> callback);

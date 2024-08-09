@@ -1,0 +1,1 @@
+BlockMeta getVolatileBlockMeta(long blockId) throws BlockDoesNotExistException;

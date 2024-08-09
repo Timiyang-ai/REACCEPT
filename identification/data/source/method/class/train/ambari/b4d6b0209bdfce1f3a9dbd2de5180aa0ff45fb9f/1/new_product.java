@@ -1,0 +1,1 @@
+public void createCluster(ClusterRequest request) throws AmbariException, AuthorizationException;

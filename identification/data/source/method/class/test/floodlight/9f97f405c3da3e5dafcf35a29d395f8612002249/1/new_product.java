@@ -1,0 +1,1 @@
+Optional<IPv4Address> assignLeaseToClientWithRequestIP(IPv4Address requestIP, MacAddress clientMac, long timeSec, boolean dynamicLease);

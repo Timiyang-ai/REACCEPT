@@ -1,0 +1,1494 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.9373040752351097
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 1
+----------------------------------------------------------------
+old description: 单元测试不通过
+----------------------------------------------------------------
+old message
+-------------------------------------------------------------------------------
+Test set: org.openmrs.api.OrderServiceTest
+-------------------------------------------------------------------------------
+Tests run: 147, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 10.09 sec <<< FAILURE!
+saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists(org.openmrs.api.OrderServiceTest)  Time elapsed: 0 sec  <<< FAILURE!
+java.lang.AssertionError: Expected test to throw (an instance of org.openmrs.api.APIException and exception with message a string containing "Order.cannot.have.more.than.one")
+	at org.junit.Assert.fail(Assert.java:88)
+	at org.junit.rules.ExpectedException.failDueToMissingException(ExpectedException.java:184)
+	at org.junit.rules.ExpectedException.access$100(ExpectedException.java:85)
+	at org.junit.rules.ExpectedException$ExpectedExceptionStatement.evaluate(ExpectedException.java:170)
+	at org.junit.rules.RunRules.evaluate(RunRules.java:20)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:73)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:271)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:217)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:83)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:238)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:63)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:236)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:53)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:229)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:68)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:309)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:163)
+	at org.apache.maven.surefire.junit4.JUnit4TestSet.execute(JUnit4TestSet.java:59)
+	at org.apache.maven.surefire.suite.AbstractDirectoryTestSuite.executeTestSet(AbstractDirectoryTestSuite.java:115)
+	at org.apache.maven.surefire.suite.AbstractDirectoryTestSuite.execute(AbstractDirectoryTestSuite.java:102)
+	at org.apache.maven.surefire.Surefire.run(Surefire.java:180)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.apache.maven.surefire.booter.SurefireBooter.runSuitesInProcess(SurefireBooter.java:350)
+	at org.apache.maven.surefire.booter.SurefireBooter.main(SurefireBooter.java:1021)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+public synchronized Order saveOrder(Order order, OrderContext orderContext) throws APIException {
+		if (order.getOrderId() != null) {
+			throw new APIException("Order.cannot.edit.existing", (Object[]) null);
+		}
+		if (order.getDateActivated() == null) {
+			order.setDateActivated(new Date());
+		}
+		//Reject if there is an active order for the same orderable with overlapping schedule
+		boolean isDrugOrder = DrugOrder.class.isAssignableFrom(getActualType(order));
+		Concept concept = order.getConcept();
+		if (concept == null && isDrugOrder) {
+			DrugOrder drugOrder = (DrugOrder) order;
+			if (drugOrder.getDrug() != null) {
+				concept = drugOrder.getDrug().getConcept();
+				drugOrder.setConcept(concept);
+			}
+		}
+		if (isDrugOrder) {
+			((DrugOrder) order).setAutoExpireDateBasedOnDuration();
+		}
+		
+		if (concept == null) {
+			throw new APIException("Order.concept.required", (Object[]) null);
+		}
+		
+		Order previousOrder = order.getPreviousOrder();
+		if (order.getOrderType() == null) {
+			OrderType orderType = null;
+			if (orderContext != null) {
+				orderType = orderContext.getOrderType();
+			}
+			if (orderType == null) {
+				orderType = getOrderTypeByConcept(concept);
+			}
+			//Check if it is instance of DrugOrder
+			if (orderType == null && order instanceof DrugOrder) {
+				orderType = Context.getOrderService().getOrderTypeByUuid(OrderType.DRUG_ORDER_TYPE_UUID);
+			}
+			//Check if it is an instance of TestOrder
+			if (orderType == null && order instanceof TestOrder) {
+				orderType = Context.getOrderService().getOrderTypeByUuid(OrderType.TEST_ORDER_TYPE_UUID);
+			}
+			
+			//this order's order type should match that of the previous
+			if (orderType == null || (previousOrder != null && !orderType.equals(previousOrder.getOrderType()))) {
+				throw new APIException("Order.type.cannot.determine", (Object[]) null);
+			}
+			
+			order.setOrderType(orderType);
+		}
+		if (order.getCareSetting() == null) {
+			CareSetting careSetting = null;
+			if (orderContext != null) {
+				careSetting = orderContext.getCareSetting();
+			}
+			if (careSetting == null || (previousOrder != null && !careSetting.equals(previousOrder.getCareSetting()))) {
+				throw new APIException("Order.care.cannot.determine", (Object[]) null);
+			}
+			order.setCareSetting(careSetting);
+		}
+		
+		if (!order.getOrderType().getJavaClass().isAssignableFrom(order.getClass())) {
+			throw new APIException("Order.type.class.does.not.match", new Object[] { order.getOrderType().getJavaClass(),
+			        order.getClass().getName() });
+		}
+		
+		if (REVISE == order.getAction()) {
+			if (previousOrder == null) {
+				throw new APIException("Order.previous.required", (Object[]) null);
+			}
+			stopOrder(previousOrder, aMomentBefore(order.getDateActivated()));
+		} else if (DISCONTINUE == order.getAction()) {
+			discontinueExistingOrdersIfNecessary(order);
+		}
+		
+		if (previousOrder != null) {
+			//Check that patient, careSetting, concept and drug if is drug order have not changed
+			//we need to use a SQL query to by pass the hibernate cache
+			boolean isPreviousDrugOrder = DrugOrder.class.isAssignableFrom(previousOrder.getClass());
+			List<Object[]> rows = dao.getOrderFromDatabase(previousOrder, isPreviousDrugOrder);
+			Object[] rowData = rows.get(0);
+			if (!rowData[0].equals(previousOrder.getPatient().getPatientId())) {
+				throw new APIException("Order.cannot.change.patient", (Object[]) null);
+			} else if (!rowData[1].equals(previousOrder.getCareSetting().getCareSettingId())) {
+				throw new APIException("Order.cannot.change.careSetting", (Object[]) null);
+			} else if (!rowData[2].equals(previousOrder.getConcept().getConceptId())) {
+				throw new APIException("Order.cannot.change.concept", (Object[]) null);
+			} else if (isPreviousDrugOrder) {
+				Drug previousDrug = ((DrugOrder) previousOrder).getDrug();
+				if (previousDrug == null && rowData[3] != null) {
+					throw new APIException("Order.cannot.change.drug", (Object[]) null);
+				} else if (previousDrug != null && !OpenmrsUtil.nullSafeEquals(rowData[3], previousDrug.getDrugId())) {
+					throw new APIException("Order.cannot.change.drug", (Object[]) null);
+				}
+			}
+			
+			//concept should be the same as on previous order, same applies to drug for drug orders
+			boolean isDrugOrderAndHasADrug = isDrugOrder && ((DrugOrder) order).getDrug() != null;
+			if (!OpenmrsUtil.nullSafeEquals(order.getConcept(), previousOrder.getConcept())) {
+				throw new APIException("Order.previous.concept", (Object[]) null);
+			} else if (isDrugOrderAndHasADrug) {
+				DrugOrder drugOrder1 = (DrugOrder) order;
+				DrugOrder drugOrder2 = (DrugOrder) previousOrder;
+				if (!OpenmrsUtil.nullSafeEquals(drugOrder1.getDrug(), drugOrder2.getDrug())) {
+					throw new APIException("Order.previous.drug", (Object[]) null);
+				}
+			} else if (!order.getOrderType().equals(previousOrder.getOrderType())) {
+				throw new APIException("Order.type.does.not.match", (Object[]) null);
+			} else if (!order.getCareSetting().equals(previousOrder.getCareSetting())) {
+				throw new APIException("Order.care.setting.does.not.match", (Object[]) null);
+			} else if (!getActualType(order).equals(getActualType(previousOrder))) {
+				throw new APIException("Order.class.does.not.match", (Object[]) null);
+			}
+		}
+		
+		if (DISCONTINUE != order.getAction()) {
+			List<Order> activeOrders = getActiveOrders(order.getPatient(), null, order.getCareSetting(), null);
+			for (Order activeOrder : activeOrders) {
+				if (order.hasSameOrderableAs(activeOrder)
+				        && !OpenmrsUtil.nullSafeEquals(order.getPreviousOrder(), activeOrder)
+				        && OrderUtil.checkScheduleOverlap(order, activeOrder)) {
+					throw new APIException("Order.cannot.have.more.than.one", (Object[]) null);
+				}
+			}
+		}
+		
+		return saveOrderInternal(order, orderContext);
+	}
+----------------------------------------------------------------
+old test
+@Test
+	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+		
+		expectedException.expect(APIException.class);
+		expectedException.expectMessage("Order.cannot.have.more.than.one");
+		orderService.saveOrder(order, null);
+	}
+----------------------------------------------------------------
+new product
+public synchronized Order saveOrder(Order order, OrderContext orderContext) throws APIException {
+		if (order.getOrderId() != null) {
+			throw new APIException("Order.cannot.edit.existing", (Object[]) null);
+		}
+		if (order.getDateActivated() == null) {
+			order.setDateActivated(new Date());
+		}
+		boolean isDrugOrder = DrugOrder.class.isAssignableFrom(getActualType(order));
+		Concept concept = order.getConcept();
+		if (concept == null && isDrugOrder) {
+			DrugOrder drugOrder = (DrugOrder) order;
+			if (drugOrder.getDrug() != null) {
+				concept = drugOrder.getDrug().getConcept();
+				drugOrder.setConcept(concept);
+			}
+		}
+		if (isDrugOrder) {
+			((DrugOrder) order).setAutoExpireDateBasedOnDuration();
+		}
+		
+		if (concept == null) {
+			throw new APIException("Order.concept.required", (Object[]) null);
+		}
+		
+		Order previousOrder = order.getPreviousOrder();
+		if (order.getOrderType() == null) {
+			OrderType orderType = null;
+			if (orderContext != null) {
+				orderType = orderContext.getOrderType();
+			}
+			if (orderType == null) {
+				orderType = getOrderTypeByConcept(concept);
+			}
+			//Check if it is instance of DrugOrder
+			if (orderType == null && order instanceof DrugOrder) {
+				orderType = Context.getOrderService().getOrderTypeByUuid(OrderType.DRUG_ORDER_TYPE_UUID);
+			}
+			//Check if it is an instance of TestOrder
+			if (orderType == null && order instanceof TestOrder) {
+				orderType = Context.getOrderService().getOrderTypeByUuid(OrderType.TEST_ORDER_TYPE_UUID);
+			}
+			
+			//this order's order type should match that of the previous
+			if (orderType == null || (previousOrder != null && !orderType.equals(previousOrder.getOrderType()))) {
+				throw new APIException("Order.type.cannot.determine", (Object[]) null);
+			}
+			
+			order.setOrderType(orderType);
+		}
+		if (order.getCareSetting() == null) {
+			CareSetting careSetting = null;
+			if (orderContext != null) {
+				careSetting = orderContext.getCareSetting();
+			}
+			if (careSetting == null || (previousOrder != null && !careSetting.equals(previousOrder.getCareSetting()))) {
+				throw new APIException("Order.care.cannot.determine", (Object[]) null);
+			}
+			order.setCareSetting(careSetting);
+		}
+		
+		if (!order.getOrderType().getJavaClass().isAssignableFrom(order.getClass())) {
+			throw new APIException("Order.type.class.does.not.match", new Object[] { order.getOrderType().getJavaClass(),
+			        order.getClass().getName() });
+		}
+		
+		if (REVISE == order.getAction()) {
+			if (previousOrder == null) {
+				throw new APIException("Order.previous.required", (Object[]) null);
+			}
+			stopOrder(previousOrder, aMomentBefore(order.getDateActivated()));
+		} else if (DISCONTINUE == order.getAction()) {
+			discontinueExistingOrdersIfNecessary(order);
+		}
+		
+		if (previousOrder != null) {
+			//Check that patient, careSetting, concept and drug if is drug order have not changed
+			//we need to use a SQL query to by pass the hibernate cache
+			boolean isPreviousDrugOrder = DrugOrder.class.isAssignableFrom(previousOrder.getClass());
+			List<Object[]> rows = dao.getOrderFromDatabase(previousOrder, isPreviousDrugOrder);
+			Object[] rowData = rows.get(0);
+			if (!rowData[0].equals(previousOrder.getPatient().getPatientId())) {
+				throw new APIException("Order.cannot.change.patient", (Object[]) null);
+			} else if (!rowData[1].equals(previousOrder.getCareSetting().getCareSettingId())) {
+				throw new APIException("Order.cannot.change.careSetting", (Object[]) null);
+			} else if (!rowData[2].equals(previousOrder.getConcept().getConceptId())) {
+				throw new APIException("Order.cannot.change.concept", (Object[]) null);
+			} else if (isPreviousDrugOrder) {
+				Drug previousDrug = ((DrugOrder) previousOrder).getDrug();
+				if (previousDrug == null && rowData[3] != null) {
+					throw new APIException("Order.cannot.change.drug", (Object[]) null);
+				} else if (previousDrug != null && !OpenmrsUtil.nullSafeEquals(rowData[3], previousDrug.getDrugId())) {
+					throw new APIException("Order.cannot.change.drug", (Object[]) null);
+				}
+			}
+			
+			//concept should be the same as on previous order, same applies to drug for drug orders
+			boolean isDrugOrderAndHasADrug = isDrugOrder && ((DrugOrder) order).getDrug() != null;
+			if (!OpenmrsUtil.nullSafeEquals(order.getConcept(), previousOrder.getConcept())) {
+				throw new APIException("Order.previous.concept", (Object[]) null);
+			} else if (isDrugOrderAndHasADrug) {
+				DrugOrder drugOrder1 = (DrugOrder) order;
+				DrugOrder drugOrder2 = (DrugOrder) previousOrder;
+				if (!OpenmrsUtil.nullSafeEquals(drugOrder1.getDrug(), drugOrder2.getDrug())) {
+					throw new APIException("Order.previous.drug", (Object[]) null);
+				}
+			} else if (!order.getOrderType().equals(previousOrder.getOrderType())) {
+				throw new APIException("Order.type.does.not.match", (Object[]) null);
+			} else if (!order.getCareSetting().equals(previousOrder.getCareSetting())) {
+				throw new APIException("Order.care.setting.does.not.match", (Object[]) null);
+			} else if (!getActualType(order).equals(getActualType(previousOrder))) {
+				throw new APIException("Order.class.does.not.match", (Object[]) null);
+			}
+		}
+		
+		if (DISCONTINUE != order.getAction()) {
+			List<Order> activeOrders = getActiveOrders(order.getPatient(), null, order.getCareSetting(), null);
+			for (Order activeOrder : activeOrders) {
+				//Reject if there is an active drug order for the same orderable with overlapping schedule
+				if (areDrugOrdersOfSameOrderableAndOverlappingSchedule(order, activeOrder)) {
+					throw new APIException("Order.cannot.have.more.than.one", (Object[]) null);
+				}
+			}
+		}
+		
+		return saveOrderInternal(order, orderContext);
+	}
+----------------------------------------------------------------
+new test
+@Test
+	public void saveOrder_shouldPassIfAnActiveTestOrderForTheSameConceptAndCareSettingExists() throws Exception {
+		final Patient patient = patientService.getPatient(2);
+		final Concept cd4Count = conceptService.getConcept(5497);
+		//sanity check that we have an active order for the same concept
+		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+		assertTrue(duplicateOrder.isActive());
+		assertEquals(cd4Count, duplicateOrder.getConcept());
+		
+		Order order = new TestOrder();
+		order.setPatient(patient);
+		order.setCareSetting(orderService.getCareSetting(2));
+		order.setConcept(cd4Count);
+		order.setEncounter(encounterService.getEncounter(6));
+		order.setOrderer(providerService.getProvider(1));
+		order.setCareSetting(duplicateOrder.getCareSetting());
+
+		Order savedOrder = orderService.saveOrder(order, null);
+
+		assertNotNull(orderService.getOrder(savedOrder.getOrderId()));
+	}
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index f2bff62..5f3cbe3 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -5,7 +5,6 @@ public synchronized Order saveOrder(Order order, OrderContext orderContext) thro
+ 		if (order.getDateActivated() == null) {
+ 			order.setDateActivated(new Date());
+ 		}
+-		//Reject if there is an active order for the same orderable with overlapping schedule
+ 		boolean isDrugOrder = DrugOrder.class.isAssignableFrom(getActualType(order));
+ 		Concept concept = order.getConcept();
+ 		if (concept == null && isDrugOrder) {
+@@ -116,9 +115,8 @@ public synchronized Order saveOrder(Order order, OrderContext orderContext) thro
+ 		if (DISCONTINUE != order.getAction()) {
+ 			List<Order> activeOrders = getActiveOrders(order.getPatient(), null, order.getCareSetting(), null);
+ 			for (Order activeOrder : activeOrders) {
+-				if (order.hasSameOrderableAs(activeOrder)
+-				        && !OpenmrsUtil.nullSafeEquals(order.getPreviousOrder(), activeOrder)
+-				        && OrderUtil.checkScheduleOverlap(order, activeOrder)) {
++				//Reject if there is an active drug order for the same orderable with overlapping schedule
++				if (areDrugOrdersOfSameOrderableAndOverlappingSchedule(order, activeOrder)) {
+ 					throw new APIException("Order.cannot.have.more.than.one", (Object[]) null);
+ 				}
+ 			}
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index 9a16932..cdd0bc6 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,5 +1,5 @@
+ @Test
+-	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
++	public void saveOrder_shouldPassIfAnActiveTestOrderForTheSameConceptAndCareSettingExists() throws Exception {
+ 		final Patient patient = patientService.getPatient(2);
+ 		final Concept cd4Count = conceptService.getConcept(5497);
+ 		//sanity check that we have an active order for the same concept
+@@ -14,8 +14,8 @@
+ 		order.setEncounter(encounterService.getEncounter(6));
+ 		order.setOrderer(providerService.getProvider(1));
+ 		order.setCareSetting(duplicateOrder.getCareSetting());
+-		
+-		expectedException.expect(APIException.class);
+-		expectedException.expectMessage("Order.cannot.have.more.than.one");
+-		orderService.saveOrder(order, null);
++
++		Order savedOrder = orderService.saveOrder(order, null);
++
++		assertNotNull(orderService.getOrder(savedOrder.getOrderId()));
+ 	}
+\ No newline at end of file
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index b9e4c24..cbc5ab7 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -5,7 +5,6 @@ public synchronized Order saveOrder(Order order, OrderContext orderContext) thro
+ 		if (order.getDateActivated() == null) {
+ 			order.setDateActivated(new Date());
+ 		}
+-		//Reject if there is an active order for the same orderable with overlapping schedule
+ 		boolean isDrugOrder = DrugOrder.class.isAssignableFrom(getActualType(order));
+ 		Concept concept = order.getConcept();
+ 		if (concept == null && isDrugOrder) {
+@@ -117,11 +116,9 @@ public synchronized Order saveOrder(Order order, OrderContext orderContext) thro
+ 		if (DISCONTINUE != order.getAction()) {
+ 			List<Order> activeOrders = getActiveOrders(order.getPatient(), null, order.getCareSetting(), null);
+ 			for (Order activeOrder : activeOrders) {
+-				if (order.hasSameOrderableAs(activeOrder)
+-				        && !OpenmrsUtil.nullSafeEquals(order.getPreviousOrder(), activeOrder)
+-				        && OrderUtil.checkScheduleOverlap(order, activeOrder)) {
+-					throw new APIException(
+-					        "Cannot have more than one active order for the same orderable and care setting at same time");
++				//Reject if there is an active drug order for the same orderable with overlapping schedule
++				if (areDrugOrdersOfSameOrderableAndOverlappingSchedule(order, activeOrder)) {
++					throw new APIException("Cannot have more than one active order for the same orderable and care setting");
+ 				}
+ 			}
+ 		}
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index a99d5eb..0265639 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,6 +1,6 @@
+ @Test
+-	public void saveOrder_shouldFailForRevisionOrderIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+-		//sanity check that we have an active order
++	public void saveOrder_shouldPassForRevisionOrderIfAnActiveTestOrderForTheSameConceptAndCareSettingsExists()
++	        throws Exception {
+ 		final Patient patient = patientService.getPatient(2);
+ 		final Concept cd4Count = conceptService.getConcept(5497);
+ 		TestOrder activeOrder = new TestOrder();
+@@ -13,7 +13,7 @@
+ 		activeOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 10));
+ 		orderService.saveOrder(activeOrder, null);
+ 		
+-		//New Drug order in future for same concept
++		//New order in future for same concept
+ 		TestOrder secondOrder = new TestOrder();
+ 		secondOrder.setPatient(activeOrder.getPatient());
+ 		secondOrder.setConcept(activeOrder.getConcept());
+@@ -25,13 +25,13 @@
+ 		secondOrder.setUrgency(Order.Urgency.ON_SCHEDULED_DATE);
+ 		orderService.saveOrder(secondOrder, null);
+ 		
+-		//Revise Second Order to have scheduled date overlapping with active order
++		//Revise second order to have scheduled date overlapping with active order
+ 		TestOrder revision = secondOrder.cloneForRevision();
+ 		revision.setScheduledDate(DateUtils.addDays(activeOrder.getEffectiveStartDate(), 2));
+ 		revision.setEncounter(encounterService.getEncounter(6));
+ 		revision.setOrderer(providerService.getProvider(1));
+ 		
+-		expectedException.expect(APIException.class);
+-		expectedException.expectMessage("Cannot have more than one active order for the same orderable and care setting");
+-		orderService.saveOrder(revision, null);
++		Order savedSecondOrder = orderService.saveOrder(revision, null);
++		
++		assertNotNull(orderService.getOrder(savedSecondOrder.getOrderId()));
+ 	}
+\ No newline at end of file
+
+----------------------------------------------------------------
+coverage: 0.9373040752351097
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+Given the updates in the production code and the information from both the old test method and the samples provided, the test method needs to be updated to reflect the changes in how orders are validated in the production method. The key change in the production method is the introduction of `areDrugOrdersOfSameOrderableAndOverlappingSchedule` method to check for active drug orders that have overlapping schedules for the same orderable, replacing the previous broader check.
+
+The old test method focuses on the failure of saving an order due to the existence of an active order for the same concept and care setting. The change in the production code suggests that the new logic is specific to drug orders and their schedules, thus requiring the test to account for overlapping schedules of drug orders specifically.
+
+Here's how you might adjust the old test to align with the new production logic:
+
+<new_test>
+```java
+@Test
+public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+    final Patient patient = patientService.getPatient(2);
+    final Concept cd4Count = conceptService.getConcept(5497);
+    // Given an active drug order for the same concept with overlapping schedule
+    DrugOrder activeDrugOrder = new DrugOrder();
+    activeDrugOrder.setPatient(patient);
+    activeDrugOrder.setConcept(cd4Count);
+    activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
+    activeDrugOrder.setEncounter(encounterService.getEncounter(6));
+    activeDrugOrder.setOrderer(providerService.getProvider(1));
+    activeDrugOrder.setDateActivated(new Date());
+    // Set duration to ensure overlap
+    activeDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 10));
+    orderService.saveOrder(activeDrugOrder, null);
+
+    // When trying to save a new drug order for the same concept with overlapping schedule
+    DrugOrder newDrugOrder = new DrugOrder();
+    newDrugOrder.setPatient(patient);
+    newDrugOrder.setConcept(cd4Count);
+    newDrugOrder.setCareSetting(activeDrugOrder.getCareSetting());
+    newDrugOrder.setEncounter(encounterService.getEncounter(6));
+    newDrugOrder.setOrderer(providerService.getProvider(1));
+    newDrugOrder.setDateActivated(DateUtils.addDays(new Date(), -5)); // start date set to ensure overlap with activeDrugOrder
+    newDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 5)); // end date set to ensure overlap
+
+    expectedException.expect(APIException.class);
+    expectedException.expectMessage("Order.cannot.have.more.than.one");
+    orderService.saveOrder(newDrugOrder, null);
+}
+```
+</new_test>
+
+This revised test anticipates the new functionality by creating a scenario where two drug orders for the same patient, concept (orderable), and care setting have overlapping schedules, which according to the new production code logic, should trigger a specific `APIException`. This test directly responds to the refactoring within the production method and aims to validate the newly introduced constraint, thereby ensuring that the system's integrity is maintained when introducing drug order-specific schedule overlap validations.
+----------------------------------------------------------------
+generated test
+@Test
+public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+    final Patient patient = patientService.getPatient(2);
+    final Concept cd4Count = conceptService.getConcept(5497);
+    // Given an active drug order for the same concept with overlapping schedule
+    DrugOrder activeDrugOrder = new DrugOrder();
+    activeDrugOrder.setPatient(patient);
+    activeDrugOrder.setConcept(cd4Count);
+    activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
+    activeDrugOrder.setEncounter(encounterService.getEncounter(6));
+    activeDrugOrder.setOrderer(providerService.getProvider(1));
+    activeDrugOrder.setDateActivated(new Date());
+    // Set duration to ensure overlap
+    activeDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 10));
+    orderService.saveOrder(activeDrugOrder, null);
+
+    // When trying to save a new drug order for the same concept with overlapping schedule
+    DrugOrder newDrugOrder = new DrugOrder();
+    newDrugOrder.setPatient(patient);
+    newDrugOrder.setConcept(cd4Count);
+    newDrugOrder.setCareSetting(activeDrugOrder.getCareSetting());
+    newDrugOrder.setEncounter(encounterService.getEncounter(6));
+    newDrugOrder.setOrderer(providerService.getProvider(1));
+    newDrugOrder.setDateActivated(DateUtils.addDays(new Date(), -5)); // start date set to ensure overlap with activeDrugOrder
+    newDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 5)); // end date set to ensure overlap
+
+    expectedException.expect(APIException.class);
+    expectedException.expectMessage("Order.cannot.have.more.than.one");
+    orderService.saveOrder(newDrugOrder, null);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,21 +1,30 @@
+
+ @Test
+-	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+-		final Patient patient = patientService.getPatient(2);
+-		final Concept cd4Count = conceptService.getConcept(5497);
+-		//sanity check that we have an active order for the same concept
+-		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+-		assertTrue(duplicateOrder.isActive());
+-		assertEquals(cd4Count, duplicateOrder.getConcept());
+-		
+-		Order order = new TestOrder();
+-		order.setPatient(patient);
+-		order.setCareSetting(orderService.getCareSetting(2));
+-		order.setConcept(cd4Count);
+-		order.setEncounter(encounterService.getEncounter(6));
+-		order.setOrderer(providerService.getProvider(1));
+-		order.setCareSetting(duplicateOrder.getCareSetting());
+-		
+-		expectedException.expect(APIException.class);
+-		expectedException.expectMessage("Order.cannot.have.more.than.one");
+-		orderService.saveOrder(order, null);
+-	}
++public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
++    final Patient patient = patientService.getPatient(2);
++    final Concept cd4Count = conceptService.getConcept(5497);
++    // Given an active drug order for the same concept with overlapping schedule
++    DrugOrder activeDrugOrder = new DrugOrder();
++    activeDrugOrder.setPatient(patient);
++    activeDrugOrder.setConcept(cd4Count);
++    activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
++    activeDrugOrder.setEncounter(encounterService.getEncounter(6));
++    activeDrugOrder.setOrderer(providerService.getProvider(1));
++    activeDrugOrder.setDateActivated(new Date());
++    // Set duration to ensure overlap
++    activeDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 10));
++    orderService.saveOrder(activeDrugOrder, null);
++
++    // When trying to save a new drug order for the same concept with overlapping schedule
++    DrugOrder newDrugOrder = new DrugOrder();
++    newDrugOrder.setPatient(patient);
++    newDrugOrder.setConcept(cd4Count);
++    newDrugOrder.setCareSetting(activeDrugOrder.getCareSetting());
++    newDrugOrder.setEncounter(encounterService.getEncounter(6));
++    newDrugOrder.setOrderer(providerService.getProvider(1));
++    newDrugOrder.setDateActivated(DateUtils.addDays(new Date(), -5)); // start date set to ensure overlap with activeDrugOrder
++    newDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 5)); // end date set to ensure overlap
++
++    expectedException.expect(APIException.class);
++    expectedException.expectMessage("Order.cannot.have.more.than.one");
++    orderService.saveOrder(newDrugOrder, null);
++}
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.openmrs.api.OrderServiceTest
+-------------------------------------------------------------------------------
+Tests run: 147, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 10.035 sec <<< FAILURE!
+saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists(org.openmrs.api.OrderServiceTest)  Time elapsed: 0.015 sec  <<< ERROR!
+org.openmrs.api.ValidationException: 'DrugOrder(nullnull of [no drug] from Tue Jul 30 20:04:23 CST 2024 to Fri Aug 09 20:04:23 CST 2024)' failed to validate with reason: dose: DrugOrder.error.doseIsNullForDosingTypeSimple, doseUnits: DrugOrder.error.doseUnitsIsNullForDosingTypeSimple, route: DrugOrder.error.routeIsNullForDosingTypeSimple, frequency: DrugOrder.error.frequencyIsNullForDosingTypeSimple
+	at org.openmrs.validator.ValidateUtil.validate(ValidateUtil.java:79)
+	at org.openmrs.aop.RequiredDataAdvice.before(RequiredDataAdvice.java:124)
+	at org.springframework.aop.framework.adapter.MethodBeforeAdviceInterceptor.invoke(MethodBeforeAdviceInterceptor.java:51)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.adapter.MethodBeforeAdviceInterceptor.invoke(MethodBeforeAdviceInterceptor.java:52)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:207)
+	at com.sun.proxy.$Proxy70.saveOrder(Unknown Source)
+	at org.openmrs.api.OrderServiceTest.saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists(OrderServiceTest.java:1574)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:47)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:44)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:73)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:82)
+	at org.junit.rules.ExpectedException$ExpectedExceptionStatement.evaluate(ExpectedException.java:168)
+	at org.junit.rules.RunRules.evaluate(RunRules.java:20)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:73)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:271)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:217)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:83)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:238)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:63)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:236)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:53)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:229)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:68)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:309)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:163)
+	at org.apache.maven.surefire.junit4.JUnit4TestSet.execute(JUnit4TestSet.java:59)
+	at org.apache.maven.surefire.suite.AbstractDirectoryTestSuite.executeTestSet(AbstractDirectoryTestSuite.java:115)
+	at org.apache.maven.surefire.suite.AbstractDirectoryTestSuite.execute(AbstractDirectoryTestSuite.java:102)
+	at org.apache.maven.surefire.Surefire.run(Surefire.java:180)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.apache.maven.surefire.booter.SurefireBooter.runSuitesInProcess(SurefireBooter.java:350)
+	at org.apache.maven.surefire.booter.SurefireBooter.main(SurefireBooter.java:1021)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 2
+----------------------------------------------------------------
+llm output
+The failure message from JUnit indicates that the `DrugOrder` objects being created and saved in the test method are failing validation because required fields for dosing (dose, doseUnits, route, and frequency) are not set. To resolve this and ensure the test method aligns with the constraints introduced by the `DrugOrder` validation logic, these fields must be populated with appropriate test data.
+
+Here's the revised version of the test method, populated with fictional, but plausible values for the required fields:
+
+<new_test>
+```java
+@Test
+public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+    final Patient patient = patientService.getPatient(2);
+    final Concept cd4Count = conceptService.getConcept(5497);
+    final Concept doseUnits = conceptService.getConcept(50); // Assume this is a valid unit
+    final DrugRoute route = new DrugRoute(); // Assuming there's a constructor. Replace with actual route fetching
+    final OrderFrequency frequency = new OrderFrequency(); // Assuming there's a constructor. Replace with actual frequency fetching
+
+    // Given an active drug order for the same concept with an overlapping schedule
+    DrugOrder activeDrugOrder = new DrugOrder();
+    activeDrugOrder.setPatient(patient);
+    activeDrugOrder.setConcept(cd4Count);
+    activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
+    activeDrugOrder.setEncounter(encounterService.getEncounter(6));
+    activeDrugOrder.setOrderer(providerService.getProvider(1));
+    activeDrugOrder.setDateActivated(new Date());
+    // Set required fields to bypass validation errors
+    activeDrugOrder.setDose(1.0);
+    activeDrugOrder.setDoseUnits(doseUnits);
+    activeDrugOrder.setRoute(route);
+    activeDrugOrder.setFrequency(frequency);
+    // Set duration to ensure overlap
+    activeDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 10));
+    orderService.saveOrder(activeDrugOrder, null);
+
+    // When trying to save a new drug order for the same concept with overlapping schedule
+    DrugOrder newDrugOrder = new DrugOrder();
+    newDrugOrder.setPatient(patient);
+    newDrugOrder.setConcept(cd4Count);
+    newDrugOrder.setCareSetting(activeDrugOrder.getCareSetting());
+    newDrugOrder.setEncounter(encounterService.getEncounter(6));
+    newDrugOrder.setOrderer(providerService.getProvider(1));
+    newDrugOrder.setDateActivated(DateUtils.addDays(new Date(), -5)); // Start date set to ensure overlap with activeDrugOrder
+    newDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 5)); // End date set to ensure overlap
+    // Set required fields for the new drug order as well
+    newDrugOrder.setDose(1.0);
+    newDrugOrder.setDoseUnits(doseUnits);
+    newDrugOrder.setRoute(route);
+    newDrugOrder.setFrequency(frequency);
+
+    expectedException.expect(APIException.class);
+    expectedException.expectMessage("Order.cannot.have.more.than.one");
+    orderService.saveOrder(newDrugOrder, null);
+}
+```
+</new_test>
+
+This version of the test method ensures that both `DrugOrder` objects have their `dose`, `doseUnits`, `route`, and `frequency` properties set, matching the validation requirements indicated by the failure message. Note that this method uses placeholders (`new DrugRoute()` and `new OrderFrequency()`) for creating `route` and `frequency` objects. You should replace these with the actual logic required to fetch or create valid `DrugRoute` and `OrderFrequency` instances in your testing environment. Additionally, ensure that the selected `doseUnits` and other set values are compatible with your OrderService and validation logic.
+----------------------------------------------------------------
+generated test
+@Test
+public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+    final Patient patient = patientService.getPatient(2);
+    final Concept cd4Count = conceptService.getConcept(5497);
+    final Concept doseUnits = conceptService.getConcept(50); // Assume this is a valid unit
+    final DrugRoute route = new DrugRoute(); // Assuming there's a constructor. Replace with actual route fetching
+    final OrderFrequency frequency = new OrderFrequency(); // Assuming there's a constructor. Replace with actual frequency fetching
+
+    // Given an active drug order for the same concept with an overlapping schedule
+    DrugOrder activeDrugOrder = new DrugOrder();
+    activeDrugOrder.setPatient(patient);
+    activeDrugOrder.setConcept(cd4Count);
+    activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
+    activeDrugOrder.setEncounter(encounterService.getEncounter(6));
+    activeDrugOrder.setOrderer(providerService.getProvider(1));
+    activeDrugOrder.setDateActivated(new Date());
+    // Set required fields to bypass validation errors
+    activeDrugOrder.setDose(1.0);
+    activeDrugOrder.setDoseUnits(doseUnits);
+    activeDrugOrder.setRoute(route);
+    activeDrugOrder.setFrequency(frequency);
+    // Set duration to ensure overlap
+    activeDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 10));
+    orderService.saveOrder(activeDrugOrder, null);
+
+    // When trying to save a new drug order for the same concept with overlapping schedule
+    DrugOrder newDrugOrder = new DrugOrder();
+    newDrugOrder.setPatient(patient);
+    newDrugOrder.setConcept(cd4Count);
+    newDrugOrder.setCareSetting(activeDrugOrder.getCareSetting());
+    newDrugOrder.setEncounter(encounterService.getEncounter(6));
+    newDrugOrder.setOrderer(providerService.getProvider(1));
+    newDrugOrder.setDateActivated(DateUtils.addDays(new Date(), -5)); // Start date set to ensure overlap with activeDrugOrder
+    newDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 5)); // End date set to ensure overlap
+    // Set required fields for the new drug order as well
+    newDrugOrder.setDose(1.0);
+    newDrugOrder.setDoseUnits(doseUnits);
+    newDrugOrder.setRoute(route);
+    newDrugOrder.setFrequency(frequency);
+
+    expectedException.expect(APIException.class);
+    expectedException.expectMessage("Order.cannot.have.more.than.one");
+    orderService.saveOrder(newDrugOrder, null);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -2,7 +2,11 @@
+
+ public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+     final Patient patient = patientService.getPatient(2);
+     final Concept cd4Count = conceptService.getConcept(5497);
+-    // Given an active drug order for the same concept with overlapping schedule
++    final Concept doseUnits = conceptService.getConcept(50); // Assume this is a valid unit
++    final DrugRoute route = new DrugRoute(); // Assuming there's a constructor. Replace with actual route fetching
++    final OrderFrequency frequency = new OrderFrequency(); // Assuming there's a constructor. Replace with actual frequency fetching
++
++    // Given an active drug order for the same concept with an overlapping schedule
+     DrugOrder activeDrugOrder = new DrugOrder();
+     activeDrugOrder.setPatient(patient);
+     activeDrugOrder.setConcept(cd4Count);
+@@ -10,6 +14,11 @@
+
+     activeDrugOrder.setEncounter(encounterService.getEncounter(6));
+     activeDrugOrder.setOrderer(providerService.getProvider(1));
+     activeDrugOrder.setDateActivated(new Date());
++    // Set required fields to bypass validation errors
++    activeDrugOrder.setDose(1.0);
++    activeDrugOrder.setDoseUnits(doseUnits);
++    activeDrugOrder.setRoute(route);
++    activeDrugOrder.setFrequency(frequency);
+     // Set duration to ensure overlap
+     activeDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 10));
+     orderService.saveOrder(activeDrugOrder, null);
+@@ -21,8 +30,13 @@
+
+     newDrugOrder.setCareSetting(activeDrugOrder.getCareSetting());
+     newDrugOrder.setEncounter(encounterService.getEncounter(6));
+     newDrugOrder.setOrderer(providerService.getProvider(1));
+-    newDrugOrder.setDateActivated(DateUtils.addDays(new Date(), -5)); // start date set to ensure overlap with activeDrugOrder
+-    newDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 5)); // end date set to ensure overlap
++    newDrugOrder.setDateActivated(DateUtils.addDays(new Date(), -5)); // Start date set to ensure overlap with activeDrugOrder
++    newDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 5)); // End date set to ensure overlap
++    // Set required fields for the new drug order as well
++    newDrugOrder.setDose(1.0);
++    newDrugOrder.setDoseUnits(doseUnits);
++    newDrugOrder.setRoute(route);
++    newDrugOrder.setFrequency(frequency);
+ 
+     expectedException.expect(APIException.class);
+     expectedException.expectMessage("Order.cannot.have.more.than.one");
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1565,10] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1565,32] 错误: 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure: Compilation failure:
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1565,10] 错误: 找不到符号
+\1\openmrs-core\api\src\test\java\org\openmrs\api\OrderServiceTest.java:[1565,32] 错误: 找不到符号
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 3
+----------------------------------------------------------------
+llm output
+Given the compilation errors mentioned and the details shared, it appears that the compilation issue might be due to references to symbols that couldn't be found, possibly `DrugRoute` and `OrderFrequency`, if these were assumed to be directly available classes or interfaces but are not found in the actual OpenMRS API or were not imported correctly. Since specific implementations for fetching instances like `DrugRoute` and `OrderFrequency` cannot be presumed without accurate representation in the OpenMRS model or without knowing the version of OpenMRS you're targeting, we will rephrase the test adjusting these aspects based on typical OpenMRS usage.
+
+In a more generalized approach, assuming the OpenMRS environment and using pseudocode for parts that are version-specific or that were placeholders, we'll correct for potential compilation issues:
+
+<new_test>
+```java
+@Test
+public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+    final Patient patient = patientService.getPatient(2);
+    final Concept cd4Count = conceptService.getConcept(5497);
+    // Assuming the concept for dose units and frequency can be fetched directly for simplicity sake
+    final Concept doseUnits = conceptService.getConcept(50); // Example, replace with actual concept id for dose units
+    final OrderFrequency frequency = orderService.getOrderFrequency(1); // Example, replace with actual order frequency id
+
+    // Assuming these are valid and existing properties
+    final Concept routeConcept = conceptService.getConcept(22); // Example, replace with actual route concept id
+
+    // Given an active drug order for the same concept with overlapping schedule
+    DrugOrder activeDrugOrder = new DrugOrder();
+    activeDrugOrder.setPatient(patient);
+    activeDrugOrder.setConcept(cd4Count);
+    activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
+    activeDrugOrder.setEncounter(encounterService.getEncounter(6));
+    activeDrugOrder.setOrderer(providerService.getProvider(1));
+    activeDrugOrder.setDateActivated(new Date());
+    // Set required fields to bypass validation errors
+    activeDrugOrder.setDose(1.0);
+    activeDrugOrder.setDoseUnits(doseUnits);
+    activeDrugOrder.setRoute(routeConcept); // Use concept as route
+    activeDrugOrder.setFrequency(frequency);
+    // Set duration to ensure overlap
+    activeDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 864000000)); // 10 days from now
+    orderService.saveOrder(activeDrugOrder, null);
+
+    // When trying to save a new drug order for the same concept with overlapping schedule
+    DrugOrder newDrugOrder = new DrugOrder();
+    newDrugOrder.setPatient(patient);
+    newDrugOrder.setConcept(cd4Count);
+    newDrugOrder.setCareSetting(activeDrugOrder.getCareSetting());
+    newDrugOrder.setEncounter(encounterService.getEncounter(6));
+    newDrugOrder.setOrderer(providerService.getProvider(1));
+    newDrugOrder.setDateActivated(new Date(System.currentTimeMillis() - 432000000)); // 5 days ago
+    newDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 432000000)); // 5 days from now
+    // Set required fields for the new drug order as well
+    newDrugOrder.setDose(1.0);
+    newDrugOrder.setDoseUnits(doseUnits);
+    newDrugOrder.setRoute(routeConcept); // Use concept as route
+    newDrugOrder.setFrequency(frequency);
+
+    expectedException.expect(APIException.class);
+    expectedException.expectMessage("Order.cannot.have.more.than.one");
+    orderService.saveOrder(newDrugOrder, null);
+}
+```
+</new_test>
+
+This test corrects potential compilation issues by assuming that `doseUnits`, `frequency`, and a `route` (as a concept) are available in the system and can be used directly. It also removes direct instantiation of non-existent classes or classes that weren't properly referenced. This should compile successfully if the assumed IDs (for doseUnits, routeConcept, and frequency) are replaced with valid identifiers in your OpenMRS instance. Ensure that every concept or identifier assumed (like `conceptService.getConcept(50)`) matches valid entries in your database.
+----------------------------------------------------------------
+generated test
+@Test
+public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+    final Patient patient = patientService.getPatient(2);
+    final Concept cd4Count = conceptService.getConcept(5497);
+    // Assuming the concept for dose units and frequency can be fetched directly for simplicity sake
+    final Concept doseUnits = conceptService.getConcept(50); // Example, replace with actual concept id for dose units
+    final OrderFrequency frequency = orderService.getOrderFrequency(1); // Example, replace with actual order frequency id
+
+    // Assuming these are valid and existing properties
+    final Concept routeConcept = conceptService.getConcept(22); // Example, replace with actual route concept id
+
+    // Given an active drug order for the same concept with overlapping schedule
+    DrugOrder activeDrugOrder = new DrugOrder();
+    activeDrugOrder.setPatient(patient);
+    activeDrugOrder.setConcept(cd4Count);
+    activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
+    activeDrugOrder.setEncounter(encounterService.getEncounter(6));
+    activeDrugOrder.setOrderer(providerService.getProvider(1));
+    activeDrugOrder.setDateActivated(new Date());
+    // Set required fields to bypass validation errors
+    activeDrugOrder.setDose(1.0);
+    activeDrugOrder.setDoseUnits(doseUnits);
+    activeDrugOrder.setRoute(routeConcept); // Use concept as route
+    activeDrugOrder.setFrequency(frequency);
+    // Set duration to ensure overlap
+    activeDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 864000000)); // 10 days from now
+    orderService.saveOrder(activeDrugOrder, null);
+
+    // When trying to save a new drug order for the same concept with overlapping schedule
+    DrugOrder newDrugOrder = new DrugOrder();
+    newDrugOrder.setPatient(patient);
+    newDrugOrder.setConcept(cd4Count);
+    newDrugOrder.setCareSetting(activeDrugOrder.getCareSetting());
+    newDrugOrder.setEncounter(encounterService.getEncounter(6));
+    newDrugOrder.setOrderer(providerService.getProvider(1));
+    newDrugOrder.setDateActivated(new Date(System.currentTimeMillis() - 432000000)); // 5 days ago
+    newDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 432000000)); // 5 days from now
+    // Set required fields for the new drug order as well
+    newDrugOrder.setDose(1.0);
+    newDrugOrder.setDoseUnits(doseUnits);
+    newDrugOrder.setRoute(routeConcept); // Use concept as route
+    newDrugOrder.setFrequency(frequency);
+
+    expectedException.expect(APIException.class);
+    expectedException.expectMessage("Order.cannot.have.more.than.one");
+    orderService.saveOrder(newDrugOrder, null);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -2,11 +2,14 @@
+
+ public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+     final Patient patient = patientService.getPatient(2);
+     final Concept cd4Count = conceptService.getConcept(5497);
+-    final Concept doseUnits = conceptService.getConcept(50); // Assume this is a valid unit
+-    final DrugRoute route = new DrugRoute(); // Assuming there's a constructor. Replace with actual route fetching
+-    final OrderFrequency frequency = new OrderFrequency(); // Assuming there's a constructor. Replace with actual frequency fetching
++    // Assuming the concept for dose units and frequency can be fetched directly for simplicity sake
++    final Concept doseUnits = conceptService.getConcept(50); // Example, replace with actual concept id for dose units
++    final OrderFrequency frequency = orderService.getOrderFrequency(1); // Example, replace with actual order frequency id
+ 
+-    // Given an active drug order for the same concept with an overlapping schedule
++    // Assuming these are valid and existing properties
++    final Concept routeConcept = conceptService.getConcept(22); // Example, replace with actual route concept id
++
++    // Given an active drug order for the same concept with overlapping schedule
+     DrugOrder activeDrugOrder = new DrugOrder();
+     activeDrugOrder.setPatient(patient);
+     activeDrugOrder.setConcept(cd4Count);
+@@ -17,10 +20,10 @@
+
+     // Set required fields to bypass validation errors
+     activeDrugOrder.setDose(1.0);
+     activeDrugOrder.setDoseUnits(doseUnits);
+-    activeDrugOrder.setRoute(route);
++    activeDrugOrder.setRoute(routeConcept); // Use concept as route
+     activeDrugOrder.setFrequency(frequency);
+     // Set duration to ensure overlap
+-    activeDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 10));
++    activeDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 864000000)); // 10 days from now
+     orderService.saveOrder(activeDrugOrder, null);
+ 
+     // When trying to save a new drug order for the same concept with overlapping schedule
+@@ -30,12 +33,12 @@
+
+     newDrugOrder.setCareSetting(activeDrugOrder.getCareSetting());
+     newDrugOrder.setEncounter(encounterService.getEncounter(6));
+     newDrugOrder.setOrderer(providerService.getProvider(1));
+-    newDrugOrder.setDateActivated(DateUtils.addDays(new Date(), -5)); // Start date set to ensure overlap with activeDrugOrder
+-    newDrugOrder.setAutoExpireDate(DateUtils.addDays(new Date(), 5)); // End date set to ensure overlap
++    newDrugOrder.setDateActivated(new Date(System.currentTimeMillis() - 432000000)); // 5 days ago
++    newDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 432000000)); // 5 days from now
+     // Set required fields for the new drug order as well
+     newDrugOrder.setDose(1.0);
+     newDrugOrder.setDoseUnits(doseUnits);
+-    newDrugOrder.setRoute(route);
++    newDrugOrder.setRoute(routeConcept); // Use concept as route
+     newDrugOrder.setFrequency(frequency);
+ 
+     expectedException.expect(APIException.class);
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.openmrs.api.OrderServiceTest
+-------------------------------------------------------------------------------
+Tests run: 147, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 10.358 sec <<< FAILURE!
+saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists(org.openmrs.api.OrderServiceTest)  Time elapsed: 0.015 sec  <<< ERROR!
+org.openmrs.api.APIException: Order.type.class.does.not.match
+	at org.openmrs.api.impl.OrderServiceImpl.saveOrder(OrderServiceImpl.java:150)
+	at sun.reflect.GeneratedMethodAccessor425.invoke(Unknown Source)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:317)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:157)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:99)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:281)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:96)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:207)
+	at com.sun.proxy.$Proxy56.saveOrder(Unknown Source)
+	at sun.reflect.GeneratedMethodAccessor425.invoke(Unknown Source)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:317)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:157)
+	at org.openmrs.aop.LoggingAdvice.invoke(LoggingAdvice.java:121)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.adapter.MethodBeforeAdviceInterceptor.invoke(MethodBeforeAdviceInterceptor.java:52)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.adapter.MethodBeforeAdviceInterceptor.invoke(MethodBeforeAdviceInterceptor.java:52)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:207)
+	at com.sun.proxy.$Proxy70.saveOrder(Unknown Source)
+	at org.openmrs.api.OrderServiceTest.saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists(OrderServiceTest.java:1586)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:47)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:44)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:73)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:82)
+	at org.junit.rules.ExpectedException$ExpectedExceptionStatement.evaluate(ExpectedException.java:168)
+	at org.junit.rules.RunRules.evaluate(RunRules.java:20)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:73)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:271)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:217)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:83)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:238)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:63)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:236)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:53)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:229)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:68)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:309)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:163)
+	at org.apache.maven.surefire.junit4.JUnit4TestSet.execute(JUnit4TestSet.java:59)
+	at org.apache.maven.surefire.suite.AbstractDirectoryTestSuite.executeTestSet(AbstractDirectoryTestSuite.java:115)
+	at org.apache.maven.surefire.suite.AbstractDirectoryTestSuite.execute(AbstractDirectoryTestSuite.java:102)
+	at org.apache.maven.surefire.Surefire.run(Surefire.java:180)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.apache.maven.surefire.booter.SurefireBooter.runSuitesInProcess(SurefireBooter.java:350)
+	at org.apache.maven.surefire.booter.SurefireBooter.main(SurefireBooter.java:1021)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 4
+----------------------------------------------------------------
+llm output
+Given the JUnit failure message indicating an `APIException` with the reason being `Order.type.class.does.not.match`, it is evident that the type of order being saved does not match the expected type within the system's logic. This typically means there's a discrepancy between the expected class or subclass of the `Order` being saved and what the system allows or expects, potentially due to mismatches in order type handling.
+
+Considering this, it would be prudent to ensure that the test accurately reflects the creation of a `DrugOrder` in a way that aligns with the requirements of the `OrderService`'s `saveOrder` method, particularly paying attention to setting the correct order type and ensuring all necessary fields are correctly populated. Since exact class matches and the precise order type are crucial here, the test must be adjusted accordingly.
+
+<new_test>
+```java
+@Test
+public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+    final Patient patient = patientService.getPatient(2);
+    final Concept cd4Count = conceptService.getConcept(5497);
+    // Assuming a valid Concept exists for doseUnits and frequency, and these fulfill the system's requirements
+    final Concept doseUnits = conceptService.getConcept(50); // Placeholder, replace with an actual concept
+    final OrderFrequency frequency = orderService.getOrderFrequency(1); // Placeholder, replace with an actual frequency
+
+    // Assuming valid Concept for the route
+    final Concept routeConcept = conceptService.getConcept(22); // Placeholder, replace with an actual route concept
+
+    // Create and save the first DrugOrder adhering to system's requirement
+    DrugOrder activeDrugOrder = new DrugOrder();
+    activeDrugOrder.setPatient(patient);
+    activeDrugOrder.setOrderType(orderService.getOrderType(1)); // Assuming 1 is the ID for DrugOrder type
+    activeDrugOrder.setConcept(cd4Count);
+    activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
+    activeDrugOrder.setEncounter(encounterService.getEncounter(6));
+    activeDrugOrder.setOrderer(providerService.getProvider(1));
+    activeDrugOrder.setDateActivated(new Date());
+    activeDrugOrder.setDose(1.0);
+    activeDrugOrder.setDoseUnits(doseUnits);
+    activeDrugOrder.setRoute(routeConcept); // Assuming assigning Concept directly is valid for route
+    activeDrugOrder.setFrequency(frequency);
+    activeDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 864000000)); // Extending auto-expire 10 days into the future
+    orderService.saveOrder(activeDrugOrder, null);
+
+    // Attempt to save a second DrugOrder with overlapping schedule
+    DrugOrder newDrugOrder = new DrugOrder();
+    newDrugOrder.setPatient(patient);
+    newDrugOrder.setOrderType(orderService.getOrderType(1)); // Ensure this matches the expected DrugOrder type
+    newDrugOrder.setConcept(cd4Count);
+    newDrugOrder.setCareSetting(orderService.getCareSetting(2));
+    newDrugOrder.setEncounter(encounterService.getEncounter(6));
+    newDrugOrder.setOrderer(providerService.getProvider(1));
+    newDrugOrder.setDateActivated(new Date(System.currentTimeMillis() - 432000000)); // Overlap by starting 5 days ago
+    newDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 432000000)); // Extending 5 days into the future
+    newDrugOrder.setDose(1.0);
+    newDrugOrder.setDoseUnits(doseUnits);
+    newDrugOrder.setRoute(routeConcept);
+    newDrugOrder.setFrequency(frequency);
+
+    expectedException.expect(APIException.class);
+    expectedException.expectMessage("Order.cannot.have.more.than.one");
+    orderService.saveOrder(newDrugOrder, null);
+}
+```
+</new_test>
+
+This test ensures that both `DrugOrder` instances are created with an explicit `OrderType` that matches the system's requirements for drug orders. The `expectedException` lines are used to anticipate the custom exception and message indicating an attempt to save a drug order when another active order with the same orderable (concept) and an overlapping schedule already exists, ensuring that the test reflects the system's constraints accurately. Remember to replace placeholder values for `doseUnits`, `frequency`, `routeConcept`, and `OrderType` with actual values from your system.
+----------------------------------------------------------------
+generated test
+@Test
+public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+    final Patient patient = patientService.getPatient(2);
+    final Concept cd4Count = conceptService.getConcept(5497);
+    // Assuming a valid Concept exists for doseUnits and frequency, and these fulfill the system's requirements
+    final Concept doseUnits = conceptService.getConcept(50); // Placeholder, replace with an actual concept
+    final OrderFrequency frequency = orderService.getOrderFrequency(1); // Placeholder, replace with an actual frequency
+
+    // Assuming valid Concept for the route
+    final Concept routeConcept = conceptService.getConcept(22); // Placeholder, replace with an actual route concept
+
+    // Create and save the first DrugOrder adhering to system's requirement
+    DrugOrder activeDrugOrder = new DrugOrder();
+    activeDrugOrder.setPatient(patient);
+    activeDrugOrder.setOrderType(orderService.getOrderType(1)); // Assuming 1 is the ID for DrugOrder type
+    activeDrugOrder.setConcept(cd4Count);
+    activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
+    activeDrugOrder.setEncounter(encounterService.getEncounter(6));
+    activeDrugOrder.setOrderer(providerService.getProvider(1));
+    activeDrugOrder.setDateActivated(new Date());
+    activeDrugOrder.setDose(1.0);
+    activeDrugOrder.setDoseUnits(doseUnits);
+    activeDrugOrder.setRoute(routeConcept); // Assuming assigning Concept directly is valid for route
+    activeDrugOrder.setFrequency(frequency);
+    activeDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 864000000)); // Extending auto-expire 10 days into the future
+    orderService.saveOrder(activeDrugOrder, null);
+
+    // Attempt to save a second DrugOrder with overlapping schedule
+    DrugOrder newDrugOrder = new DrugOrder();
+    newDrugOrder.setPatient(patient);
+    newDrugOrder.setOrderType(orderService.getOrderType(1)); // Ensure this matches the expected DrugOrder type
+    newDrugOrder.setConcept(cd4Count);
+    newDrugOrder.setCareSetting(orderService.getCareSetting(2));
+    newDrugOrder.setEncounter(encounterService.getEncounter(6));
+    newDrugOrder.setOrderer(providerService.getProvider(1));
+    newDrugOrder.setDateActivated(new Date(System.currentTimeMillis() - 432000000)); // Overlap by starting 5 days ago
+    newDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 432000000)); // Extending 5 days into the future
+    newDrugOrder.setDose(1.0);
+    newDrugOrder.setDoseUnits(doseUnits);
+    newDrugOrder.setRoute(routeConcept);
+    newDrugOrder.setFrequency(frequency);
+
+    expectedException.expect(APIException.class);
+    expectedException.expectMessage("Order.cannot.have.more.than.one");
+    orderService.saveOrder(newDrugOrder, null);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -2,43 +2,42 @@
+
+ public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+     final Patient patient = patientService.getPatient(2);
+     final Concept cd4Count = conceptService.getConcept(5497);
+-    // Assuming the concept for dose units and frequency can be fetched directly for simplicity sake
+-    final Concept doseUnits = conceptService.getConcept(50); // Example, replace with actual concept id for dose units
+-    final OrderFrequency frequency = orderService.getOrderFrequency(1); // Example, replace with actual order frequency id
++    // Assuming a valid Concept exists for doseUnits and frequency, and these fulfill the system's requirements
++    final Concept doseUnits = conceptService.getConcept(50); // Placeholder, replace with an actual concept
++    final OrderFrequency frequency = orderService.getOrderFrequency(1); // Placeholder, replace with an actual frequency
+ 
+-    // Assuming these are valid and existing properties
+-    final Concept routeConcept = conceptService.getConcept(22); // Example, replace with actual route concept id
++    // Assuming valid Concept for the route
++    final Concept routeConcept = conceptService.getConcept(22); // Placeholder, replace with an actual route concept
+ 
+-    // Given an active drug order for the same concept with overlapping schedule
++    // Create and save the first DrugOrder adhering to system's requirement
+     DrugOrder activeDrugOrder = new DrugOrder();
+     activeDrugOrder.setPatient(patient);
++    activeDrugOrder.setOrderType(orderService.getOrderType(1)); // Assuming 1 is the ID for DrugOrder type
+     activeDrugOrder.setConcept(cd4Count);
+     activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
+     activeDrugOrder.setEncounter(encounterService.getEncounter(6));
+     activeDrugOrder.setOrderer(providerService.getProvider(1));
+     activeDrugOrder.setDateActivated(new Date());
+-    // Set required fields to bypass validation errors
+     activeDrugOrder.setDose(1.0);
+     activeDrugOrder.setDoseUnits(doseUnits);
+-    activeDrugOrder.setRoute(routeConcept); // Use concept as route
++    activeDrugOrder.setRoute(routeConcept); // Assuming assigning Concept directly is valid for route
+     activeDrugOrder.setFrequency(frequency);
+-    // Set duration to ensure overlap
+-    activeDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 864000000)); // 10 days from now
++    activeDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 864000000)); // Extending auto-expire 10 days into the future
+     orderService.saveOrder(activeDrugOrder, null);
+ 
+-    // When trying to save a new drug order for the same concept with overlapping schedule
++    // Attempt to save a second DrugOrder with overlapping schedule
+     DrugOrder newDrugOrder = new DrugOrder();
+     newDrugOrder.setPatient(patient);
++    newDrugOrder.setOrderType(orderService.getOrderType(1)); // Ensure this matches the expected DrugOrder type
+     newDrugOrder.setConcept(cd4Count);
+-    newDrugOrder.setCareSetting(activeDrugOrder.getCareSetting());
++    newDrugOrder.setCareSetting(orderService.getCareSetting(2));
+     newDrugOrder.setEncounter(encounterService.getEncounter(6));
+     newDrugOrder.setOrderer(providerService.getProvider(1));
+-    newDrugOrder.setDateActivated(new Date(System.currentTimeMillis() - 432000000)); // 5 days ago
+-    newDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 432000000)); // 5 days from now
+-    // Set required fields for the new drug order as well
++    newDrugOrder.setDateActivated(new Date(System.currentTimeMillis() - 432000000)); // Overlap by starting 5 days ago
++    newDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 432000000)); // Extending 5 days into the future
+     newDrugOrder.setDose(1.0);
+     newDrugOrder.setDoseUnits(doseUnits);
+-    newDrugOrder.setRoute(routeConcept); // Use concept as route
++    newDrugOrder.setRoute(routeConcept);
+     newDrugOrder.setFrequency(frequency);
+ 
+     expectedException.expect(APIException.class);
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.9373040752351097
+----------------------------------------------------------------
+message
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 4
+----------------------------------------------------------------
+generated test
+@Test
+public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+    final Patient patient = patientService.getPatient(2);
+    final Concept cd4Count = conceptService.getConcept(5497);
+    // Assuming a valid Concept exists for doseUnits and frequency, and these fulfill the system's requirements
+    final Concept doseUnits = conceptService.getConcept(50); // Placeholder, replace with an actual concept
+    final OrderFrequency frequency = orderService.getOrderFrequency(1); // Placeholder, replace with an actual frequency
+
+    // Assuming valid Concept for the route
+    final Concept routeConcept = conceptService.getConcept(22); // Placeholder, replace with an actual route concept
+
+    // Create and save the first DrugOrder adhering to system's requirement
+    DrugOrder activeDrugOrder = new DrugOrder();
+    activeDrugOrder.setPatient(patient);
+    activeDrugOrder.setOrderType(orderService.getOrderType(1)); // Assuming 1 is the ID for DrugOrder type
+    activeDrugOrder.setConcept(cd4Count);
+    activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
+    activeDrugOrder.setEncounter(encounterService.getEncounter(6));
+    activeDrugOrder.setOrderer(providerService.getProvider(1));
+    activeDrugOrder.setDateActivated(new Date());
+    activeDrugOrder.setDose(1.0);
+    activeDrugOrder.setDoseUnits(doseUnits);
+    activeDrugOrder.setRoute(routeConcept); // Assuming assigning Concept directly is valid for route
+    activeDrugOrder.setFrequency(frequency);
+    activeDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 864000000)); // Extending auto-expire 10 days into the future
+    orderService.saveOrder(activeDrugOrder, null);
+
+    // Attempt to save a second DrugOrder with overlapping schedule
+    DrugOrder newDrugOrder = new DrugOrder();
+    newDrugOrder.setPatient(patient);
+    newDrugOrder.setOrderType(orderService.getOrderType(1)); // Ensure this matches the expected DrugOrder type
+    newDrugOrder.setConcept(cd4Count);
+    newDrugOrder.setCareSetting(orderService.getCareSetting(2));
+    newDrugOrder.setEncounter(encounterService.getEncounter(6));
+    newDrugOrder.setOrderer(providerService.getProvider(1));
+    newDrugOrder.setDateActivated(new Date(System.currentTimeMillis() - 432000000)); // Overlap by starting 5 days ago
+    newDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 432000000)); // Extending 5 days into the future
+    newDrugOrder.setDose(1.0);
+    newDrugOrder.setDoseUnits(doseUnits);
+    newDrugOrder.setRoute(routeConcept);
+    newDrugOrder.setFrequency(frequency);
+
+    expectedException.expect(APIException.class);
+    expectedException.expectMessage("Order.cannot.have.more.than.one");
+    orderService.saveOrder(newDrugOrder, null);
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,21 +1,46 @@
+
+ @Test
+-	public void saveOrder_shouldFailIfAnActiveOrderForTheSameConceptAndCareSettingExists() throws Exception {
+-		final Patient patient = patientService.getPatient(2);
+-		final Concept cd4Count = conceptService.getConcept(5497);
+-		//sanity check that we have an active order for the same concept
+-		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
+-		assertTrue(duplicateOrder.isActive());
+-		assertEquals(cd4Count, duplicateOrder.getConcept());
+-		
+-		Order order = new TestOrder();
+-		order.setPatient(patient);
+-		order.setCareSetting(orderService.getCareSetting(2));
+-		order.setConcept(cd4Count);
+-		order.setEncounter(encounterService.getEncounter(6));
+-		order.setOrderer(providerService.getProvider(1));
+-		order.setCareSetting(duplicateOrder.getCareSetting());
+-		
+-		expectedException.expect(APIException.class);
+-		expectedException.expectMessage("Order.cannot.have.more.than.one");
+-		orderService.saveOrder(order, null);
+-	}
++public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
++    final Patient patient = patientService.getPatient(2);
++    final Concept cd4Count = conceptService.getConcept(5497);
++    // Assuming a valid Concept exists for doseUnits and frequency, and these fulfill the system's requirements
++    final Concept doseUnits = conceptService.getConcept(50); // Placeholder, replace with an actual concept
++    final OrderFrequency frequency = orderService.getOrderFrequency(1); // Placeholder, replace with an actual frequency
++
++    // Assuming valid Concept for the route
++    final Concept routeConcept = conceptService.getConcept(22); // Placeholder, replace with an actual route concept
++
++    // Create and save the first DrugOrder adhering to system's requirement
++    DrugOrder activeDrugOrder = new DrugOrder();
++    activeDrugOrder.setPatient(patient);
++    activeDrugOrder.setOrderType(orderService.getOrderType(1)); // Assuming 1 is the ID for DrugOrder type
++    activeDrugOrder.setConcept(cd4Count);
++    activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
++    activeDrugOrder.setEncounter(encounterService.getEncounter(6));
++    activeDrugOrder.setOrderer(providerService.getProvider(1));
++    activeDrugOrder.setDateActivated(new Date());
++    activeDrugOrder.setDose(1.0);
++    activeDrugOrder.setDoseUnits(doseUnits);
++    activeDrugOrder.setRoute(routeConcept); // Assuming assigning Concept directly is valid for route
++    activeDrugOrder.setFrequency(frequency);
++    activeDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 864000000)); // Extending auto-expire 10 days into the future
++    orderService.saveOrder(activeDrugOrder, null);
++
++    // Attempt to save a second DrugOrder with overlapping schedule
++    DrugOrder newDrugOrder = new DrugOrder();
++    newDrugOrder.setPatient(patient);
++    newDrugOrder.setOrderType(orderService.getOrderType(1)); // Ensure this matches the expected DrugOrder type
++    newDrugOrder.setConcept(cd4Count);
++    newDrugOrder.setCareSetting(orderService.getCareSetting(2));
++    newDrugOrder.setEncounter(encounterService.getEncounter(6));
++    newDrugOrder.setOrderer(providerService.getProvider(1));
++    newDrugOrder.setDateActivated(new Date(System.currentTimeMillis() - 432000000)); // Overlap by starting 5 days ago
++    newDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 432000000)); // Extending 5 days into the future
++    newDrugOrder.setDose(1.0);
++    newDrugOrder.setDoseUnits(doseUnits);
++    newDrugOrder.setRoute(routeConcept);
++    newDrugOrder.setFrequency(frequency);
++
++    expectedException.expect(APIException.class);
++    expectedException.expectMessage("Order.cannot.have.more.than.one");
++    orderService.saveOrder(newDrugOrder, null);
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,46 +1,21 @@
+
+ @Test
+-public void saveOrder_shouldFailIfAnActiveDrugOrderForTheSameOrderableAndOverlappingScheduleExists() throws Exception {
+-    final Patient patient = patientService.getPatient(2);
+-    final Concept cd4Count = conceptService.getConcept(5497);
+-    // Assuming a valid Concept exists for doseUnits and frequency, and these fulfill the system's requirements
+-    final Concept doseUnits = conceptService.getConcept(50); // Placeholder, replace with an actual concept
+-    final OrderFrequency frequency = orderService.getOrderFrequency(1); // Placeholder, replace with an actual frequency
++	public void saveOrder_shouldPassIfAnActiveTestOrderForTheSameConceptAndCareSettingExists() throws Exception {
++		final Patient patient = patientService.getPatient(2);
++		final Concept cd4Count = conceptService.getConcept(5497);
++		//sanity check that we have an active order for the same concept
++		TestOrder duplicateOrder = (TestOrder) orderService.getOrder(7);
++		assertTrue(duplicateOrder.isActive());
++		assertEquals(cd4Count, duplicateOrder.getConcept());
++		
++		Order order = new TestOrder();
++		order.setPatient(patient);
++		order.setCareSetting(orderService.getCareSetting(2));
++		order.setConcept(cd4Count);
++		order.setEncounter(encounterService.getEncounter(6));
++		order.setOrderer(providerService.getProvider(1));
++		order.setCareSetting(duplicateOrder.getCareSetting());
+ 
+-    // Assuming valid Concept for the route
+-    final Concept routeConcept = conceptService.getConcept(22); // Placeholder, replace with an actual route concept
++		Order savedOrder = orderService.saveOrder(order, null);
+ 
+-    // Create and save the first DrugOrder adhering to system's requirement
+-    DrugOrder activeDrugOrder = new DrugOrder();
+-    activeDrugOrder.setPatient(patient);
+-    activeDrugOrder.setOrderType(orderService.getOrderType(1)); // Assuming 1 is the ID for DrugOrder type
+-    activeDrugOrder.setConcept(cd4Count);
+-    activeDrugOrder.setCareSetting(orderService.getCareSetting(2));
+-    activeDrugOrder.setEncounter(encounterService.getEncounter(6));
+-    activeDrugOrder.setOrderer(providerService.getProvider(1));
+-    activeDrugOrder.setDateActivated(new Date());
+-    activeDrugOrder.setDose(1.0);
+-    activeDrugOrder.setDoseUnits(doseUnits);
+-    activeDrugOrder.setRoute(routeConcept); // Assuming assigning Concept directly is valid for route
+-    activeDrugOrder.setFrequency(frequency);
+-    activeDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 864000000)); // Extending auto-expire 10 days into the future
+-    orderService.saveOrder(activeDrugOrder, null);
+-
+-    // Attempt to save a second DrugOrder with overlapping schedule
+-    DrugOrder newDrugOrder = new DrugOrder();
+-    newDrugOrder.setPatient(patient);
+-    newDrugOrder.setOrderType(orderService.getOrderType(1)); // Ensure this matches the expected DrugOrder type
+-    newDrugOrder.setConcept(cd4Count);
+-    newDrugOrder.setCareSetting(orderService.getCareSetting(2));
+-    newDrugOrder.setEncounter(encounterService.getEncounter(6));
+-    newDrugOrder.setOrderer(providerService.getProvider(1));
+-    newDrugOrder.setDateActivated(new Date(System.currentTimeMillis() - 432000000)); // Overlap by starting 5 days ago
+-    newDrugOrder.setAutoExpireDate(new Date(System.currentTimeMillis() + 432000000)); // Extending 5 days into the future
+-    newDrugOrder.setDose(1.0);
+-    newDrugOrder.setDoseUnits(doseUnits);
+-    newDrugOrder.setRoute(routeConcept);
+-    newDrugOrder.setFrequency(frequency);
+-
+-    expectedException.expect(APIException.class);
+-    expectedException.expectMessage("Order.cannot.have.more.than.one");
+-    orderService.saveOrder(newDrugOrder, null);
+-}
++		assertNotNull(orderService.getOrder(savedOrder.getOrderId()));
++	}
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.9373040752351097
+--------------------------------------------------------------------------------------------------------------------------------

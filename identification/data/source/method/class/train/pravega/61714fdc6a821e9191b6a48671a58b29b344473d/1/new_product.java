@@ -1,0 +1,1 @@
+CompletableFuture<Void> write(SegmentHandle handle, long offset, InputStream data, int length, Duration timeout);

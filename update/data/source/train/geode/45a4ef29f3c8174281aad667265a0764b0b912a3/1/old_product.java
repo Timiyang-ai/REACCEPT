@@ -1,0 +1,1 @@
+void removeExtension(Extension<T> extension);

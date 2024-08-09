@@ -1,0 +1,1 @@
+void accept(T t) throws Exception;

@@ -1,0 +1,83 @@
+diff --git a/old_product.java b/new_product.java
+index 18312ff..deb0ea2 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,46 +1,54 @@
+ @Override
+     public void applyDelegate(Config config) {
+-        for (String port : listenPorts) {
+-            ConnectionEnd clientCon = new ConnectionEnd();
+-            clientCon.setConnectionEndType(ConnectionEndType.SERVER);
+ 
+-            String[] parsedPort = port.split(":");
++        if ((acceptingConnectionEnds == null) || (connectingConnectionEnds == null)) {
++            // Though {accepting,connecting}ConnectionEnds are required
++            // parameters we can get here if we call applyDelegate
++            // manually, e.g. in tests.
++            throw new ParameterException("{accepting|connecting}ConnectionEnds is empty!");
++        }
++
++        config.clearConnectionEnds();
++
++        for (String conEndStr : acceptingConnectionEnds) {
++            ServerConnectionEnd serverConEnd = new ServerConnectionEnd();
++
++            String[] parsedPort = conEndStr.split(":");
+             switch (parsedPort.length) {
+                 case 1:
+-                    clientCon.setAlias("client:" + parsedPort[0]);
+-                    clientCon.setPort(Integer.parseInt(parsedPort[0]));
++                    serverConEnd.setAlias("accept:" + parsedPort[0]);
++                    serverConEnd.setPort(parsePort(parsedPort[0]));
+                     break;
+                 case 2:
+-                    clientCon.setAlias(parsedPort[0]);
+-                    clientCon.setPort(Integer.parseInt(parsedPort[1]));
++                    serverConEnd.setAlias(parsedPort[0]);
++                    serverConEnd.setPort(parsePort(parsedPort[1]));
+                     break;
+                 default:
+-                    throw new ConfigurationException("Could not parse provided listen port: " + port
+-                            + ". Expected [CONNECTION_ALIAS:]<PORT>");
++                    throw new ConfigurationException("Could not parse provided accepting connection" + " end: "
++                            + conEndStr + ". Expected [CONNECTION_ALIAS:]<PORT>");
+             }
+-            config.addConnectionEnd(clientCon);
++            config.addConnectionEnd(serverConEnd);
+         }
+ 
+-        for (String host : serverHosts) {
+-            ConnectionEnd serverCon = new ConnectionEnd();
+-            serverCon.setConnectionEndType(ConnectionEndType.CLIENT);
++        for (String conEndStr : connectingConnectionEnds) {
++            ClientConnectionEnd clientConEnd = new ClientConnectionEnd();
+ 
+-            String[] parsedHost = host.split(":");
++            String[] parsedHost = conEndStr.split(":");
+             switch (parsedHost.length) {
+                 case 2:
+-                    serverCon.setHostname(parsedHost[0]);
+-                    serverCon.setPort(Integer.parseInt(parsedHost[1]));
+-                    serverCon.setAlias(host);
++                    clientConEnd.setHostname(parsedHost[0]);
++                    clientConEnd.setPort(parsePort(parsedHost[1]));
++                    clientConEnd.setAlias(conEndStr);
+                     break;
+                 case 3:
+-                    serverCon.setAlias(parsedHost[0]);
+-                    serverCon.setHostname(parsedHost[1]);
+-                    serverCon.setPort(Integer.parseInt(parsedHost[2]));
++                    clientConEnd.setAlias(parsedHost[0]);
++                    clientConEnd.setHostname(parsedHost[1]);
++                    clientConEnd.setPort(parsePort(parsedHost[2]));
+                     break;
+                 default:
+-                    throw new ConfigurationException("Could not parse provided server address: " + host
++                    throw new ConfigurationException("Could not parse provided server address: " + conEndStr
+                             + ". Expected [CONNECTION_ALIAS:]<HOSTNAME>:<PORT>");
+             }
+-            config.addConnectionEnd(serverCon);
++            config.addConnectionEnd(clientConEnd);
+         }
+     }
+\ No newline at end of file

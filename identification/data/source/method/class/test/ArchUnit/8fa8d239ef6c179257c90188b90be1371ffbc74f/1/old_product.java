@@ -1,0 +1,1 @@
+ClassesShouldConjunction accessField(String ownerName, String fieldName);

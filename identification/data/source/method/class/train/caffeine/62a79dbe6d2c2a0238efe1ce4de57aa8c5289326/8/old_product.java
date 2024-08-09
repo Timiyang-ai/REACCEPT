@@ -1,0 +1,1 @@
+Map<K, V> getAllPresent(Iterable<?> keys);

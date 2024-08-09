@@ -1,0 +1,1 @@
+CompletableFuture<MemberUpdateResponse> updateMember(long memberID, List<URI> peerAddrs);

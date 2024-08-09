@@ -1,0 +1,2 @@
+Mono<ResourceResponse<Document>> createDocument(String collectionLink, Object document, RequestOptions options,
+                                                    boolean disableAutomaticIdGeneration);

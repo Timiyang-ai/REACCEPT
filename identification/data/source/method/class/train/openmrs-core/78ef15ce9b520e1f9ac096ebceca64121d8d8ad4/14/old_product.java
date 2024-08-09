@@ -1,0 +1,1 @@
+public Obs getObs(Long obsId);

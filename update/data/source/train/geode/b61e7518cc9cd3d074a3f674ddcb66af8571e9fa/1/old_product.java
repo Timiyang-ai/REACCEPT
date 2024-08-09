@@ -1,0 +1,1 @@
+void addExtension(Extension<T> extension);

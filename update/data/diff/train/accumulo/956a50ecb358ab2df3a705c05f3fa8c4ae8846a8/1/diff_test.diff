@@ -1,0 +1,69 @@
+diff --git a/old_test.java b/new_test.java
+index 9be913a..f7e7fe0 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,5 +1,5 @@
+ @Test
+-  public void testGetSplits() throws IOException, AccumuloSecurityException, AccumuloException, TableNotFoundException, TableExistsException {
++  public void testGetSplits() throws Exception {
+     Connector conn = getConnector();
+     String table = getUniqueNames(1)[0];
+     conn.tableOperations().create(table);
+@@ -52,7 +52,7 @@
+     try {
+       inputFormat.getSplits(job);
+       fail("An exception should have been thrown");
+-    } catch (Exception e) {}
++    } catch (IOException e) {}
+ 
+     conn.tableOperations().offline(table);
+     splits = inputFormat.getSplits(job);
+@@ -70,4 +70,47 @@
+     AccumuloInputFormat.setAutoAdjustRanges(job, false);
+     splits = inputFormat.getSplits(job);
+     assertEquals(ranges.size(), splits.size());
++
++    //BatchScan not available for offline scans
++    AccumuloInputFormat.setBatchScan(job, true);
++
++    AccumuloInputFormat.setOfflineTableScan(job, true);
++    try {
++      inputFormat.getSplits(job);
++      fail("An exception should have been thrown");
++    } catch (IOException e) {}
++    AccumuloInputFormat.setOfflineTableScan(job, false);
++
++    // test for resumption of success
++    inputFormat.getSplits(job);
++    assertEquals(2, splits.size());
++
++    //BatchScan not available with isolated iterators
++    AccumuloInputFormat.setScanIsolation(job, true);
++    try {
++      inputFormat.getSplits(job);
++      fail("An exception should have been thrown");
++    } catch (IOException e) {}
++    AccumuloInputFormat.setScanIsolation(job, false);
++
++    // test for resumption of success
++    inputFormat.getSplits(job);
++    assertEquals(2, splits.size());
++
++    //BatchScan not available with local iterators
++    AccumuloInputFormat.setLocalIterators(job, true);
++    try {
++      inputFormat.getSplits(job);
++      fail("An exception should have been thrown");
++    } catch (IOException e) {}
++    AccumuloInputFormat.setLocalIterators(job, false);
++
++    //Check we are getting back correct type pf split
++    conn.tableOperations().online(table);
++    splits = inputFormat.getSplits(job);
++    for (InputSplit split: splits)
++      assert(split instanceof BatchInputSplit);
++
++    //We should divide along the tablet lines similar to when using `setAutoAdjustRanges(job, true)`
++    assertEquals(2, splits.size());
+   }
+\ No newline at end of file

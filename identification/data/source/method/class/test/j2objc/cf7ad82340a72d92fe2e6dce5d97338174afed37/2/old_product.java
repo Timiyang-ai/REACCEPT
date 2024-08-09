@@ -1,0 +1,1 @@
+public abstract FileChannel position(long offset) throws IOException;

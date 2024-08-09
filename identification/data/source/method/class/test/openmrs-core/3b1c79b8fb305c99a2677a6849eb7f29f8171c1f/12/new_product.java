@@ -1,0 +1,2 @@
+@Authorized(PrivilegeConstants.GET_CONCEPT_REFERENCE_TERMS)
+	public List<ConceptReferenceTermMap> getReferenceTermMappingsTo(ConceptReferenceTerm term) throws APIException;

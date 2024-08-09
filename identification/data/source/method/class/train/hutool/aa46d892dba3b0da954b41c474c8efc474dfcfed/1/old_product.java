@@ -1,0 +1,19 @@
+@SuppressWarnings("unchecked")
+	public static File unzip(File zipFile, File outFile) throws IOException {
+		final ZipFile zipFileObj = new ZipFile(zipFile);
+		final Enumeration<ZipEntry> em = (Enumeration<ZipEntry>) zipFileObj.entries();
+		ZipEntry zipEntry = null;
+		File outItemFile = null;
+		while (em.hasMoreElements()) {
+			zipEntry = em.nextElement();
+			outItemFile = new File(outFile, zipEntry.getName());
+			if (zipEntry.isDirectory()) {
+				outItemFile.mkdirs();
+			} else {
+				FileUtil.touch(outItemFile);
+				copy(zipFileObj, zipEntry, outItemFile);
+			}
+		}
+		IoUtil.close(zipFileObj);
+		return outFile;
+	}

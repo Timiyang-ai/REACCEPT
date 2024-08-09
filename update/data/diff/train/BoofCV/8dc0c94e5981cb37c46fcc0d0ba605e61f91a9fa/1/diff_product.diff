@@ -1,0 +1,81 @@
+diff --git a/old_product.java b/new_product.java
+index 5f7d21f..047bce3 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,54 +1,32 @@
+ public boolean process( T leftImage ) {
+ 		tracker.process(leftImage);
+ 
+-		boolean foundMotion = estimateMotion();
++		inliersValid = false;
+ 
+-		if( !foundMotion ) {
+-//			System.out.println("MOTION FAILED!");
+-			motionFailed++;
++		if( !hasSignificantChange ) {
++			if( !checkSignificantMotion() ) {
++				return false;
++			} else
++				hasSignificantChange = true;
+ 		}
+ 
+-//		System.out.println(" numTracksUsed = "+numTracksUsed);
+-		if( numTracksUsed < MIN_TRACKS ) {
+-			pixelTo3D.initialize();
+-
+-			if( bundle != null )
+-				bundleAdjustment();
+-
+-			System.out.println("----------- CHANGE KEY FRAME ---------------");
+-			concatMotion();
+-
+-			tracker.setKeyFrame();
+-			tracker.spawnTracks();
+-
+-			List<PointPoseTrack> tracks = tracker.getPairs();
+-			List<PointPoseTrack> drop = new ArrayList<PointPoseTrack>();
+-
+-			// estimate 3D coordinate using stereo vision
+-			for( PointPoseTrack p : tracks ) {
+-				Point2D_F64 pixel = p.getPixel().keyLoc;
+-				// discard point if it can't triangulate
+-				if( !pixelTo3D.process(pixel.x,pixel.y) || pixelTo3D.getW() == 0 ) {
+-					drop.add(p);
+-				} else {
+-					double w = pixelTo3D.getW();
+-					p.getLocation().set( pixelTo3D.getX()/w , pixelTo3D.getY()/w, pixelTo3D.getZ()/w);
+-
+-//					System.out.println("Stereo z = "+p.getLocation().getZ());
+-//					if( p.getLocation().z < 100 )
+-//						System.out.println("   * ");
+-				}
++		if( first ) {
++			setNewKeyFrame();
++			first = false;
++		} else {
++			if( !estimateMotion() ) {
++				motionFailed++;
++				return false;
+ 			}
+ 
+-			// drop tracks which couldn't be triangulated
+-			for( PointPoseTrack p : drop ) {
+-				tracker.dropTrack(p);
++			System.out.println(" numTracksUsed = "+numTracksUsed+"  original "+numOriginalUsed+" total "+tracker.getPairs().size());
++			if( numOriginalUsed < MIN_TRACKS/2 ) {
++				setNewKeyFrame();
++				inliersValid = false;
++			} else if( numTracksUsed < MIN_TRACKS ) {
++				addNewTracks();
+ 			}
+-
+-			hasSignificantChange = false;
+-			motionEstimated = false;
+-			return foundMotion;
+-		} else {
+-			return foundMotion;
+ 		}
++
++		return true;
+ 	}
+\ No newline at end of file

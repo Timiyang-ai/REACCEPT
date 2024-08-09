@@ -1,0 +1,1 @@
+void setAccessAndExpiryTimeWhenCallerOutsideLock(K key, OnHeapValueHolder<V> valueHolder, long now);

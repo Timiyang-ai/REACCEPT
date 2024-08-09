@@ -1,0 +1,1 @@
+double[] rank(double[][] x, int[] y);

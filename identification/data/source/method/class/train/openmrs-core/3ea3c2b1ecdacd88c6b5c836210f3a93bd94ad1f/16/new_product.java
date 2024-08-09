@@ -1,0 +1,56 @@
+@Override
+	public void handle(Person person, User creator, Date dateCreated, String other) {
+		
+		// address collection
+		if (person.getAddresses() != null && !person.getAddresses().isEmpty()) {
+			Set<Address> blankAddresses = new HashSet<>();
+			for (PersonAddress pAddress : person.getAddresses()) {
+				if (pAddress.isBlank()) {
+					blankAddresses.add(pAddress);
+					continue;
+				}
+				pAddress.setPerson(person);
+			}
+
+			person.getAddresses().removeAll(blankAddresses);
+		}
+		
+		// name collection
+		if (person.getNames() != null && !person.getNames().isEmpty()) {
+			for (PersonName pName : person.getNames()) {
+				pName.setPerson(person);
+			}
+		}
+		
+		// attribute collection
+		if (person.getAttributes() != null && !person.getAttributes().isEmpty()) {
+			for (PersonAttribute pAttr : person.getAttributes()) {
+				pAttr.setPerson(person);
+			}
+		}
+		
+		//if the patient was marked as dead and reversed, drop the cause of death
+		if (!person.getDead() && person.getCauseOfDeath() != null) {
+			person.setCauseOfDeath(null);
+		}
+		
+		// do the checks for voided attributes (also in PersonVoidHandler)
+		if (person.getPersonVoided()) {
+			
+			if (!StringUtils.hasLength(person.getPersonVoidReason())) {
+				throw new APIException("Person.voided.bit", new Object[] { person });
+			}
+			
+			if (person.getPersonVoidedBy() == null) {
+				person.setPersonVoidedBy(creator);
+			}
+			if (person.getPersonDateVoided() == null) {
+				person.setPersonDateVoided(dateCreated);
+			}
+		} else {
+			// voided is set to false
+			person.setPersonVoidedBy(null);
+			person.setPersonDateVoided(null);
+			person.setPersonVoidReason(null);
+		}
+	}

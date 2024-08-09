@@ -1,0 +1,57 @@
+diff --git a/old_product.java b/new_product.java
+index fbd0a17..26aa18b 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -10,7 +10,8 @@ CompletableFuture<Void> initialize(Duration timeout) {
+                     if (this.metadata.getStorageLength() != segmentInfo.getLength()) {
+                         if (this.metadata.getStorageLength() >= 0) {
+                             // Only log warning if the StorageLength has actually been initialized, but is different.
+-                            log.warn("{}: SegmentMetadata has a StorageLength ({}) that is different than the actual one ({}) - updating metadata.", this.traceObjectId, this.metadata.getStorageLength(), segmentInfo.getLength());
++                            log.info("{}: SegmentMetadata has a StorageLength ({}) that is different than the actual one ({}) - updating metadata.",
++                                    this.traceObjectId, this.metadata.getStorageLength(), segmentInfo.getLength());
+                         }
+ 
+                         // It is very important to keep this value up-to-date and correct.
+@@ -20,12 +21,13 @@ CompletableFuture<Void> initialize(Duration timeout) {
+                     // Check if the Storage segment is sealed, but it's not in metadata (this is 100% indicative of some data corruption happening).
+                     if (segmentInfo.isSealed()) {
+                         if (!this.metadata.isSealed()) {
+-                            throw new CompletionException(new DataCorruptionException(String.format("Segment '%s' is sealed in Storage but not in the metadata.", this.metadata.getName())));
++                            throw new CompletionException(new DataCorruptionException(String.format(
++                                    "Segment '%s' is sealed in Storage but not in the metadata.", this.metadata.getName())));
+                         }
+ 
+                         if (!this.metadata.isSealedInStorage()) {
+                             this.metadata.markSealedInStorage();
+-                            log.warn("{}: Segment is sealed in Storage but metadata does not reflect that - updating metadata.", this.traceObjectId);
++                            log.info("{}: Segment is sealed in Storage but metadata does not reflect that - updating metadata.", this.traceObjectId);
+                         }
+                     }
+ 
+@@ -36,11 +38,21 @@ CompletableFuture<Void> initialize(Duration timeout) {
+                 .exceptionally(ex -> {
+                     ex = Exceptions.unwrap(ex);
+                     if (ex instanceof StreamSegmentNotExistsException) {
+-                        // Segment does not exist anymore. This is a real possibility during recovery, in the following cases:
+-                        // * We already processed a Segment Deletion but did not have a chance to checkpoint metadata
+-                        // * We processed a TransactionMergeOperation but did not have a chance to ack/truncate the DataSource
+-                        this.metadata.markDeleted(); // Update metadata, just in case it is not already updated.
+-                        log.warn("{}: Segment '{}' does not exist in Storage. Ignoring all further operations on it.", this.traceObjectId, this.metadata.getName());
++                        // Segment does not exist in Storage. There are two possibilities here:
++                        if (this.metadata.getStorageLength() == 0 && !this.metadata.isDeletedInStorage()) {
++                            // Segment has never been created because there was nothing to write to it. As long as we know
++                            // its expected length is zero, this is a valid case.
++                            this.handle.set(null);
++                            log.info("{}: Initialized. Segment does not exist in Storage but Metadata indicates it should be empty.");
++                        } else {
++                            // Segment does not exist anymore. This is a real possibility during recovery, in the following cases:
++                            // * We already processed a Segment Deletion but did not have a chance to checkpoint metadata
++                            // * We processed a MergeSegmentOperation but did not have a chance to ack/truncate the DataSource
++                            // Update metadata, just in case it is not already updated.
++                            updateMetadataPostDeletion(this.metadata);
++                            log.info("{}: Segment '{}' does not exist in Storage. Ignoring all further operations on it.",
++                                    this.traceObjectId, this.metadata.getName());
++                        }
+                         setState(AggregatorState.Writing);
+                         LoggerHelpers.traceLeave(log, this.traceObjectId, "initialize", traceId);
+                     } else {

@@ -1,0 +1,2 @@
+@Authorized(PrivilegeConstants.VIEW_ORDER_FREQUENCIES)
+	public OrderFrequency getOrderFrequencyByConcept(Concept concept);

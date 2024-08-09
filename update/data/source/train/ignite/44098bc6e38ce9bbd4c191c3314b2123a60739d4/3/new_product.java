@@ -1,0 +1,1 @@
+public abstract StepFunction<T>[] calculate(DecisionTreeData data, TreeFilter filter, int depth);

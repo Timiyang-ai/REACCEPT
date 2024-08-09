@@ -1,0 +1,1 @@
+public abstract Iterator<Long2DoubleMap.Entry> fastIterator();

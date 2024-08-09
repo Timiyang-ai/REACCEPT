@@ -1,0 +1,1 @@
+Path calcPath( EdgeIteratorState from, EdgeIteratorState to );

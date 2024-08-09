@@ -1,0 +1,1 @@
+public abstract void update(ByteBuffer rowKey, Cell oldCol, Cell col, OpOrder.Group opGroup);

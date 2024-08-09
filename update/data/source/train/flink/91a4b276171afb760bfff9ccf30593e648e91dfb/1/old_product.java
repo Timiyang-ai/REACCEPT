@@ -1,0 +1,1 @@
+void recover(SharedStateRegistry sharedStateRegistry) throws Exception;

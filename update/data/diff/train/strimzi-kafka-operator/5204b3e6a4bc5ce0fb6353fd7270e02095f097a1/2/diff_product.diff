@@ -1,0 +1,56 @@
+diff --git a/old_product.java b/new_product.java
+index 7f445e5..6500e54 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -9,13 +9,13 @@ void reconcile(final HasMetadata involvedObject,
+         if (privateTopic == null) {
+             if (k8sTopic == null) {
+                 if (kafkaTopic == null) {
+-                    // All three null: This happens reentrantly when a topic or configmap is deleted
++                    // All three null: This happens reentrantly when a topic or KafkaTopic is deleted
+                     LOGGER.debug("All three topics null during reconciliation.");
+                     reconciliationResultHandler.handle(Future.succeededFuture());
+                 } else {
+                     // it's been created in Kafka => create in k8s and privateState
+-                    LOGGER.debug("topic created in kafka, will create cm in k8s and topicStore");
+-                    enqueue(new CreateConfigMap(kafkaTopic, ar -> {
++                    LOGGER.debug("topic created in kafka, will create KafkaTopic in k8s and topicStore");
++                    enqueue(new CreateResource(kafkaTopic, ar -> {
+                         // In all cases, create in privateState
+                         if (ar.succeeded()) {
+                             enqueue(new CreateInTopicStore(kafkaTopic, involvedObject, reconciliationResultHandler));
+@@ -26,7 +26,7 @@ void reconcile(final HasMetadata involvedObject,
+                 }
+             } else if (kafkaTopic == null) {
+                 // it's been created in k8s => create in Kafka and privateState
+-                LOGGER.debug("cm created in k8s, will create topic in kafka and topicStore");
++                LOGGER.debug("KafkaTopic created in k8s, will create topic in kafka and topicStore");
+                 enqueue(new CreateKafkaTopic(k8sTopic, involvedObject, ar -> {
+                     // In all cases, create in privateState
+                     if (ar.succeeded()) {
+@@ -42,12 +42,12 @@ void reconcile(final HasMetadata involvedObject,
+             if (k8sTopic == null) {
+                 if (kafkaTopic == null) {
+                     // delete privateState
+-                    LOGGER.debug("cm deleted in k8s and topic deleted in kafka => delete from topicStore");
++                    LOGGER.debug("KafkaTopic deleted in k8s and topic deleted in kafka => delete from topicStore");
+                     enqueue(new DeleteFromTopicStore(privateTopic.getTopicName(), involvedObject, reconciliationResultHandler));
+                     reconciliationResultHandler.handle(Future.succeededFuture());
+                 } else {
+                     // it was deleted in k8s so delete in kafka and privateState
+-                    LOGGER.debug("cm deleted in k8s => delete topic from kafka and from topicStore");
++                    LOGGER.debug("KafkaTopic deleted in k8s => delete topic from kafka and from topicStore");
+                     enqueue(new DeleteKafkaTopic(kafkaTopic.getTopicName(), ar -> {
+                         if (ar.succeeded()) {
+                             enqueue(new DeleteFromTopicStore(privateTopic.getTopicName(), involvedObject, reconciliationResultHandler));
+@@ -59,8 +59,8 @@ void reconcile(final HasMetadata involvedObject,
+                 }
+             } else if (kafkaTopic == null) {
+                 // it was deleted in kafka so delete in k8s and privateState
+-                LOGGER.debug("topic deleted in kafkas => delete cm from k8s and from topicStore");
+-                enqueue(new DeleteConfigMap(privateTopic.getOrAsMapName(), ar -> {
++                LOGGER.debug("topic deleted in kafkas => delete KafkaTopic from k8s and from topicStore");
++                enqueue(new DeleteResource(privateTopic.getOrAsMapName(), ar -> {
+                     if (ar.succeeded()) {
+                         enqueue(new DeleteFromTopicStore(privateTopic.getTopicName(), involvedObject, reconciliationResultHandler));
+                     } else {

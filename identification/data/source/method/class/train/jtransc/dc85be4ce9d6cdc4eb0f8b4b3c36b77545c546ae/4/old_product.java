@@ -1,0 +1,1 @@
+native public static double rint(double a);

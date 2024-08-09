@@ -1,0 +1,1 @@
+public long createUfsFile(String ufsPath, UFSCreateFileTOptions options) throws alluxio.thrift.AlluxioTException, alluxio.thrift.ThriftIOException, org.apache.thrift.TException;

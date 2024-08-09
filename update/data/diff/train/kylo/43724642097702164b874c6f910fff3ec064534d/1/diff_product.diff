@@ -1,0 +1,85 @@
+diff --git a/old_product.java b/new_product.java
+index 520dd7d..972fc24 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -2,16 +2,9 @@
+     public TransformResponse execute(@Nonnull final TransformRequest request) throws ScriptException {
+         log.trace("entry params({})", request);
+ 
+-        // Generate destination
+-        final String table = newTableName();
+-
+         // Build bindings list
+         final List<NamedParam> bindings = new ArrayList<>();
+-        bindings.add(new NamedParamClass("policies", "Array[" + FieldPolicy.class.getName() + "]", getPolicies(request)));
+-        bindings.add(new NamedParamClass("profiler", Profiler.class.getName(), profiler));
+         bindings.add(new NamedParamClass("sparkContextService", SparkContextService.class.getName(), sparkContextService));
+-        bindings.add(new NamedParamClass("tableName", "String", table));
+-        bindings.add(new NamedParamClass("validator", DataValidator.class.getName(), validator));
+ 
+         if (request.getDatasources() != null && !request.getDatasources().isEmpty()) {
+             if (datasourceProviderFactory != null) {
+@@ -25,13 +18,21 @@
+         }
+ 
+         // Execute script
+-        final Object result = this.engine.eval(toScript(request), bindings);
++        final Object result;
++        try {
++            result = this.engine.eval(toScript(request), bindings);
++        } catch (final Exception cause) {
++            final ScriptException e = new ScriptException(cause);
++            log.error("Throwing {}", e);
++            throw e;
++        }
+ 
+-        final TransformJob job;
+-        if (result instanceof Callable) {
+-            @SuppressWarnings("unchecked") final Callable<TransformResponse> callable = (Callable) result;
+-            job = new TransformJob(table, callable, engine.getSparkContext());
+-            tracker.submitJob(job);
++        TransformResponse response;
++        StructType schema;
++        if (result instanceof DataSet) {
++            final DataSet dataSet = (DataSet) result;
++            schema = dataSet.schema();
++            response = submitJob(new ShellTransformStage(dataSet), getPolicies(request));
+         } else {
+             final IllegalStateException e = new IllegalStateException("Unexpected script result type: " + (result != null ? result.getClass() : null));
+             log.error("Throwing {}", e);
+@@ -39,25 +40,16 @@
+         }
+ 
+         // Build response
+-        TransformResponse response;
+-
+-        try {
+-            response = job.get(500, TimeUnit.MILLISECONDS);
+-            tracker.removeJob(table);
+-        } catch (final ExecutionException cause) {
+-            final ScriptException e = new ScriptException(cause);
+-            log.error("Throwing {}", e);
+-            throw e;
+-        } catch (final InterruptedException | TimeoutException e) {
+-            log.trace("Timeout waiting for script result", e);
+-            if (result instanceof TransformResponse) {
+-                response = (TransformResponse) result;
+-            } else {
+-                response = new TransformResponse();
+-                response.setProgress(0.0);
+-                response.setStatus(TransformResponse.Status.PENDING);
+-                response.setTable(table);
+-            }
++        if (response.getStatus() != TransformResponse.Status.SUCCESS) {
++            final String table = response.getTable();
++            final TransformQueryResult partialResult = new TransformQueryResult();
++            partialResult.setColumns(Arrays.<QueryResultColumn>asList(new QueryResultRowTransform(schema, table).columns()));
++
++            response = new TransformResponse();
++            response.setProgress(0.0);
++            response.setResults(partialResult);
++            response.setStatus(TransformResponse.Status.PENDING);
++            response.setTable(table);
+         }
+ 
+         log.trace("exit with({})", response);

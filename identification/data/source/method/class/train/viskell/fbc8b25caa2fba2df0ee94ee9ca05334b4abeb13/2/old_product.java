@@ -1,0 +1,1 @@
+public abstract Type getFresh();

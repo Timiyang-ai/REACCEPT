@@ -1,0 +1,1 @@
+BlockoutTrigger getBlockout(String blockoutName) throws SchedulerException;

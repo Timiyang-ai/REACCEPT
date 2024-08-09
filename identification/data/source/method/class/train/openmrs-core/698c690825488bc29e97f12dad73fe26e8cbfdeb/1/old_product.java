@@ -1,0 +1,50 @@
+@Override
+	public void validate(Object object, Errors errors) throws DAOException {
+		Class entityClass = object.getClass();
+		ClassMetadata metadata = sessionFactory.getClassMetadata(entityClass);
+		if (metadata != null) {
+			String[] propNames = metadata.getPropertyNames();
+			Object IdentifierTpye = metadata.getIdentifierType();
+			String identifierName = metadata.getIdentifierPropertyName();
+			if (IdentifierTpye instanceof StringType || IdentifierTpye instanceof TextType) {
+				int maxLength = getMaximumPropertyLength(entityClass, identifierName);
+				String identifierValue = (String) metadata.getIdentifier(object,
+				    (SessionImplementor) sessionFactory.getCurrentSession());
+				if (identifierValue != null) {
+					int identifierLength = identifierValue.length();
+					if (identifierLength > maxLength) {
+						
+						errors.rejectValue(identifierName, "error.exceededMaxLengthOfField", new Object[] { maxLength },
+						    null);
+					}
+				}
+			}
+			for (int i = 0; i < propNames.length; i++) {
+				Type propType = metadata.getPropertyType(propNames[i]);
+				if (propType instanceof StringType || propType instanceof TextType) {
+					String propertyValue = (String) metadata.getPropertyValue(object, propNames[i]);
+					if (propertyValue != null) {
+						int maxLength = getMaximumPropertyLength(entityClass, propNames[i]);
+						int propertyValueLength = propertyValue.length();
+						if (propertyValueLength > maxLength) {
+							errors.rejectValue(propNames[i], "error.exceededMaxLengthOfField", new Object[] { maxLength },
+							    null);
+						}
+					}
+				}
+			}
+		}
+		FlushMode previousFlushMode = sessionFactory.getCurrentSession().getFlushMode();
+		sessionFactory.getCurrentSession().setFlushMode(FlushMode.MANUAL);
+		try {
+			for (Validator validator : getValidators(object)) {
+				validator.validate(object, errors);
+			}
+			
+		}
+		
+		finally {
+			sessionFactory.getCurrentSession().setFlushMode(previousFlushMode);
+		}
+		
+	}

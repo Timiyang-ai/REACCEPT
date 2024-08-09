@@ -1,0 +1,1 @@
+public void delete(String name, String type) throws MetaDataException;

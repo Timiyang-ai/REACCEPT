@@ -1,0 +1,113 @@
+diff --git a/old_test.java b/new_test.java
+index d9dc1a6..b1b0120 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -8,77 +8,58 @@
+         final int      rsplen = 8;
+         final String      uri = "/random/" + rsplen;
+ 
+-        final ClassicHttpRequest request = new BasicClassicHttpRequest("GET", uri);
++        final ClassicHttpRequest request = new BasicClassicHttpRequest("GET", target, uri);
+         final HttpContext context = new BasicHttpContext();
+ 
+-        HttpClientConnection conn = getConnection(this.connManager, route);
+-        this.connManager.connect(conn, route, 0, context);
+-        this.connManager.routeComplete(conn, route, context);
++        final LeaseRequest leaseRequest1 = this.connManager.lease(route, null);
++        final ConnectionEndpoint endpoint1 = leaseRequest1.get(0, TimeUnit.MILLISECONDS);
+ 
+-        context.setAttribute(HttpCoreContext.HTTP_CONNECTION, conn);
++        this.connManager.connect(endpoint1, 0, TimeUnit.MILLISECONDS, context);
+ 
+         final HttpProcessor httpProcessor = new DefaultHttpProcessor(
+                 new RequestTargetHost(), new RequestContent(), new RequestConnControl());
+ 
+         final HttpRequestExecutor exec = new HttpRequestExecutor();
+         exec.preProcess(request, httpProcessor, context);
+-        ClassicHttpResponse response = exec.execute(request, conn, context);
+-
+-        Assert.assertEquals("wrong status in first response",
+-                     HttpStatus.SC_OK,
+-                     response.getCode());
+-        byte[] data = EntityUtils.toByteArray(response.getEntity());
+-        Assert.assertEquals("wrong length of first response entity",
+-                     rsplen, data.length);
+-        // ignore data, but it must be read
++        try (final ClassicHttpResponse response1 = endpoint1.execute(request, exec, context)) {
++            Assert.assertEquals(HttpStatus.SC_OK, response1.getCode());
++        }
+ 
+         // check that there is no auto-release by default
+         try {
+             // this should fail quickly, connection has not been released
+-            getConnection(this.connManager, route, 10L, TimeUnit.MILLISECONDS);
+-            Assert.fail("ConnectionPoolTimeoutException should have been thrown");
+-        } catch (final ConnectionPoolTimeoutException e) {
++            final LeaseRequest leaseRequest2 = this.connManager.lease(route, null);
++            leaseRequest2.get(10, TimeUnit.MILLISECONDS);
++            Assert.fail("TimeoutException expected");
++        } catch (final TimeoutException ex) {
+             // expected
+         }
+ 
+-        conn.close();
+-        this.connManager.releaseConnection(conn, null, -1, null);
+-        conn = getConnection(this.connManager, route);
+-        Assert.assertFalse("connection should have been closed", conn.isOpen());
++        endpoint1.close();
++        this.connManager.release(endpoint1, null, -1, null);
++        final LeaseRequest leaseRequest2 = this.connManager.lease(route, null);
++        final ConnectionEndpoint endpoint2 = leaseRequest2.get(0, TimeUnit.MILLISECONDS);
++        Assert.assertFalse(endpoint2.isConnected());
+ 
+-        this.connManager.connect(conn, route, 0, context);
+-        this.connManager.routeComplete(conn, route, context);
+-
+-        // repeat the communication, no need to prepare the request again
+-        context.setAttribute(HttpCoreContext.HTTP_CONNECTION, conn);
+-        response = exec.execute(request, conn, context);
++        this.connManager.connect(endpoint2, 0, TimeUnit.MILLISECONDS, context);
+ 
+-        Assert.assertEquals("wrong status in second response",
+-                     HttpStatus.SC_OK,
+-                     response.getCode());
+-        data = EntityUtils.toByteArray(response.getEntity());
+-        Assert.assertEquals("wrong length of second response entity",
+-                     rsplen, data.length);
+-        // ignore data, but it must be read
++        try (final ClassicHttpResponse response2 = endpoint2.execute(request, exec, context)) {
++            Assert.assertEquals(HttpStatus.SC_OK, response2.getCode());
++        }
+ 
+         // release connection after marking it for re-use
+         // expect the next connection obtained to be open
+-        this.connManager.releaseConnection(conn, null, -1, null);
+-        conn = getConnection(this.connManager, route);
+-        Assert.assertTrue("connection should have been open", conn.isOpen());
++        this.connManager.release(endpoint2, null, -1, null);
+ 
+-        // repeat the communication, no need to prepare the request again
+-        context.setAttribute(HttpCoreContext.HTTP_CONNECTION, conn);
+-        response = exec.execute(request, conn, context);
++        final LeaseRequest leaseRequest3 = this.connManager.lease(route, null);
++        final ConnectionEndpoint endpoint3 = leaseRequest3.get(0, TimeUnit.MILLISECONDS);
++        Assert.assertTrue(endpoint3.isConnected());
+ 
+-        Assert.assertEquals("wrong status in third response",
+-                     HttpStatus.SC_OK,
+-                     response.getCode());
+-        data = EntityUtils.toByteArray(response.getEntity());
+-        Assert.assertEquals("wrong length of third response entity",
+-                     rsplen, data.length);
+-        // ignore data, but it must be read
++        // repeat the communication, no need to prepare the request again
++        try (final ClassicHttpResponse response3 = endpoint3.execute(request, exec, context)) {
++            Assert.assertEquals(HttpStatus.SC_OK, response3.getCode());
++        }
+ 
+-        this.connManager.releaseConnection(conn, null, -1, null);
+-        this.connManager.shutdown();
++        this.connManager.release(endpoint3, null, -1, null);
++        this.connManager.close();
+     }
+\ No newline at end of file

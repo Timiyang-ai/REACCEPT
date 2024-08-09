@@ -1,0 +1,28 @@
+diff --git a/old_test.java b/new_test.java
+index f86f6d9..f8a6869 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,7 +1,17 @@
+ @Test
+-  public void downgradeTest() throws BaseXException {
+-    // hangs if QueryContext.downgrade call is activated..
+-    new CreateDB(NAME, "<x/>").execute(context);
+-    new XQuery("delete node /y").execute(context);
+-    new XQuery("let $d := '" + NAME + "' return doc($d)").execute(context);
++  public void downgradeToNoWriteLocksTest() throws InterruptedException {
++    final CountDownLatch sync = new CountDownLatch(1), test = new CountDownLatch(1);
++
++    final LockTester th1 = new LockTester(null, NONE, objects, sync);
++    final LockTester th2 = new LockTester(sync, null, NONE, test);
++
++    th1.start();
++    th2.start();
++    assertFalse("Thread 2 shouldn't be able to acquire lock yet.",
++        test.await(WAIT, TimeUnit.MILLISECONDS));
++    th1.downgrade(NONE);
++    assertTrue("Thread 2 should be able to acquire lock now.",
++        test.await(WAIT, TimeUnit.MILLISECONDS));
++    th1.release();
++    th2.release();
+   }
+\ No newline at end of file

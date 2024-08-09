@@ -1,0 +1,1 @@
+ShouldConjunction resideInAPackage(String packageIdentifier);

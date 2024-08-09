@@ -1,0 +1,1 @@
+Selection and(Selection otherSelection);

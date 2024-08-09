@@ -1,0 +1,1 @@
+public User setUserActivationKey(User user);

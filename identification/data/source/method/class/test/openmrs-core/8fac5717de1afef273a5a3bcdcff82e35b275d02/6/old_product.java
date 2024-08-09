@@ -1,0 +1,1 @@
+public List<User> getUsers() throws DAOException;

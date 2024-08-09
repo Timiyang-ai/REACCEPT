@@ -1,0 +1,1 @@
+public abstract RealmObjectSchema setRequired(String fieldName, boolean required);

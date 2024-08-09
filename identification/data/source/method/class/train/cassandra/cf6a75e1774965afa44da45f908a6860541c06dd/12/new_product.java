@@ -1,0 +1,11 @@
+public void listen(InetAddress localEp) throws ConfigurationException
+    {
+        callbacks.reset(); // hack to allow tests to stop/restart MS
+        for (ServerSocket ss : getServerSockets(localEp))
+        {
+            SocketThread th = new SocketThread(ss, "ACCEPT-" + localEp);
+            th.start();
+            socketThreads.add(th);
+        }
+        listenGate.signalAll();
+    }

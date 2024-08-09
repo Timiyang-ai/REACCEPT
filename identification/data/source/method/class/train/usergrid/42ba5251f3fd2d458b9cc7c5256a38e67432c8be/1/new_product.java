@@ -1,0 +1,1 @@
+Lock createLock(final UUID applicationId, final String... path) throws UGLockException;

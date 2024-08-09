@@ -1,0 +1,1 @@
+IdResult createUser(@WebParam(name = "user") UserDTO user);

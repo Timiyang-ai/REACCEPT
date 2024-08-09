@@ -1,0 +1,1 @@
+void throwing(Throwable t);

@@ -1,0 +1,4 @@
+DBConnection getDBConnection()
+    {
+        return dbConnection;
+    }

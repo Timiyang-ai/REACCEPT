@@ -1,0 +1,2 @@
+@Authorized( { PrivilegeConstants.ADD_PATIENT_IDENTIFIERS, PrivilegeConstants.EDIT_PATIENT_IDENTIFIERS })
+	public PatientIdentifier savePatientIdentifier(PatientIdentifier patientIdentifier) throws APIException;

@@ -1,0 +1,25 @@
+@Nonnull
+	MultiTaskSlot createRootSlot(
+			SlotRequestId slotRequestId,
+			CompletableFuture<? extends SlotContext> slotContextFuture,
+			SlotRequestId allocatedSlotRequestId) {
+		LOG.debug("Create multi task slot [{}] in slot [{}].", slotRequestId, allocatedSlotRequestId);
+
+		final CompletableFuture<SlotContext> slotContextFutureAfterRootSlotResolution = new CompletableFuture<>();
+		final MultiTaskSlot rootMultiTaskSlot = createAndRegisterRootSlot(
+			slotRequestId,
+			allocatedSlotRequestId,
+			slotContextFutureAfterRootSlotResolution);
+
+		FutureUtils.forward(
+			slotContextFuture.thenApply(
+				(SlotContext slotContext) -> {
+					// add the root node to the set of resolved root nodes once the SlotContext future has
+					// been completed and we know the slot's TaskManagerLocation
+					tryMarkSlotAsResolved(slotRequestId, slotContext);
+					return slotContext;
+				}),
+			slotContextFutureAfterRootSlotResolution);
+
+		return rootMultiTaskSlot;
+	}

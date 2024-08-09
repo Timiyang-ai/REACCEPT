@@ -1,0 +1,20 @@
+@Test
+  public void writeBinary() {
+    // check errors
+    final String bin = "xs:base64Binary('MA==')";
+    error(_FILE_WRITE_BINARY.args(PATH, bin), Err.FILE_IS_DIR);
+    error(_FILE_WRITE_BINARY.args(PATH1, "NoBinary"), Err.BINARYTYPE);
+    // write file and check size
+    query(_FILE_WRITE_BINARY.args(PATH1, bin));
+    query(_FILE_SIZE.args(PATH1), "1");
+    query(_FILE_WRITE_BINARY.args(PATH1, bin));
+    query(_FILE_SIZE.args(PATH1), "1");
+    // write data to specific offset and check size
+    error(_FILE_WRITE_BINARY.args(PATH1, bin, 2), Err.FILE_OUT_OF_RANGE);
+    query(_FILE_WRITE_BINARY.args(PATH1, bin, 0));
+    query(_FILE_READ_TEXT.args(PATH1), "0");
+    query(_FILE_WRITE_BINARY.args(PATH1, bin, 1));
+    query(_FILE_READ_TEXT.args(PATH1), "00");
+    // delete size
+    query(_FILE_DELETE.args(PATH1));
+  }

@@ -1,0 +1,1 @@
+void setAuthKey(String authKey);

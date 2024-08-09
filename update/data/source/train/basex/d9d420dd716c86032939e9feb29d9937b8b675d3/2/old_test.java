@@ -1,0 +1,14 @@
+@Test
+  public void foldRightTest() {
+    query("declare function local:before-first(" +
+        "  $input as item()*," +
+        "  $pred as function(item()) as item()*" +
+        ") as item()* {" +
+        "  fold-right(" +
+        "    function($x, $xs) { if($pred($x)) then () else ($x, $xs) }," +
+        "      (), $input)" +
+        "};" +
+        "local:before-first((<h1/>, <p/>, <h1/>, <h2/>, <h3/>)," +
+        "  function($it) { name($it) = 'h2' })",
+        "<h1/><p/><h1/>");
+  }

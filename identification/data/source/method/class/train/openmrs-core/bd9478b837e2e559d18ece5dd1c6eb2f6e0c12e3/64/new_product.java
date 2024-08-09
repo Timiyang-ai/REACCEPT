@@ -1,0 +1,1 @@
+public void voidOrder(Order order, String voidReason) throws APIException;

@@ -1,0 +1,1 @@
+Task insertMedia(URI vmHref, MediaInsertOrEjectParams mediaParams);

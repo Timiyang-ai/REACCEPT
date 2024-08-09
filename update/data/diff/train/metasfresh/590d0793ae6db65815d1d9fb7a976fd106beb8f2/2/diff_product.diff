@@ -1,0 +1,103 @@
+diff --git a/old_product.java b/new_product.java
+index 2a0d433..b3fd115 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,63 +1,55 @@
+ @Override
+-	public Candidate onCandidateNewOrChange(@NonNull final Candidate demandCandidate)
++	public Candidate onCandidateNewOrChange(@NonNull final Candidate candidate)
+ 	{
+-		assertCorrectCandidateType(demandCandidate);
++		assertCorrectCandidateType(candidate);
+ 
+-		final Candidate demandCandidateDeltaWithId = candidateRepositoryWriteService
+-				.addOrUpdateOverwriteStoredSeqNo(demandCandidate);
++		final SaveResult candidateSaveResult = candidateRepositoryWriteService.addOrUpdateOverwriteStoredSeqNo(candidate);
+ 
+-		if (demandCandidateDeltaWithId.getQuantity().signum() == 0)
++		if (!candidateSaveResult.isDateChanged() && !candidateSaveResult.isQtyChanged())
+ 		{
+-			// this candidate didn't change anything
+-			return demandCandidateDeltaWithId;
++			return candidateSaveResult.toCandidateWithQtyDelta(); // nothing to do
+ 		}
+ 
+-		// this is the seqno which the new stock candidate shall get according to the demand candidate
+-		final int expectedStockSeqNo = demandCandidateDeltaWithId.getSeqNo() + 1;
++		final Candidate stockCandidate;
+ 
+-		final Candidate childStockWithDemand;
+-		final Candidate childStockWithDemandDelta;
+-
+-		final Optional<Candidate> possibleChildStockCandidate = candidateRepository.retrieveSingleChild(demandCandidateDeltaWithId.getId());
+-		if (possibleChildStockCandidate.isPresent())
++		final Candidate savedCandidate = candidateSaveResult.getCandidate();
++		final Optional<Candidate> childStockCandidate = candidateRepository.retrieveSingleChild(savedCandidate.getId());
++		if (childStockCandidate.isPresent())
+ 		{
+-			childStockWithDemand = possibleChildStockCandidate.get().withQuantity(demandCandidate.getQuantity().negate());
+-			childStockWithDemandDelta = stockCandidateService.updateQty(childStockWithDemand);
++			stockCandidate = stockCandidateService
++					.createStockCandidate(savedCandidate.withNegatedQuantity())
++					.withId(childStockCandidate.get().getId());
+ 		}
+ 		else
+ 		{
+-			final Candidate templateForNewDemandCandidateChild = demandCandidateDeltaWithId.withNegatedQuantity().withSeqNo(expectedStockSeqNo);
+-			final Candidate newDemandCandidateChild = stockCandidateService.createStockCandidate(templateForNewDemandCandidateChild);
+-
+-			childStockWithDemandDelta = candidateRepositoryWriteService
+-					.addOrUpdatePreserveExistingSeqNo(newDemandCandidateChild);
+-			childStockWithDemand = childStockWithDemandDelta.withQuantity(newDemandCandidateChild.getQuantity());
++			stockCandidate = stockCandidateService
++					.createStockCandidate(savedCandidate.withNegatedQuantity());
+ 		}
+ 
+-		candidateRepositoryWriteService
+-				.updateCandidateById(childStockWithDemand.withParentId(demandCandidateDeltaWithId.getId()));
++		final Candidate savedStockCandidate = candidateRepositoryWriteService
++				.addOrUpdateOverwriteStoredSeqNo(stockCandidate.withParentId(savedCandidate.getId()))
++				.getCandidate();
+ 
+-		stockCandidateService
+-				.applyDeltaToMatchingLaterStockCandidates(childStockWithDemandDelta);
++		final SaveResult deltaToApplyToLaterStockCandiates = SaveResult.builder()
++				.previousQty(candidateSaveResult.getPreviousQty())
++				.previousTime(candidateSaveResult.getPreviousTime())
++				.candidate(savedCandidate)
++				.build();
+ 
+-		final Candidate demandCandidateToReturn;
++		stockCandidateService.applyDeltaToMatchingLaterStockCandidates(deltaToApplyToLaterStockCandiates);
+ 
+-		if (childStockWithDemandDelta.getSeqNo() != expectedStockSeqNo)
+-		{
+-			// there was already a stock candidate which already had a seqNo.
+-			// keep it and in turn update the demandCandidate's seqNo accordingly
+-			demandCandidateToReturn = demandCandidate
+-					.withSeqNo(childStockWithDemandDelta.getSeqNo() - 1);
+-			candidateRepositoryWriteService.addOrUpdateOverwriteStoredSeqNo(demandCandidateToReturn);
+-		}
+-		else
+-		{
+-			demandCandidateToReturn = demandCandidateDeltaWithId;
+-		}
++		// set the stock candidate as child for the demand candidate
++		candidateRepositoryWriteService.updateCandidateById(
++				savedCandidate
++						.withParentId(savedStockCandidate.getId()));
++
++		final Candidate candidateToReturn = candidateSaveResult
++				.toCandidateWithQtyDelta()
++				.withParentId(savedStockCandidate.getId());
+ 
+-		if (demandCandidateDeltaWithId.getType() == CandidateType.DEMAND)
++		if (savedCandidate.getType() == CandidateType.DEMAND)
+ 		{
+-			fireSupplyRequiredEventIfQtyBelowZero(demandCandidateDeltaWithId);
++			fireSupplyRequiredEventIfQtyBelowZero(candidateToReturn);
+ 		}
+-		return demandCandidateToReturn;
++		return candidateToReturn;
+ 	}
+\ No newline at end of file

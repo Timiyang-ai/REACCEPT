@@ -1,0 +1,1 @@
+DmnDecisionResult evaluateDecisionByKeyAndVersion(String decisionDefinitionKey, Integer version, Map<String, Object> variables);

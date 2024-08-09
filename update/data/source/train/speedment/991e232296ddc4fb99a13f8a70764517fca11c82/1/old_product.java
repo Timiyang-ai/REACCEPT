@@ -1,0 +1,1 @@
+Connection newConnection(String uri, String user, String password) throws SQLException;

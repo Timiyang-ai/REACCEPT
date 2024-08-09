@@ -1,0 +1,753 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.9615384615384616
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 0
+----------------------------------------------------------------
+old description: 编译报错
+----------------------------------------------------------------
+old message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+符号： 变量 DosingType
+位置： 类 org.openmrs.DrugOrder
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+public void validate(Object obj, Errors errors) {
+		super.validate(obj, errors);
+		
+		DrugOrder order = (DrugOrder) obj;
+		if (order == null) {
+			errors.reject("error.general");
+		} else {
+			// for the following elements Order.hbm.xml says: not-null="true"
+			ValidationUtils.rejectIfEmpty(errors, "asNeeded", "error.null");
+			if (order.getAction() != Order.Action.DISCONTINUE) {
+				ValidationUtils.rejectIfEmpty(errors, "dosingType", "error.null");
+			}
+			if (order.getDrug() == null || order.getDrug().getConcept() == null) {
+				ValidationUtils.rejectIfEmpty(errors, "concept", "error.null");
+			}
+			
+			if (order.getConcept() != null && order.getDrug() != null && order.getDrug().getConcept() != null) {
+				if (!order.getDrug().getConcept().equals(order.getConcept())) {
+					errors.rejectValue("drug", "error.general");
+					errors.rejectValue("concept", "error.concept");
+				}
+			}
+			if (order.getAction() != Order.Action.DISCONTINUE && order.getDosingType() != null) {
+				if (order.getDosingType().equals(DrugOrder.DosingType.SIMPLE)) {
+					ValidationUtils.rejectIfEmpty(errors, "dose", "DrugOrder.error.doseIsNullForDosingTypeSimple");
+					ValidationUtils.rejectIfEmpty(errors, "doseUnits", "DrugOrder.error.doseUnitsIsNullForDosingTypeSimple");
+					ValidationUtils.rejectIfEmpty(errors, "route", "DrugOrder.error.routeIsNullForDosingTypeSimple");
+					ValidationUtils.rejectIfEmpty(errors, "frequency", "DrugOrder.error.frequencyIsNullForDosingTypeSimple");
+				} else {
+					ValidationUtils.rejectIfEmpty(errors, "dosingInstructions",
+					    "DrugOrder.error.dosingInstructionsIsNullForDosingTypeOther");
+				}
+			}
+			validateFieldsForOutpatientCareSettingType(order, errors);
+			validatePairedFields(order, errors);
+			validateUnitsAreAmongAllowedConcepts(errors, order);
+		}
+	}
+----------------------------------------------------------------
+old test
+@Test
+	public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+		DrugOrder order = new DrugOrder();
+		order.setDosingType(DrugOrder.DosingType.SIMPLE);
+		order.setDoseUnits(null);
+		Errors errors = new BindException(order, "order");
+		new DrugOrderValidator().validate(order, errors);
+		Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+	}
+----------------------------------------------------------------
+new product
+public void validate(Object obj, Errors errors) {
+		super.validate(obj, errors);
+		
+		DrugOrder order = (DrugOrder) obj;
+		if (order == null) {
+			errors.reject("error.general");
+		} else {
+			// for the following elements Order.hbm.xml says: not-null="true"
+			ValidationUtils.rejectIfEmpty(errors, "asNeeded", "error.null");
+			if (order.getAction() != Order.Action.DISCONTINUE) {
+				ValidationUtils.rejectIfEmpty(errors, "dosingType", "error.null");
+			}
+			if (order.getDrug() == null || order.getDrug().getConcept() == null) {
+				ValidationUtils.rejectIfEmpty(errors, "concept", "error.null");
+			}
+			
+			if (order.getConcept() != null && order.getDrug() != null && order.getDrug().getConcept() != null) {
+				if (!order.getDrug().getConcept().equals(order.getConcept())) {
+					errors.rejectValue("drug", "error.general");
+					errors.rejectValue("concept", "error.concept");
+				}
+			}
+			if (order.getAction() != Order.Action.DISCONTINUE && order.getDosingType() != null) {
+				DosingInstructions dosingInstructions = order.getDosingInstructionsInstance();
+				dosingInstructions.validate(order, errors);
+			}
+			validateFieldsForOutpatientCareSettingType(order, errors);
+			validatePairedFields(order, errors);
+			validateUnitsAreAmongAllowedConcepts(errors, order);
+		}
+	}
+----------------------------------------------------------------
+new test
+@Test
+	public void validate_shouldFailValidationIfDoseUnitsIsNullForSimpleDosingInstructionsDosingType() throws Exception {
+		DrugOrder order = new DrugOrder();
+		order.setDosingType(SimpleDosingInstructions.class);
+		order.setDoseUnits(null);
+		Errors errors = new BindException(order, "order");
+		new DrugOrderValidator().validate(order, errors);
+		Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+	}
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index a2354d8..12debd4 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -21,15 +21,8 @@ public void validate(Object obj, Errors errors) {
+ 				}
+ 			}
+ 			if (order.getAction() != Order.Action.DISCONTINUE && order.getDosingType() != null) {
+-				if (order.getDosingType().equals(DrugOrder.DosingType.SIMPLE)) {
+-					ValidationUtils.rejectIfEmpty(errors, "dose", "DrugOrder.error.doseIsNullForDosingTypeSimple");
+-					ValidationUtils.rejectIfEmpty(errors, "doseUnits", "DrugOrder.error.doseUnitsIsNullForDosingTypeSimple");
+-					ValidationUtils.rejectIfEmpty(errors, "route", "DrugOrder.error.routeIsNullForDosingTypeSimple");
+-					ValidationUtils.rejectIfEmpty(errors, "frequency", "DrugOrder.error.frequencyIsNullForDosingTypeSimple");
+-				} else {
+-					ValidationUtils.rejectIfEmpty(errors, "dosingInstructions",
+-					    "DrugOrder.error.dosingInstructionsIsNullForDosingTypeOther");
+-				}
++				DosingInstructions dosingInstructions = order.getDosingInstructionsInstance();
++				dosingInstructions.validate(order, errors);
+ 			}
+ 			validateFieldsForOutpatientCareSettingType(order, errors);
+ 			validatePairedFields(order, errors);
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index b9af052..6512088 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,7 +1,7 @@
+ @Test
+-	public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
++	public void validate_shouldFailValidationIfDoseUnitsIsNullForSimpleDosingInstructionsDosingType() throws Exception {
+ 		DrugOrder order = new DrugOrder();
+-		order.setDosingType(DrugOrder.DosingType.SIMPLE);
++		order.setDosingType(SimpleDosingInstructions.class);
+ 		order.setDoseUnits(null);
+ 		Errors errors = new BindException(order, "order");
+ 		new DrugOrderValidator().validate(order, errors);
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index bd0fe01..1a6d29f 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -8,7 +8,6 @@ public void validate(Object obj, Errors errors) {
+ 			// for the following elements Order.hbm.xml says: not-null="true"
+ 			ValidationUtils.rejectIfEmpty(errors, "asNeeded", "error.null");
+ 			ValidationUtils.rejectIfEmpty(errors, "dosingType", "error.null");
+-			//ValidationUtils.rejectIfEmpty(errors, "drug", "error.null");
+ 			
+ 			if (order.getDrug() != null)
+ 				ValidationUtils.rejectIfEmpty(errors, "drug.concept", "error.null");
+@@ -17,8 +16,22 @@ public void validate(Object obj, Errors errors) {
+ 				if (!(order.getDrug() == null) && !(order.getDrug().getConcept().equals(order.getConcept()))) {
+ 					errors.rejectValue("drug", "error.general");
+ 					errors.rejectValue("concept", "error.concept");
+-					
+ 				}
+ 			}
++			if (order.getDosingType() != null) {
++				if (order.getDosingType().equals(DrugOrder.DosingType.SIMPLE)) {
++					ValidationUtils.rejectIfEmpty(errors, "dose", "error.doseIsNullForDosingTypeSimple");
++					ValidationUtils.rejectIfEmpty(errors, "doseUnits", "error.doseUnitsIsNullForDosingTypeSimple");
++					ValidationUtils.rejectIfEmpty(errors, "route", "error.routeIsNullForDosingTypeSimple");
++					ValidationUtils.rejectIfEmpty(errors, "frequency", "error.frequencyIsNullForDosingTypeSimple");
++				} else if (order.getDosingType().equals(DrugOrder.DosingType.FREE_TEXT)) {
++					ValidationUtils.rejectIfEmpty(errors, "instructions", "error.instructionIsNullForDosingTypeFreeText");
++				} else {
++					ValidationUtils.rejectIfEmpty(errors, "dosingInstructions",
++					    "error.dosingInstructionsIsNullForDosingTypeOther");
++				}
++			}
++			validateFieldsForOutpatientCareSettingType(order, errors);
++			validatePairedFields(order, errors);
+ 		}
+ 	}
+\ No newline at end of file
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index 979902c..90b50f4 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -2,6 +2,7 @@
+ 	@Verifies(value = "should not fail validation if drug is null", method = "validate(Object,Errors)")
+ 	public void validate_shouldNotFailValidationIfDrugIsNull() throws Exception {
+ 		DrugOrder order = new DrugOrder();
++		order.setDrug(null);
+ 		
+ 		Errors errors = new BindException(order, "order");
+ 		new DrugOrderValidator().validate(order, errors);
+
+----------------------------------------------------------------
+coverage: 0.9615384615384616
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType(DrugOrder.DosingType.SIMPLE);
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType(DrugOrder.DosingType.SIMPLE);
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,9 +1,9 @@
+
+ @Test
+-	public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+-		DrugOrder order = new DrugOrder();
+-		order.setDosingType(DrugOrder.DosingType.SIMPLE);
+-		order.setDoseUnits(null);
+-		Errors errors = new BindException(order, "order");
+-		new DrugOrderValidator().validate(order, errors);
+-		Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+-	}
++public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
++    DrugOrder order = new DrugOrder();
++    order.setDosingType(DrugOrder.DosingType.SIMPLE);
++    order.setDoseUnits(null);
++    Errors errors = new BindException(order, "order");
++    new DrugOrderValidator().validate(order, errors);
++    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
++}
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+符号： 变量 DosingType
+位置： 类 org.openmrs.DrugOrder
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 2
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,7 +1,7 @@
+
+ @Test
+ public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+     DrugOrder order = new DrugOrder();
+-    order.setDosingType(DrugOrder.DosingType.SIMPLE);
++    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+     order.setDoseUnits(null);
+     Errors errors = new BindException(order, "order");
+     new DrugOrderValidator().validate(order, errors);
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+符号： 变量 DosingType
+位置： 类 org.openmrs.DrugOrder
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 3
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+符号： 变量 DosingType
+位置： 类 org.openmrs.DrugOrder
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 4
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+符号： 变量 DosingType
+位置： 类 org.openmrs.DrugOrder
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 5
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+符号： 变量 DosingType
+位置： 类 org.openmrs.DrugOrder
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 6
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+符号： 变量 DosingType
+位置： 类 org.openmrs.DrugOrder
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 7
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+符号： 变量 DosingType
+位置： 类 org.openmrs.DrugOrder
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 8
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType("SIMPLE"); // Update to use the dosing type as a String
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+----------------------------------------------------------------
+last generated diff test
+
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.3.2:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\validator\DrugOrderValidatorTest.java:[190,31] 找不到符号
+符号： 变量 DosingType
+位置： 类 org.openmrs.DrugOrder
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 1
+----------------------------------------------------------------
+generated test
+@Test
+public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+    DrugOrder order = new DrugOrder();
+    order.setDosingType(DrugOrder.DosingType.SIMPLE);
+    order.setDoseUnits(null);
+    Errors errors = new BindException(order, "order");
+    new DrugOrderValidator().validate(order, errors);
+    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,9 +1,9 @@
+
+ @Test
+-	public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+-		DrugOrder order = new DrugOrder();
+-		order.setDosingType(DrugOrder.DosingType.SIMPLE);
+-		order.setDoseUnits(null);
+-		Errors errors = new BindException(order, "order");
+-		new DrugOrderValidator().validate(order, errors);
+-		Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+-	}
++public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
++    DrugOrder order = new DrugOrder();
++    order.setDosingType(DrugOrder.DosingType.SIMPLE);
++    order.setDoseUnits(null);
++    Errors errors = new BindException(order, "order");
++    new DrugOrderValidator().validate(order, errors);
++    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,9 +1,9 @@
+
+ @Test
+-public void validate_shouldFailValidationIfDoseUnitsIsNullForSIMPLEDosingType() throws Exception {
+-    DrugOrder order = new DrugOrder();
+-    order.setDosingType(DrugOrder.DosingType.SIMPLE);
+-    order.setDoseUnits(null);
+-    Errors errors = new BindException(order, "order");
+-    new DrugOrderValidator().validate(order, errors);
+-    Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
+-}
++	public void validate_shouldFailValidationIfDoseUnitsIsNullForSimpleDosingInstructionsDosingType() throws Exception {
++		DrugOrder order = new DrugOrder();
++		order.setDosingType(SimpleDosingInstructions.class);
++		order.setDoseUnits(null);
++		Errors errors = new BindException(order, "order");
++		new DrugOrderValidator().validate(order, errors);
++		Assert.assertTrue(errors.hasFieldErrors("doseUnits"));
++	}
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+--------------------------------------------------------------------------------------------------------------------------------

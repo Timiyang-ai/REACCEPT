@@ -1,0 +1,1 @@
+public OrderFrequency getOrderFrequencyByUuid(String uuid);

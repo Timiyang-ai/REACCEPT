@@ -1,0 +1,1 @@
+protected abstract boolean isEndOfDataFromStorage();

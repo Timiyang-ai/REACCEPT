@@ -1,0 +1,57 @@
+diff --git a/old_test.java b/new_test.java
+index 32f2d6e..751b7a7 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,22 +1,32 @@
+ @Test
+ 	public void testRecover() throws Exception {
+ 		CompletedCheckpointStore checkpoints = createCompletedCheckpoints(3);
++		SharedStateRegistry sharedStateRegistry = new SharedStateRegistry();
+ 
+ 		TestCompletedCheckpoint[] expected = new TestCompletedCheckpoint[] {
+ 				createCheckpoint(0), createCheckpoint(1), createCheckpoint(2)
+ 		};
+ 
+ 		// Add multiple checkpoints
+-		checkpoints.addCheckpoint(expected[0]);
+-		checkpoints.addCheckpoint(expected[1]);
+-		checkpoints.addCheckpoint(expected[2]);
++		checkpoints.addCheckpoint(expected[0], sharedStateRegistry);
++		checkpoints.addCheckpoint(expected[1], sharedStateRegistry);
++		checkpoints.addCheckpoint(expected[2], sharedStateRegistry);
++
++		verifyCheckpointRegistered(expected[0].getTaskStates().values(), sharedStateRegistry);
++		verifyCheckpointRegistered(expected[1].getTaskStates().values(), sharedStateRegistry);
++		verifyCheckpointRegistered(expected[2].getTaskStates().values(), sharedStateRegistry);
+ 
+ 		// All three should be in ZK
+ 		assertEquals(3, ZooKeeper.getClient().getChildren().forPath(CheckpointsPath).size());
+ 		assertEquals(3, checkpoints.getNumberOfRetainedCheckpoints());
+ 
++		resetCheckpoint(expected[0].getTaskStates().values());
++		resetCheckpoint(expected[1].getTaskStates().values());
++		resetCheckpoint(expected[2].getTaskStates().values());
++
+ 		// Recover
+-		checkpoints.recover();
++		SharedStateRegistry newSharedStateRegistry = new SharedStateRegistry();
++		checkpoints.recover(newSharedStateRegistry);
+ 
+ 		assertEquals(3, ZooKeeper.getClient().getChildren().forPath(CheckpointsPath).size());
+ 		assertEquals(3, checkpoints.getNumberOfRetainedCheckpoints());
+@@ -27,9 +37,13 @@
+ 		expectedCheckpoints.add(expected[2]);
+ 		expectedCheckpoints.add(createCheckpoint(3));
+ 
+-		checkpoints.addCheckpoint(expectedCheckpoints.get(2));
++		checkpoints.addCheckpoint(expectedCheckpoints.get(2), newSharedStateRegistry);
+ 
+ 		List<CompletedCheckpoint> actualCheckpoints = checkpoints.getAllCheckpoints();
+ 
+ 		assertEquals(expectedCheckpoints, actualCheckpoints);
++
++		for (CompletedCheckpoint actualCheckpoint : actualCheckpoints) {
++			verifyCheckpointRegistered(actualCheckpoint.getTaskStates().values(), newSharedStateRegistry);
++		}
+ 	}
+\ No newline at end of file

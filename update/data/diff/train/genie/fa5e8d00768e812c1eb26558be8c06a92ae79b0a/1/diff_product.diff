@@ -1,0 +1,57 @@
+diff --git a/old_product.java b/new_product.java
+index d51009d..a4a40b5 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -9,12 +9,8 @@ public String coordinateJob(
+             throw new GenieServerException("Id of the jobRequest cannot be null");
+         }
+ 
+-        // Log the job request
+-        this.jobPersistenceService.createJobRequest(jobRequest);
+-
+-        if (StringUtils.isNotBlank(clientHost)) {
+-            this.jobPersistenceService.addClientHostToJobRequest(jobRequest.getId(), clientHost);
+-        }
++        // Log the job request and optionally the client host
++        this.jobPersistenceService.createJobRequest(jobRequest, clientHost);
+ 
+         String archiveLocation = null;
+         if (!jobRequest.isDisableLogArchival()) {
+@@ -25,7 +21,7 @@ public String coordinateJob(
+         }
+ 
+         // create the job object in the database with status INIT
+-        final Job job = new Job.Builder(
++        final Job.Builder jobBuilder = new Job.Builder(
+             jobRequest.getName(),
+             jobRequest.getUser(),
+             jobRequest.getVersion(),
+@@ -34,12 +30,20 @@ public String coordinateJob(
+             .withArchiveLocation(archiveLocation)
+             .withDescription(jobRequest.getDescription())
+             .withId(jobRequest.getId())
+-            .withStatus(JobStatus.INIT)
+-            .withTags(jobRequest.getTags())
+-            .withStatusMsg("Job Accepted and in initialization phase.")
+-            .build();
++            .withTags(jobRequest.getTags());
+ 
+-        this.jobPersistenceService.createJob(job);
+-        this.jobSubmitterService.submitJob(jobRequest);
+-        return jobRequest.getId();
++        if (this.canRunJob()) {
++            jobBuilder
++                .withStatus(JobStatus.INIT)
++                .withStatusMsg("Job Accepted and in initialization phase.");
++            this.jobPersistenceService.createJob(jobBuilder.build());
++            this.jobSubmitterService.submitJob(jobRequest);
++            return jobRequest.getId();
++        } else {
++            jobBuilder
++                .withStatus(JobStatus.FAILED)
++                .withStatusMsg("Unable to run job due to host being too busy during request.");
++            this.jobPersistenceService.createJob(jobBuilder.build());
++            throw new GenieServerUnavailableException("Reached max running jobs on this host. Unable to run job.");
++        }
+     }
+\ No newline at end of file

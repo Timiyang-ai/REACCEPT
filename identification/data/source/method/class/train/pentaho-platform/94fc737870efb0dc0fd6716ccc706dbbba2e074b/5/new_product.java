@@ -1,0 +1,1 @@
+boolean willFire(Trigger scheduleTrigger) throws SchedulerException;

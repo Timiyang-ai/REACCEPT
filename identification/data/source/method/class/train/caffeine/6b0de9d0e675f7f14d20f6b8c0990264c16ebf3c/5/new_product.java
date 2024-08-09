@@ -1,0 +1,1 @@
+V load(K key);

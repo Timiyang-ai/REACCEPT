@@ -1,0 +1,37 @@
+diff --git a/old_test.java b/new_test.java
+index f73a057..99c7d32 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,15 +1,6 @@
+ @Test
+     public void testCompletedStage() throws Exception {
+-        // TODO switch to defaultManagedExecutor.completedStage once implemented
+-        CompletionStage<Integer> cs0;
+-        try {
+-            cs0 = ManagedCompletableFuture.completedStage(86);
+-        } catch (UnsupportedOperationException x) {
+-            if (AT_LEAST_JAVA_9)
+-                throw x;
+-            else
+-                return; // expected for Java SE 8
+-        }
++        CompletionStage<Integer> cs0 = defaultManagedExecutor.completedStage(86);
+ 
+         // Disallow CompletableFuture methods:
+         CompletableFuture<Integer> cf0 = (CompletableFuture<Integer>) cs0;
+@@ -27,7 +18,14 @@
+         // Verify the value, and the thread of dependent stage:
+         final CompletableFuture<String> cf = new CompletableFuture<String>();
+         CompletionStage<Void> cs1 = cs0.thenAcceptAsync(value -> cf.complete(Thread.currentThread().getName() + ":" + value));
+-        String result = cf.get(TIMEOUT_NS, TimeUnit.NANOSECONDS);
++
++        // It's odd that the lambda supplied to cf.complete could run on the thread that invokes cf.get,
++        // but that appears to happen infrequently, and it is Java's code, not OpenLiberty.  The test can
++        // cope with it by polling for the cf to be done.
++        for (long start = System.nanoTime(); !cf.isDone() && System.nanoTime() - start < TIMEOUT_NS; TimeUnit.MILLISECONDS.sleep(200));
++        assertTrue(cf.isDone());
++
++        String result = cf.getNow("value-if-absent");
+         assertTrue(result, result.endsWith(":86"));
+         assertTrue(result, result.startsWith("Default Executor-thread-"));
+         assertTrue(result, !result.startsWith(Thread.currentThread().getName()));

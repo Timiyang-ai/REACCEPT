@@ -1,0 +1,1 @@
+public void process( T input , FastQueue<Desc> descriptions );

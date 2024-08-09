@@ -1,0 +1,1 @@
+ClassesShouldConjunction notHaveSimpleName(String name);

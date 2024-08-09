@@ -1,0 +1,77 @@
+diff --git a/old_product.java b/new_product.java
+index 224eacc..4903c0f 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -6,18 +6,21 @@ public static JavaPairRDD<Point, List<Point>> SpatialJoinQueryUsingIndex(JavaSpa
+ 
+         //Build grid on circleRDD2.
+ 
+-        final Broadcast<HashSet<EnvelopeWithGrid>> envelopeWithGrid = sc.broadcast(pointRDD1.grids);
++        final Broadcast<List<Envelope>> envelopeWithGrid = sc.broadcast(pointRDD1.grids);
+ 
+         JavaPairRDD<Integer, Circle> tmpGridedCircleForQuerySetBeforePartition = circleRDD2.getCircleRDD().flatMapToPair(new PairFlatMapFunction<Circle, Integer, Circle>() {
+             @Override
+             public Iterator<Tuple2<Integer, Circle>> call(Circle circle) throws Exception {
+             	HashSet<Tuple2<Integer, Circle>> result = new HashSet<Tuple2<Integer, Circle>>();
+-
+-                HashSet<EnvelopeWithGrid> grid = envelopeWithGrid.getValue();
+-
+-                for (EnvelopeWithGrid e : grid) {
+-                    if (circle.intersects(e)) {
+-                        result.add(new Tuple2<Integer, Circle>(e.grid, circle));
++            	List<Envelope> grid = envelopeWithGrid.getValue();
++
++                for (int i=0;i<grid.size();i++) {
++                    try {
++                        if (circle.intersects(grid.get(i))) {
++                            result.add(new Tuple2<Integer, Circle>(i, circle));
++                        }
++                    } catch (NullPointerException exp) {
++                        System.out.println(grid.get(i).toString() + circle.toString());
+                     }
+                 }
+                 return result.iterator();
+@@ -25,27 +28,29 @@ public static JavaPairRDD<Point, List<Point>> SpatialJoinQueryUsingIndex(JavaSpa
+             }
+         });
+ 
+-        JavaPairRDD<Integer, Circle> tmpGridRDDForQuerySet = tmpGridedCircleForQuerySetBeforePartition.partitionBy(pointRDD1.gridPointRDD.partitioner().get()).persist(StorageLevel.DISK_ONLY());
++        JavaPairRDD<Integer, Circle> tmpGridRDDForQuerySet = tmpGridedCircleForQuerySetBeforePartition.partitionBy(pointRDD1.spatialPartitionedRDD.partitioner().get()).persist(StorageLevel.DISK_ONLY());
+ 
+-        JavaPairRDD<Integer, Tuple2<Iterable<STRtree>, Iterable<Circle>>> cogroupResult = pointRDD1.indexedRDD.cogroup(tmpGridRDDForQuerySet);
++        JavaPairRDD<Integer, Tuple2<Iterable<Object>, Iterable<Circle>>> cogroupResult = pointRDD1.indexedRDD.cogroup(tmpGridRDDForQuerySet);
+ 
+-        JavaPairRDD<Point, HashSet<Point>> joinResultBeforeAggregation = cogroupResult.flatMapToPair(new PairFlatMapFunction<Tuple2<Integer, Tuple2<Iterable<STRtree>, Iterable<Circle>>>, Point, HashSet<Point>>() {
++        JavaPairRDD<Point, HashSet<Point>> joinResultBeforeAggregation = cogroupResult.flatMapToPair(new PairFlatMapFunction<Tuple2<Integer, Tuple2<Iterable<Object>, Iterable<Circle>>>, Point, HashSet<Point>>() {
+             @Override
+-            public Iterator<Tuple2<Point, HashSet<Point>>> call(Tuple2<Integer, Tuple2<Iterable<STRtree>, Iterable<Circle>>> cogroup) throws Exception {
++            public Iterator<Tuple2<Point, HashSet<Point>>> call(Tuple2<Integer, Tuple2<Iterable<Object>, Iterable<Circle>>> cogroup) throws Exception {
+             	HashSet<Tuple2<Point, HashSet<Point>>> result = new HashSet<Tuple2<Point, HashSet<Point>>>();
+-
+-                Tuple2<Iterable<STRtree>, Iterable<Circle>> cogroupTupleList = cogroup._2();
+-                for (Circle c : cogroupTupleList._2()) {
++                SpatialIndex treeIndex=(SpatialIndex) cogroup._2()._1().iterator().next();
++                if(treeIndex instanceof STRtree)
++                {
++                	treeIndex = (STRtree)treeIndex;
++                }
++                else
++                {
++                	treeIndex = (Quadtree)treeIndex;
++                }
++                for (Object c : cogroup._2()._2()) {
+                     List<Point> pointList = new ArrayList<Point>();
+-                    for (STRtree s : cogroupTupleList._1()) {
+-                        //这可以? 他都不知道类型把..
+-                        pointList = s.query(c.getMBR());
+-
+-                        //This is not enough, need to verify again.
+ 
+-                    }
++                    pointList = treeIndex.query(((Circle)c).getMBR());
+                     HashSet<Point> pointSet = new HashSet<Point>(pointList);
+-                    result.add(new Tuple2<Point, HashSet<Point>>(c.getCenter(), pointSet));
++                    result.add(new Tuple2<Point, HashSet<Point>>(((Circle)c).getCenter(), pointSet));
+                 }
+                 return result.iterator();
+             }

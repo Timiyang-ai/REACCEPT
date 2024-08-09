@@ -1,0 +1,1 @@
+String describeVersion() throws TTransportException, TException;

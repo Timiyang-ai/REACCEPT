@@ -1,0 +1,1 @@
+public abstract ObjectNode encode(T entity, ObjectMapper mapper);

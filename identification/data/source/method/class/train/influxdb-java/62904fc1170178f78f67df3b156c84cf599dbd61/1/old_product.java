@@ -1,0 +1,1 @@
+public void deletePoints(final String database, final String serieName);

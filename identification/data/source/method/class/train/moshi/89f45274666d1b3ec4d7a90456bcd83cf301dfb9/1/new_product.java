@@ -1,0 +1,1 @@
+abstract int selectString(Options options) throws IOException;

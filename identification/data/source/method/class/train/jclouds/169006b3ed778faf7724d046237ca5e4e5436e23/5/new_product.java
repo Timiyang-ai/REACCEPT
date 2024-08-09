@@ -1,0 +1,1 @@
+Task relocate(URI vmHref, RelocateParams params);

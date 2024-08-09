@@ -1,0 +1,1 @@
+void putVar(int v);

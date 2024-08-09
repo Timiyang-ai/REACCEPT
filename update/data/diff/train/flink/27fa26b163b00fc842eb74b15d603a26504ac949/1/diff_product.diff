@@ -1,0 +1,63 @@
+diff --git a/old_product.java b/new_product.java
+index ee24686..aa4bd1b 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -11,13 +11,6 @@
+ 			return;
+ 		}
+ 
+-		// Check if all required libraries are available on the instance
+-		try {
+-			allocatedResource.getInstance().checkLibraryAvailability(jobID);
+-		} catch (IOException ioe) {
+-			LOG.error("Cannot check library availability: " + StringUtils.stringifyException(ioe));
+-		}
+-
+ 		synchronized (this.jobQueue) {
+ 
+ 			final ExecutionGraph eg = getExecutionGraphByID(jobID);
+@@ -27,16 +20,18 @@
+ 				 * we release the instance immediately.
+ 				 */
+ 				try {
+-					this.instanceManager.releaseAllocatedResource(jobID, null, allocatedResource);
++					getInstanceManager().releaseAllocatedResource(jobID, null, allocatedResource);
+ 				} catch (InstanceException e) {
+ 					LOG.error(e);
+ 				}
+ 				return;
+ 			}
+ 
++			final int indexOfCurrentStage = eg.getIndexOfCurrentExecutionStage();
++
+ 			AllocatedResource resourceToBeReplaced = null;
+ 			// Important: only look for instances to be replaced in the current stage
+-			ExecutionGraphIterator it = new ExecutionGraphIterator(eg, eg.getIndexOfCurrentExecutionStage(), true, true);
++			ExecutionGraphIterator it = new ExecutionGraphIterator(eg, indexOfCurrentStage, true, true);
+ 			while (it.hasNext()) {
+ 
+ 				final ExecutionVertex vertex = it.next();
+@@ -54,7 +49,7 @@
+ 			if (resourceToBeReplaced == null) {
+ 				LOG.warn("Instance " + allocatedResource.getInstance() + " is not required for job" + eg.getJobID());
+ 				try {
+-					this.instanceManager.releaseAllocatedResource(jobID, eg.getJobConfiguration(), allocatedResource);
++					getInstanceManager().releaseAllocatedResource(jobID, eg.getJobConfiguration(), allocatedResource);
+ 				} catch (InstanceException e) {
+ 					LOG.error(e);
+ 				}
+@@ -68,8 +63,13 @@
+ 				if (vertex.getAllocatedResource().equals(resourceToBeReplaced)) {
+ 					vertex.setAllocatedResource(allocatedResource);
+ 					vertex.setExecutionState(ExecutionState.ASSIGNED);
++				}else{
++					
+ 				}
+ 			}
++
++			// Deploy the assigned vertices
++			deployAssignedVertices(eg);
+ 		}
+ 
+ 	}
+\ No newline at end of file

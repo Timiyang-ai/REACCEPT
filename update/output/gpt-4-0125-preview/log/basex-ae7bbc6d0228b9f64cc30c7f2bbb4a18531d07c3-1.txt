@@ -1,0 +1,371 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state
+3
+----------------------------------------------------------------
+new description
+测试通过，覆盖率：0.8846153846153846
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state
+0
+----------------------------------------------------------------
+old description
+编译报错
+----------------------------------------------------------------
+old message
+COMPILATION ERROR : 
+/E:/0/basex/src/test/java/org/basex/test/util/ItemListTest.java:[50,25] E:\0\basex\src\test\java\org\basex\test\util\ItemListTest.java:50: 找不到符号
+/E:/0/basex/src/test/java/org/basex/test/util/ItemListTest.java:[51,31] E:\0\basex\src\test\java\org\basex\test\util\ItemListTest.java:51: 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.1:testCompile (default-testCompile) on project basex: Compilation failure: Compilation failure:
+/E:/0/basex/src/test/java/org/basex/test/util/ItemListTest.java:[50,25] E:\0\basex\src\test\java\org\basex\test\util\ItemListTest.java:50: 找不到符号
+符号： 方法 toArray()
+位置： 类 org.basex.query.util.ItemList
+/E:/0/basex/src/test/java/org/basex/test/util/ItemListTest.java:[51,31] E:\0\basex\src\test\java\org\basex\test\util\ItemListTest.java:51: 找不到符号
+符号： 方法 toArray()
+位置： 类 org.basex.query.util.ItemList
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+public Item[] toArray() {
+    return Arrays.copyOf(values, size());
+  }
+----------------------------------------------------------------
+old test
+@Test 
+  public final void testToArray() {
+    ItemList il = new ItemList(Itr.ZERO);
+    for(int i = 0; i < CAP - 1; i++) {
+      il.add(Itr.ZERO);
+    }
+    assertEquals(CAP, il.toArray().length); 
+    assertEquals(il.size(), il.toArray().length);
+  }
+----------------------------------------------------------------
+new product
+public Item[] finish() {
+    assert size > 0 : "List is empty.";
+    
+    Item[] its = new Item[size];
+    System.arraycopy(values, 0, its, 0, size);
+    values = new Item[CAP];
+    size = 0;
+    return its;
+  }
+----------------------------------------------------------------
+new test
+@Test 
+  public final void testToArray() {
+    ItemList il = new ItemList(Itr.ZERO);
+    for(int i = 0; i < CAP - 1; i++) {
+      il.add(Itr.ZERO);
+    }
+    assertEquals(CAP, il.finish().length); 
+  }
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index c241ad1..10acd27 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,3 +1,9 @@
+-public Item[] toArray() {
+-    return Arrays.copyOf(values, size());
++public Item[] finish() {
++    assert size > 0 : "List is empty.";
++    
++    Item[] its = new Item[size];
++    System.arraycopy(values, 0, its, 0, size);
++    values = new Item[CAP];
++    size = 0;
++    return its;
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index bb19fd1..c72f216 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -4,6 +4,5 @@
+     for(int i = 0; i < CAP - 1; i++) {
+       il.add(Itr.ZERO);
+     }
+-    assertEquals(CAP, il.toArray().length); 
+-    assertEquals(il.size(), il.toArray().length);
++    assertEquals(CAP, il.finish().length); 
+   }
+\ No newline at end of file
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index 2cdfa05..e4feb63 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,12 +1,14 @@
+-@Override
+-    public void close() {
+-        if (!this.closed) {
+-            this.closed = true;
+-            lock.lock();
+-            try {
++public List<T> close() {
++        lock.lock();
++        try {
++            if (!this.closed) {
++                this.closed = true;
+                 this.notEmpty.signal();
+-            } finally {
+-                lock.unlock();
++                return swapContents();
+             }
++        } finally {
++            lock.unlock();
+         }
++
++        return new ArrayList<>();
+     }
+\ No newline at end of file
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index 336e431..95a83bf 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -17,12 +17,14 @@
+         // Verify the queue hasn't returned before we actually set the result.
+         Assert.assertNull("Queue unblocked before result was set.", result.get());
+         Thread.sleep(10);
+-        queue.close();
++        List<Integer> queueContents = queue.close();
+ 
+         // Verify result.
+         AssertExtensions.assertThrows(
+                 "Future was not cancelled with the correct exception.",
+                 resultSet::join,
+                 ex -> ex instanceof InterruptedException);
++
+         Assert.assertNull("Queue returned an item even if it got closed.", result.get());
++        Assert.assertEquals("Queue.close() returned an item even though it was empty.", 0, queueContents.size());
+     }
+\ No newline at end of file
+
+----------------------------------------------------------------
+coverage
+0.8846153846153846
+--------------------------------------------------------------------------------------------------------------------------------
+当前次数：1
+----------------------------------------------------------------
+LLM输出
+<new_test>
+@Test 
+  public final void testFinish() {
+    ItemList il = new ItemList(Itr.ZERO);
+    for(int i = 0; i < CAP - 1; i++) {
+      il.add(Itr.ZERO);
+    }
+    Item[] finishedArray = il.finish();
+    assertEquals(CAP, finishedArray.length); 
+    assertEquals(0, il.size());
+    assertEquals(CAP, il.getCapacity()); // Assuming getCapacity() method exists to check if the internal array is reset to initial capacity
+  }
+</new_test>
+----------------------------------------------------------------
+测试代码
+
+@Test 
+  public final void testFinish() {
+    ItemList il = new ItemList(Itr.ZERO);
+    for(int i = 0; i < CAP - 1; i++) {
+      il.add(Itr.ZERO);
+    }
+    Item[] finishedArray = il.finish();
+    assertEquals(CAP, finishedArray.length); 
+    assertEquals(0, il.size());
+    assertEquals(CAP, il.getCapacity()); // Assuming getCapacity() method exists to check if the internal array is reset to initial capacity
+  }
+
+----------------------------------------------------------------
+改动
+--- 
+
++++ 
+
+@@ -1,9 +1,13 @@
+
++
+ @Test 
+-  public final void testToArray() {
++  public final void testFinish() {
+     ItemList il = new ItemList(Itr.ZERO);
+     for(int i = 0; i < CAP - 1; i++) {
+       il.add(Itr.ZERO);
+     }
+-    assertEquals(CAP, il.toArray().length); 
+-    assertEquals(il.size(), il.toArray().length);
++    Item[] finishedArray = il.finish();
++    assertEquals(CAP, finishedArray.length); 
++    assertEquals(0, il.size());
++    assertEquals(CAP, il.getCapacity()); // Assuming getCapacity() method exists to check if the internal array is reset to initial capacity
+   }
++
+
+----------------------------------------------------------------
+state
+0
+----------------------------------------------------------------
+description
+编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+/E:/0/basex/src/test/java/org/basex/test/util/ItemListTest.java:[51,5] E:\0\basex\src\test\java\org\basex\test\util\ItemListTest.java:51: 找不到符号
+/E:/0/basex/src/test/java/org/basex/test/util/ItemListTest.java:[54,25] E:\0\basex\src\test\java\org\basex\test\util\ItemListTest.java:54: 找不到符号
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.1:testCompile (default-testCompile) on project basex: Compilation failure: Compilation failure:
+/E:/0/basex/src/test/java/org/basex/test/util/ItemListTest.java:[51,5] E:\0\basex\src\test\java\org\basex\test\util\ItemListTest.java:51: 找不到符号
+符号： 类 Item
+位置： 类 org.basex.test.util.ItemListTest
+/E:/0/basex/src/test/java/org/basex/test/util/ItemListTest.java:[54,25] E:\0\basex\src\test\java\org\basex\test\util\ItemListTest.java:54: 找不到符号
+符号： 方法 getCapacity()
+位置： 类 org.basex.query.util.ItemList
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+--------------------------------------------------------------------------------------------------------------------------------
+当前次数：2
+----------------------------------------------------------------
+LLM输出
+<new_test>
+@Test 
+  public final void testFinish() {
+    ItemList il = new ItemList(Itr.ZERO);
+    for(int i = 0; i < CAP - 1; i++) {
+      il.add(Itr.ZERO);
+    }
+    Object[] finishedArray = il.finish(); // Adjusted to use Object[] to avoid compilation error due to unknown Item class
+    assertEquals(CAP, finishedArray.length); 
+    assertEquals(0, il.size());
+  }
+</new_test>
+----------------------------------------------------------------
+测试代码
+
+@Test 
+  public final void testFinish() {
+    ItemList il = new ItemList(Itr.ZERO);
+    for(int i = 0; i < CAP - 1; i++) {
+      il.add(Itr.ZERO);
+    }
+    Object[] finishedArray = il.finish(); // Adjusted to use Object[] to avoid compilation error due to unknown Item class
+    assertEquals(CAP, finishedArray.length); 
+    assertEquals(0, il.size());
+  }
+
+----------------------------------------------------------------
+改动
+--- 
+
++++ 
+
+@@ -5,9 +5,8 @@
+
+     for(int i = 0; i < CAP - 1; i++) {
+       il.add(Itr.ZERO);
+     }
+-    Item[] finishedArray = il.finish();
++    Object[] finishedArray = il.finish(); // Adjusted to use Object[] to avoid compilation error due to unknown Item class
+     assertEquals(CAP, finishedArray.length); 
+     assertEquals(0, il.size());
+-    assertEquals(CAP, il.getCapacity()); // Assuming getCapacity() method exists to check if the internal array is reset to initial capacity
+   }
+ 
+
+----------------------------------------------------------------
+state
+3
+----------------------------------------------------------------
+description
+测试通过，覆盖率：0.8846153846153846
+----------------------------------------------------------------
+message
+
+--------------------------------------------------------------------------------------------------------------------------------
+总次数：2
+----------------------------------------------------------------
+generated test
+
+@Test 
+  public final void testFinish() {
+    ItemList il = new ItemList(Itr.ZERO);
+    for(int i = 0; i < CAP - 1; i++) {
+      il.add(Itr.ZERO);
+    }
+    Object[] finishedArray = il.finish(); // Adjusted to use Object[] to avoid compilation error due to unknown Item class
+    assertEquals(CAP, finishedArray.length); 
+    assertEquals(0, il.size());
+  }
+
+----------------------------------------------------------------
+diff old generated test
+--- 
+
++++ 
+
+@@ -1,9 +1,12 @@
+
++
+ @Test 
+-  public final void testToArray() {
++  public final void testFinish() {
+     ItemList il = new ItemList(Itr.ZERO);
+     for(int i = 0; i < CAP - 1; i++) {
+       il.add(Itr.ZERO);
+     }
+-    assertEquals(CAP, il.toArray().length); 
+-    assertEquals(il.size(), il.toArray().length);
++    Object[] finishedArray = il.finish(); // Adjusted to use Object[] to avoid compilation error due to unknown Item class
++    assertEquals(CAP, finishedArray.length); 
++    assertEquals(0, il.size());
+   }
++
+
+----------------------------------------------------------------
+diff generated new test
+--- 
+
++++ 
+
+@@ -1,12 +1,8 @@
+
+-
+ @Test 
+-  public final void testFinish() {
++  public final void testToArray() {
+     ItemList il = new ItemList(Itr.ZERO);
+     for(int i = 0; i < CAP - 1; i++) {
+       il.add(Itr.ZERO);
+     }
+-    Object[] finishedArray = il.finish(); // Adjusted to use Object[] to avoid compilation error due to unknown Item class
+-    assertEquals(CAP, finishedArray.length); 
+-    assertEquals(0, il.size());
++    assertEquals(CAP, il.finish().length); 
+   }
+-
+
+--------------------------------------------------------------------------------------------------------------------------------

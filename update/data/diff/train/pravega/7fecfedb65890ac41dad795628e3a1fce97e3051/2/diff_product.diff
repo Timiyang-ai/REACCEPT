@@ -1,0 +1,20 @@
+diff --git a/old_product.java b/new_product.java
+index f969226..b87dc8e 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -3,8 +3,13 @@ CompletableFuture<Void> initialize(Duration timeout) {
+         Preconditions.checkState(this.state.get() == AggregatorState.NotInitialized, "SegmentAggregator has already been initialized.");
+         long traceId = LoggerHelpers.traceEnter(log, this.traceObjectId, "initialize");
+ 
+-        return this.storage.acquireLockForSegment(this.metadata.getName()).
+-                thenCompose( bool -> this.storage.getStreamSegmentInfo(this.metadata.getName(), timeout))
++        TimeoutTimer timer = new TimeoutTimer(timeout);
++        return this.storage
++                .open(this.metadata.getName(), timer.getRemaining())
++                .thenCompose(handle -> {
++                    this.segmentHandle.set(handle);
++                    return this.storage.getStreamSegmentInfo(handle, timer.getRemaining());
++                })
+                 .thenAccept(segmentInfo -> {
+                     // Check & Update StorageLength in metadata.
+                     if (this.metadata.getStorageLength() != segmentInfo.getLength()) {

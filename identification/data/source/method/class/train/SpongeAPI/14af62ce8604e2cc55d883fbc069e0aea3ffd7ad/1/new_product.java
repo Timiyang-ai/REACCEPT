@@ -1,0 +1,1 @@
+<T> T createFactoryInterfaceImpl(Class<T> clazz);

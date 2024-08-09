@@ -1,0 +1,35 @@
+private IEngine createEngine() {
+        DefaultEngineFactory factory = new DefaultEngineFactory() {
+
+            @Override
+            protected IConnectorFactory createConnectorFactory(IPluginRegistry pluginRegistry) {
+                return new PolicyTesterConnectorFactory();
+            }
+
+            @Override
+            protected IComponentRegistry createComponentRegistry(IPluginRegistry pluginRegistry) {
+                return new DefaultComponentRegistry() {
+                    @Override
+                    protected void registerBufferFactoryComponent() {
+                        addComponent(IBufferFactoryComponent.class, new ByteBufferFactoryComponent());
+                    }
+                };
+            }
+
+            @Override
+            protected IPluginRegistry createPluginRegistry() {
+                return new IPluginRegistry() {
+                    @Override
+                    public Future<IAsyncResult<Plugin>> loadPlugin(PluginCoordinates coordinates, IAsyncResultHandler<Plugin> handler) {
+                        throw new RuntimeException("Plugins not supported.");
+                    }
+                };
+            }
+
+            @Override
+            protected IApiRequestPathParser createRequestPathParser(IPluginRegistry pluginRegistry) {
+                return new DefaultRequestPathParser(null);
+            }
+        };
+        return factory.createEngine();
+    }

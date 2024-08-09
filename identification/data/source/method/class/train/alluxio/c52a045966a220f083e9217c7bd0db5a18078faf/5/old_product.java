@@ -1,0 +1,21 @@
+public long getAvailableBytes(BlockStoreLocation location) throws IllegalArgumentException {
+    long spaceAvailable = 0;
+
+    if (location.equals(BlockStoreLocation.anyTier())) {
+      for (StorageTier tier : mTiers) {
+        spaceAvailable += tier.getAvailableBytes();
+      }
+      return spaceAvailable;
+    }
+
+    String tierAlias = location.tierAlias();
+    StorageTier tier = getTier(tierAlias);
+    // TODO(calvin): This should probably be max of the capacity bytes in the dirs?
+    if (location.equals(BlockStoreLocation.anyDirInTier(tierAlias))) {
+      return tier.getAvailableBytes();
+    }
+
+    int dirIndex = location.dir();
+    StorageDir dir = tier.getDir(dirIndex);
+    return dir.getAvailableBytes();
+  }

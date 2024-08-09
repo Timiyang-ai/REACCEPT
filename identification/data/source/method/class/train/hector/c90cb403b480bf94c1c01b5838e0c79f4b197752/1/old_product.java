@@ -1,0 +1,1 @@
+String describeThriftVersion() throws TTransportException, TException;

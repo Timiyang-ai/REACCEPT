@@ -1,0 +1,1 @@
+abstract public Vec multiply(Vec b);

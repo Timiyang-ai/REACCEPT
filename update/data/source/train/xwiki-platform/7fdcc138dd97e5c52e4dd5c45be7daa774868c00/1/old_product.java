@@ -1,0 +1,19 @@
+protected File getTemporaryFile(String uri, XWikiContext context)
+    {
+        Matcher matcher = URI_PATTERN.matcher(uri);
+        File result = null;
+        if (matcher.find()) {
+            String wiki = context.getDatabase();
+            String space = matcher.group(1);
+            String page = matcher.group(2);
+            String module = matcher.group(3);
+            String filePath = matcher.group(4);
+            String prefix = String.format("temp/%s/%s/%s/%s/", module, wiki, space, page);
+            String path = URI.create(prefix + filePath).normalize().toString();
+            if (path.startsWith(prefix)) {
+                result = new File(container.getApplicationContext().getTemporaryDirectory(), path);
+                result = result.exists() ? result : null;
+            }
+        }
+        return result;
+    }

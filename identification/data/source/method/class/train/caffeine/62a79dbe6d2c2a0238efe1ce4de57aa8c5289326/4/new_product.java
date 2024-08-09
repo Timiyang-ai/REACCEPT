@@ -1,0 +1,1 @@
+void invalidateAll(@Nonnull Iterable<?> keys);

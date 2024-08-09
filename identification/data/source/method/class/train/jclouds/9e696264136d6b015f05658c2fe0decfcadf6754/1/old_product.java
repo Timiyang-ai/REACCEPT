@@ -1,0 +1,1 @@
+void deleteCatalogItem(URI catalogItemRef);

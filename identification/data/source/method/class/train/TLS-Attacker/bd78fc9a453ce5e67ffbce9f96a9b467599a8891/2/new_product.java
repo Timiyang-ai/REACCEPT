@@ -1,0 +1,1 @@
+public abstract AgentResult collectResults(File branchTrace, TestVector vector);

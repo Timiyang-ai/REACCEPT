@@ -1,0 +1,1 @@
+CompletableFuture<List<StreamConfiguration>> listStreamsInScope(final String scopeName);

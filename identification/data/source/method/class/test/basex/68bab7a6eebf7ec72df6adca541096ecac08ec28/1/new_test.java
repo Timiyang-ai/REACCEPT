@@ -1,0 +1,26 @@
+@Test
+  public final void replace() {
+    // query to count number of documents
+    final String count = "count(db:open('" + NAME + "'))";
+    // database must be opened to replace resources
+    no(new Replace(FILE, "xxx"));
+    ok(new CreateDB(NAME, FILE));
+    assertEquals("1", ok(new XQuery(count)));
+    // replace existing document
+    ok(new Replace(FN, "<a/>"));
+    assertEquals("1", ok(new XQuery(count)));
+    // replace existing document (again)
+    ok(new Replace(FN, "<a/>"));
+    assertEquals("1", ok(new XQuery(count)));
+    // invalid content
+    no(new Replace(FN, ""));
+    assertEquals("1", ok(new XQuery(count)));
+    // create and replace binary file
+    ok(new XQuery("db:store('" + NAME + "', 'a', 'a')"));
+    ok(new Replace("a", "<b/>"));
+    assertTrue(ok(new XQuery("db:open('" + NAME + "')")).length() != 0);
+    ok(new XQuery("db:retrieve('" + NAME + "', 'a')"));
+    // a failing replace should not remove existing documents
+    no(new Replace(FN, "<a>"));
+    assertEquals("1", ok(new XQuery(count)));
+  }

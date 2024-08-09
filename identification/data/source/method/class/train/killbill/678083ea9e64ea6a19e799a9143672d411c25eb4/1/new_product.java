@@ -1,0 +1,1 @@
+public void setBlockingStateAndPostBlockingTransitionEvent(BlockingState state, UUID bundleId, InternalCallContext context);

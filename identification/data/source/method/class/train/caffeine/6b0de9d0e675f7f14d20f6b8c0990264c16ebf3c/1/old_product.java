@@ -1,0 +1,1 @@
+ImmutableMap<K, V> getAll(Iterable<? extends K> keys) throws ExecutionException;

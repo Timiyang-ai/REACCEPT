@@ -1,0 +1,1 @@
+public T addGraph(Object graph, SelectBuilder subQuery);

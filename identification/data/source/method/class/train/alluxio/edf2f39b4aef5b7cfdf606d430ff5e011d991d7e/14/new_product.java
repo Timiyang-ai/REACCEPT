@@ -1,0 +1,1 @@
+void unlockBlock(long lockId) throws BlockDoesNotExistException;

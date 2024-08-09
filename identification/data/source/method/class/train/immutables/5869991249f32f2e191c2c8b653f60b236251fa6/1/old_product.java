@@ -1,0 +1,1 @@
+<T> FluentFuture<T> transform(AsyncFunction<? super V, ? extends T> function);

@@ -1,0 +1,1 @@
+boolean fireEvent(Eventable event) throws ElementNotVisibleException;

@@ -1,0 +1,1 @@
+protected abstract FileFilter getFileFilter();

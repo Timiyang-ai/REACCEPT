@@ -1,0 +1,1 @@
+@NonIdempotent boolean unlockAndFreeze(HeldLocksToken token);

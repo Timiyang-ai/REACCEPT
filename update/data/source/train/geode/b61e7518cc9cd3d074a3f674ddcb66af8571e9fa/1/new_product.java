@@ -1,0 +1,1 @@
+void addExtension(Object key, Extension<T> extension);

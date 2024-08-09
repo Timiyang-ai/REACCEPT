@@ -1,0 +1,10 @@
+public byte[] buildClass( ClassDefinition def ) throws IOException,
+            IntrospectionException,
+            SecurityException,
+            IllegalArgumentException,
+            ClassNotFoundException,
+            NoSuchMethodException,
+            IllegalAccessException,
+            InvocationTargetException,
+            InstantiationException,
+            NoSuchFieldException;

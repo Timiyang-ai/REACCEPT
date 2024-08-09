@@ -1,0 +1,1 @@
+public boolean isLast(E e);

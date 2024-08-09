@@ -1,0 +1,80 @@
+diff --git a/old_test.java b/new_test.java
+index 92964e1..224d10f 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -30,22 +30,23 @@
+ 
+ 		OperatorStateStore backend = mock(OperatorStateStore.class);
+ 
+-		TestingListState<Serializable> init = new TestingListState<>();
+-		TestingListState<Serializable> listState1 = new TestingListState<>();
+-		TestingListState<Serializable> listState2 = new TestingListState<>();
+-		TestingListState<Serializable> listState3 = new TestingListState<>();
++		TestingListState<Serializable> listState = new TestingListState<>();
+ 
+-		when(backend.getSerializableListState(Matchers.any(String.class))).
+-				thenReturn(init, listState1, listState2, listState3);
++		when(backend.getSerializableListState(Matchers.any(String.class))).thenReturn(listState);
+ 
+-		consumer.initializeState(backend);
++		StateInitializationContext initializationContext = mock(StateInitializationContext.class);
++
++		when(initializationContext.getManagedOperatorStateStore()).thenReturn(backend);
++		when(initializationContext.isRestored()).thenReturn(false, true, true, true);
++
++		consumer.initializeState(initializationContext);
+ 
+ 		// checkpoint 1
+-		consumer.prepareSnapshot(138L, 138L);
++		consumer.snapshotState(new StateSnapshotContextSynchronousImpl(138, 138));
+ 
+ 		HashMap<KafkaTopicPartition, Long> snapshot1 = new HashMap<>();
+ 
+-		for (Serializable serializable : listState1.get()) {
++		for (Serializable serializable : listState.get()) {
+ 			Tuple2<KafkaTopicPartition, Long> kafkaTopicPartitionLongTuple2 = (Tuple2<KafkaTopicPartition, Long>) serializable;
+ 			snapshot1.put(kafkaTopicPartitionLongTuple2.f0, kafkaTopicPartitionLongTuple2.f1);
+ 		}
+@@ -55,11 +56,11 @@
+ 		assertEquals(state1, pendingOffsetsToCommit.get(138L));
+ 
+ 		// checkpoint 2
+-		consumer.prepareSnapshot(140L, 140L);
++		consumer.snapshotState(new StateSnapshotContextSynchronousImpl(140, 140));
+ 
+ 		HashMap<KafkaTopicPartition, Long> snapshot2 = new HashMap<>();
+ 
+-		for (Serializable serializable : listState2.get()) {
++		for (Serializable serializable : listState.get()) {
+ 			Tuple2<KafkaTopicPartition, Long> kafkaTopicPartitionLongTuple2 = (Tuple2<KafkaTopicPartition, Long>) serializable;
+ 			snapshot2.put(kafkaTopicPartitionLongTuple2.f0, kafkaTopicPartitionLongTuple2.f1);
+ 		}
+@@ -74,11 +75,11 @@
+ 		assertTrue(pendingOffsetsToCommit.containsKey(140L));
+ 
+ 		// checkpoint 3
+-		consumer.prepareSnapshot(141L, 141L);
++		consumer.snapshotState(new StateSnapshotContextSynchronousImpl(141, 141));
+ 
+ 		HashMap<KafkaTopicPartition, Long> snapshot3 = new HashMap<>();
+ 
+-		for (Serializable serializable : listState3.get()) {
++		for (Serializable serializable : listState.get()) {
+ 			Tuple2<KafkaTopicPartition, Long> kafkaTopicPartitionLongTuple2 = (Tuple2<KafkaTopicPartition, Long>) serializable;
+ 			snapshot3.put(kafkaTopicPartitionLongTuple2.f0, kafkaTopicPartitionLongTuple2.f1);
+ 		}
+@@ -96,12 +97,12 @@
+ 		assertEquals(0, pendingOffsetsToCommit.size());
+ 
+ 		OperatorStateStore operatorStateStore = mock(OperatorStateStore.class);
+-		TestingListState<Tuple2<KafkaTopicPartition, Long>> listState = new TestingListState<>();
++		listState = new TestingListState<>();
+ 		when(operatorStateStore.getOperatorState(Matchers.any(ListStateDescriptor.class))).thenReturn(listState);
+ 
+ 		// create 500 snapshots
+ 		for (int i = 100; i < 600; i++) {
+-			consumer.prepareSnapshot(i, i);
++			consumer.snapshotState(new StateSnapshotContextSynchronousImpl(i, i));
+ 			listState.clear();
+ 		}
+ 		assertEquals(FlinkKafkaConsumerBase.MAX_NUM_PENDING_CHECKPOINTS, pendingOffsetsToCommit.size());

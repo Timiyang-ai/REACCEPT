@@ -1,0 +1,1 @@
+double cost(Link link, LinkResourceService resourceService);

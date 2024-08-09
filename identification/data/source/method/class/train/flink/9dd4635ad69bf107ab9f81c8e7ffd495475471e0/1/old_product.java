@@ -1,0 +1,1 @@
+public void configure(Configuration config);

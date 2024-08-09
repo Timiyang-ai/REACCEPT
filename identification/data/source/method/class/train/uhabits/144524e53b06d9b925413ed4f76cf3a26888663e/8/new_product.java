@@ -1,0 +1,1 @@
+public abstract int[] getValues(long from, long to);

@@ -1,0 +1,1 @@
+boolean accept(final String absolutePath);

@@ -1,0 +1,1 @@
+abstract public void issueSoftReset() throws Exception;

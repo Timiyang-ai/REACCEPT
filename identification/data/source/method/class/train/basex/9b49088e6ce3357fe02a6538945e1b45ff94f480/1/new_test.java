@@ -1,0 +1,39 @@
+@Test public void stringTest() throws QueryIOException {
+    parse("\"\"", false);
+    parse("\"test\"", false);
+    parse("\"\u00e4\"", false);
+    parse("\"\uD834\uDD1E\"", false);
+    parse("\"\uD853\uDF5C\"", false);
+    parse("\"\\n\"", false);
+    parse("\"\\\"\\\\\"", false);
+    parse("\"\\u000a\"", "\"\\n\"", false);
+    parse("\"\\u000A\"", "\"\\n\"", false);
+    parse("\"\n\"", "\"\\n\"", true);
+    parse("\"\uD834\"", "\"\uFFFD\"", false);
+    parse("\"\uFFFF\"", "\"\uFFFD\"", false);
+    parse("\"\\b\\f\\t\\r\\n\"", "\"\uFFFD\uFFFD\\t\\r\\n\"", false);
+    parse("\"\\u0000\\u001F\"", "\"\uFFFD\uFFFD\"", false);
+    parse("\"\uD853\uFFFF\"", "\"\uFFFD\uFFFD\"", false);
+    parse("\"\uD853a\"", "\"\uFFFDa\"", false);
+
+    escape("\"\\u0008\\u000c\\u0009\\u000d\\u000a\"", "\"\\\\b\\\\f\\\\t\\\\r\\\\n\"");
+    escape("\"\\b\\f\\t\\r\\n\"", "\"\\\\b\\\\f\\\\t\\\\r\\\\n\"");
+    // Unicode in JSON notation
+    //escape("\"\\uD853\\uDF5C\"", "\"\\\\uD853\\\\uDF5C\"");
+    escape("\"\\uD853asdf\"", "\"\\\\uD853asdf\"");
+    escape("\"\\uD853\"", "\"\\\\uD853\"");
+
+    // Unicode in Java notation
+    escape("\"\u00E4\\t\"", "\"\u00E4\\\\t\"");
+    escape("\"\u00E4\\u00E4\\t\"", "\"\u00E4\u00E4\\\\t\"");
+
+    error("\"\\u0A", false);
+    error("\"\\uXX0A\"", false);
+    error("\"\\u0 00\"", false);
+    error("\"\\u0:00\"", false);
+    error("\"\\u0_00\"", false);
+    error("\"\\u0~00\"", false);
+    error("\"test", false);
+    error("\"\uD800", false);
+    error("\"\n\"", false);
+  }

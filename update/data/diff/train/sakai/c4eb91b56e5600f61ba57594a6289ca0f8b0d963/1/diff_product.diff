@@ -1,0 +1,73 @@
+diff --git a/old_product.java b/new_product.java
+index a58bb71..a2e43c1 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,9 +1,10 @@
+-public static List<ProcessedGradeItem> processImportedGrades(final ImportedGradeWrapper importedGradeWrapper,
++public static List<ProcessedGradeItem> processImportedGrades(final ImportedSpreadsheetWrapper spreadsheetWrapper,
+ 			final List<Assignment> assignments, final List<GbStudentGradeInfo> currentGrades) {
+ 
+ 		// setup
+ 		// TODO this will ensure dupes can't be added. Provide a report to the user that dupes were added. There would need to be a step before this though
+-		final Map<String, ProcessedGradeItem> assignmentProcessedGradeItemMap = new HashMap<>();
++		// this retains order of the columns in the imported file
++		final Map<String, ProcessedGradeItem> assignmentProcessedGradeItemMap = new LinkedHashMap<>();
+ 
+ 		// process grades
+ 		final Map<Long, AssignmentStudentGradeInfo> transformedGradeMap = transformCurrentGrades(currentGrades);
+@@ -15,7 +16,7 @@ public static List<ProcessedGradeItem> processImportedGrades(final ImportedGrade
+ 		final List<String> commentColumns = new ArrayList<>();
+ 
+ 		//for every column, setup the data
+-		for (final ImportColumn column : importedGradeWrapper.getColumns()) {
++		for (final ImportedColumn column : spreadsheetWrapper.getColumns()) {
+ 			boolean needsToBeAdded = false;
+ 
+ 			// skip the ignorable columns
+@@ -37,20 +38,20 @@ public static List<ProcessedGradeItem> processImportedGrades(final ImportedGrade
+ 			}
+ 
+ 			final Assignment assignment = assignmentNameMap.get(columnTitle);
+-			final ProcessedGradeItemStatus status = determineStatus(column, assignment, importedGradeWrapper, transformedGradeMap);
++			final ProcessedGradeItemStatus status = determineStatus(column, assignment, spreadsheetWrapper, transformedGradeMap);
+ 
+ 
+-			if (column.getType() == ImportColumn.Type.GB_ITEM_WITH_POINTS) {
++			if (column.getType() == ImportedColumn.Type.GB_ITEM_WITH_POINTS) {
+ 				log.debug("GB Item: " + columnTitle + ", status: " + status.getStatusCode());
+ 				processedGradeItem.setItemTitle(columnTitle);
+ 				processedGradeItem.setItemPointValue(column.getPoints());
+ 				processedGradeItem.setStatus(status);
+-			} else if (column.getType() == ImportColumn.Type.COMMENTS) {
++			} else if (column.getType() == ImportedColumn.Type.COMMENTS) {
+ 				log.debug("Comments: " + columnTitle + ", status: " + status.getStatusCode());
+ 				processedGradeItem.setType(ProcessedGradeItem.Type.COMMENT);
+ 				processedGradeItem.setCommentStatus(status);
+ 				commentColumns.add(columnTitle);
+-			} else if (column.getType() == ImportColumn.Type.GB_ITEM_WITHOUT_POINTS) {
++			} else if (column.getType() == ImportedColumn.Type.GB_ITEM_WITHOUT_POINTS) {
+ 				log.debug("Regular: " + columnTitle + ", status: " + status.getStatusCode());
+ 				processedGradeItem.setItemTitle(columnTitle);
+ 				processedGradeItem.setStatus(status);
+@@ -66,14 +67,14 @@ public static List<ProcessedGradeItem> processImportedGrades(final ImportedGrade
+ 			}
+ 
+ 			final List<ProcessedGradeItemDetail> processedGradeItemDetails = new ArrayList<>();
+-			for (final ImportedGrade importedGrade : importedGradeWrapper.getImportedGrades()) {
+-				final ImportedGradeItem importedGradeItem = importedGrade.getGradeItemMap().get(columnTitle);
+-				if (importedGradeItem != null) {
++			for (final ImportedRow row : spreadsheetWrapper.getRows()) {
++				final ImportedCell cell = row.getCellMap().get(columnTitle);
++				if (cell != null) {
+ 					final ProcessedGradeItemDetail processedGradeItemDetail = new ProcessedGradeItemDetail();
+-					processedGradeItemDetail.setStudentEid(importedGrade.getStudentEid());
+-					processedGradeItemDetail.setStudentUuid(importedGrade.getStudentUuid());
+-					processedGradeItemDetail.setGrade(importedGradeItem.getGradeItemScore());
+-					processedGradeItemDetail.setComment(importedGradeItem.getGradeItemComment());
++					processedGradeItemDetail.setStudentEid(row.getStudentEid());
++					processedGradeItemDetail.setStudentUuid(row.getStudentUuid());
++					processedGradeItemDetail.setGrade(cell.getScore());
++					processedGradeItemDetail.setComment(cell.getComment());
+ 					processedGradeItemDetails.add(processedGradeItemDetail);
+ 				}
+ 

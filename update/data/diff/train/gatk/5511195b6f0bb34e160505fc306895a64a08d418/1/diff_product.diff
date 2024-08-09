@@ -1,0 +1,45 @@
+diff --git a/old_product.java b/new_product.java
+index 5792045..b0577db 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -38,10 +38,11 @@ public static DoFn<ContextShard,ContextShard> subdivideAndFillReads(String bam,
+                         SAMRecordToGATKReadAdapter g = new SAMRecordToGATKReadAdapter(r);
+                         // yes, it'd be a tad faster to check before the wrapping.
+                         // But this keeps the code a tad simpler.
+-                        if (!accept(g, shard.interval)) continue;
+-                        if (null!=optFilter) {
+-                            // skip reads that don't pass the filter
+-                            if (!optFilter.test(g)) continue;
++                        if (!accept(g, shard.interval)) {
++                            continue;
++                        }
++                        if (null!=optFilter && !optFilter.test(g)) {
++                            continue;
+                         }
+                         if (!g.isUnmapped()) {
+                             // error out if we accept a read that sticks out too far
+@@ -64,13 +65,23 @@ public static DoFn<ContextShard,ContextShard> subdivideAndFillReads(String bam,
+                             // move to the next shard
+                             currentSubShard = subshards.get(++currentSubShardIndex);
+                         }
++                        int currentSubShardEnd;
++                        if (g.isUnmapped()) {
++                            if (!g.mateIsUnmapped()) {
++                                currentSubShardEnd = g.getMateStart() + margin;
++                            } else {
++                                throw new GATKException.ShouldNeverReachHereException("How did an unmapped read make it to here? "+g.toString());
++                            }
++                        } else {
++                            currentSubShardEnd = g.getStart() + margin;
++                        }
+                         // the header slows serialization too much
+                         g.setHeader(null);
+                         readsSoFar.add(g);
+                         if (readsSoFar.size()>=maxReadsPerShard) {
+                             log.info("Too many reads in this shard, splitting it."+readsSoFar.size());
+                             // ship this one.
+-                            SimpleInterval thisInterval = new SimpleInterval(currentSubShard.getContig(), currentSubShard.getStart(), g.getStart()+margin);
++                            SimpleInterval thisInterval = new SimpleInterval(currentSubShard.getContig(), currentSubShard.getStart(), currentSubShardEnd);
+                             // we grow the interval by "margin" to make sure we get all the variants we need.
+                             // Since we already assume that margin has that property, we're good to go.
+                             ContextShard ret = shard.split(thisInterval).withReads(readsSoFar);

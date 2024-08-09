@@ -1,0 +1,109 @@
+diff --git a/old_test.java b/new_test.java
+index 454bcbe..4f6b7cc 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,9 +1,38 @@
+-@Test(expected = GenieServerException.class)
++@SuppressWarnings("unchecked")
++    @Test(expected = GenieServerException.class)
+     public void testSubmitJob() throws GenieException {
+ 
+         final Set<CommandStatus> enumStatuses = EnumSet.noneOf(CommandStatus.class);
+         enumStatuses.add(CommandStatus.ACTIVE);
+ 
++        final String app1 = UUID.randomUUID().toString();
++        final String app2 = UUID.randomUUID().toString();
++        final String app3 = UUID.randomUUID().toString();
++        final List<String> applications = Lists.newArrayList(app3, app1, app2);
++
++        final String placeholder = UUID.randomUUID().toString();
++        Mockito
++            .when(this.applicationService.getApplication(app3))
++            .thenReturn(
++                new Application.Builder(placeholder, placeholder, placeholder, ApplicationStatus.ACTIVE)
++                    .withId(app3)
++                    .build()
++            );
++        Mockito
++            .when(this.applicationService.getApplication(app1))
++            .thenReturn(
++                new Application.Builder(placeholder, placeholder, placeholder, ApplicationStatus.ACTIVE)
++                    .withId(app1)
++                    .build()
++            );
++        Mockito
++            .when(this.applicationService.getApplication(app2))
++            .thenReturn(
++                new Application.Builder(placeholder, placeholder, placeholder, ApplicationStatus.ACTIVE)
++                    .withId(app2)
++                    .build()
++            );
++
+         final JobRequest jobRequest = new JobRequest.Builder(
+             JOB_1_NAME,
+             USER,
+@@ -11,8 +40,9 @@
+             null,
+             null,
+             null
+-        ).
+-            withId(JOB_1_ID)
++        )
++            .withId(JOB_1_ID)
++            .withApplications(applications)
+             .build();
+ 
+         final Cluster cluster = new Cluster.Builder(
+@@ -28,7 +58,6 @@
+         final List<Cluster> clusterList = new ArrayList<>();
+         clusterList.add(cluster);
+ 
+-
+         final Command command = new Command.Builder(
+             COMMAND_NAME,
+             USER,
+@@ -43,25 +72,32 @@
+         final List<Command> commandList = new ArrayList<>();
+         commandList.add(command);
+ 
+-        Mockito.when(this.clusterService.chooseClusterForJobRequest(Mockito.eq(jobRequest))).thenReturn(clusterList);
+-        Mockito.when(this.clusterLoadBalancer.selectCluster(Mockito.eq(clusterList))).thenReturn(cluster);
++        Mockito.when(this.clusterService.chooseClusterForJobRequest(jobRequest)).thenReturn(clusterList);
++        Mockito.when(this.clusterLoadBalancer.selectCluster(clusterList)).thenReturn(cluster);
+         Mockito
+-            .when(this.clusterService.getCommandsForCluster(Mockito.eq(CLUSTER_ID), Mockito.eq(enumStatuses)))
++            .when(this.clusterService.getCommandsForCluster(CLUSTER_ID, enumStatuses))
+             .thenReturn(commandList);
+-        //Mockito.when(this.wfExecutor.executeWorkflow(Mockito.any(), Mockito.anyMap())).thenReturn(true);
+ 
+         final ArgumentCaptor<String> jobId1 = ArgumentCaptor.forClass(String.class);
+-        final ArgumentCaptor<String> jobId2 = ArgumentCaptor.forClass(String.class);
+         final ArgumentCaptor<String> clusterId = ArgumentCaptor.forClass(String.class);
+         final ArgumentCaptor<String> commandId = ArgumentCaptor.forClass(String.class);
++        final ArgumentCaptor<List<String>> applicationIds = ArgumentCaptor.forClass((Class) List.class);
+ 
+         this.jobSubmitterService.submitJob(jobRequest);
+ 
+-        Mockito.verify(this.jobPersistenceService).updateClusterForJob(jobId1.capture(), clusterId.capture());
+-        Mockito.verify(this.jobPersistenceService).updateCommandForJob(jobId2.capture(), commandId.capture());
++        Mockito
++            .verify(this.jobPersistenceService)
++            .updateJobWithRuntimeEnvironment(
++                jobId1.capture(),
++                clusterId.capture(),
++                commandId.capture(),
++                applicationIds.capture()
++            );
+ 
+-        Assert.assertEquals(JOB_1_ID, jobId1.getValue());
+-        Assert.assertEquals(JOB_1_ID, jobId2.getValue());
+-        Assert.assertEquals(CLUSTER_ID, clusterId.getValue());
+-        Assert.assertEquals(COMMAND_ID, commandId.getValue());
++        Assert.assertThat(jobId1.getValue(), Matchers.is(JOB_1_ID));
++        Assert.assertThat(clusterId.getValue(), Matchers.is(CLUSTER_ID));
++        Assert.assertThat(commandId.getValue(), Matchers.is(COMMAND_ID));
++        Assert.assertThat(applicationIds.getValue().get(0), Matchers.is(app3));
++        Assert.assertThat(applicationIds.getValue().get(1), Matchers.is(app1));
++        Assert.assertThat(applicationIds.getValue().get(2), Matchers.is(app2));
+     }
+\ No newline at end of file

@@ -1,0 +1,1 @@
+public abstract String cancelWithSavepoint(JobID jobId, @Nullable String savepointDirectory) throws Exception;

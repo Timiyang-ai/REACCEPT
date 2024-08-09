@@ -1,0 +1,1 @@
+DistributedMetaStorageKeyValuePair[] localFullData() throws IgniteCheckedException;

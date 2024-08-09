@@ -1,0 +1,1 @@
+void andNot(Selection otherSelection);

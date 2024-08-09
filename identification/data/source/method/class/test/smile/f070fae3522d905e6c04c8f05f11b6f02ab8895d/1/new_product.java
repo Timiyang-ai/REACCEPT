@@ -1,0 +1,1 @@
+Neighbor<K,V>[] knn(K q, int k);

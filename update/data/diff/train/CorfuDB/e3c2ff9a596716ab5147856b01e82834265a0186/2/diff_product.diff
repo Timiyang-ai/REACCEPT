@@ -1,0 +1,39 @@
+diff --git a/old_product.java b/new_product.java
+index 00cb0dc..ea866ce 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,11 +1,14 @@
+ CompletableFuture<Result<List<LogData>, BatchProcessorFailure>> retryReadRecords
+-    (List<Long> addresses, AtomicInteger readRetries) {
++    (List<Long> addresses, int retriesTried) {
+ 
+         try {
++            AtomicInteger readRetries = new AtomicInteger(retriesTried);
+             return IRetry.build(ExponentialBackoffRetry.class, RetryExhaustedException.class, () -> {
+-
++                if(readRetries.incrementAndGet() >= MAX_RETRIES){
++                    throw new RetryExhaustedException("Read retries are exhausted");
++                }
+                 Supplier<CompletableFuture<Result<List<LogData>, BatchProcessorFailure>>> pipeline =
+-                        () -> readRecords(addresses, readRetries);
++                        () -> readRecords(addresses, readRetries.get());
+ 
+                 // If a pipeline completed exceptionally, than return the error.
+                 CompletableFuture<Result<List<LogData>, BatchProcessorFailure>> pipelineFuture =
+@@ -19,15 +22,7 @@ CompletableFuture<Result<List<LogData>, BatchProcessorFailure>> retryReadRecords
+                 // Join the result.
+                 Result<List<LogData>, BatchProcessorFailure> joinResult = pipelineFuture.join();
+                 if (joinResult.isError()) {
+-                    // If an error occurred, increment retries.
+-                    readRetries.incrementAndGet();
+-
+-                    if (readRetries.get() >= MAX_RETRIES) {
+-                        throw new RetryExhaustedException("Read retries are exhausted");
+-                    } else {
+-                        log.warn("Retried {} times", readRetries.get());
+-                        throw new RetryNeededException();
+-                    }
++                    throw new RetryNeededException();
+                 } else {
+                     // If the result is not an error, return.
+                     return CompletableFuture.completedFuture(joinResult);

@@ -1,0 +1,1 @@
+KernelTransaction beginTransaction( KernelTransaction.Type type, AccessMode accessMode, long timeout );

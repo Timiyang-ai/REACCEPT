@@ -1,0 +1,5 @@
+@Test(groups={"tck"})
+    public void test_withDate_iMi() {
+        LocalDateTime t = TEST_2007_07_15_12_30_40_987654321.withDate(2008, Month.FEBRUARY, 29);
+        check(t, 2008, 2, 29, 12, 30, 40, 987654321);
+    }

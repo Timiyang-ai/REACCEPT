@@ -1,0 +1,1 @@
+public abstract List<AbstractRecord> parseRecords(byte[] rawBytes) throws ParserException;

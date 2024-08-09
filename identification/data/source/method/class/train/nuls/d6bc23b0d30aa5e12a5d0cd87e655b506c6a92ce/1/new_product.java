@@ -1,0 +1,1 @@
+Result forwardTx(Transaction tx, Node excludeNode);

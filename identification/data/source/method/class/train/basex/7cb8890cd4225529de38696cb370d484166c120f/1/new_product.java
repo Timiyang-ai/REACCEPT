@@ -1,0 +1,1 @@
+abstract boolean instanceOf(final AtomType kt, final SeqType vt);

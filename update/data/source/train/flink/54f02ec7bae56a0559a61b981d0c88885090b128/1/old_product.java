@@ -1,0 +1,1 @@
+void discardAllCheckpoints() throws Exception;

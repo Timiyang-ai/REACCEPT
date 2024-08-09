@@ -1,0 +1,1 @@
+Application getApplication(String id);

@@ -1,0 +1,1 @@
+V edgeValue(N nodeU, N nodeV);

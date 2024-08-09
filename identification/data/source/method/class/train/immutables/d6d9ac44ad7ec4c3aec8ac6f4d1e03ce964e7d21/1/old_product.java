@@ -1,0 +1,1 @@
+OrdinalDomain<E> ordinalDomain();

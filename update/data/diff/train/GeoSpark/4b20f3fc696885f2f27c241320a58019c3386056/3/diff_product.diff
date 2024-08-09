@@ -1,0 +1,60 @@
+diff --git a/old_product.java b/new_product.java
+index 25cc18e..da21d73 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,4 +1,4 @@
+-public static List<Envelope> SpatialKnnQuery(RectangleRDD spatialRDD, Point queryCenter, Integer k, boolean useIndex) {
++public static List<Polygon> SpatialKnnQuery(RectangleRDD spatialRDD, Point queryCenter, Integer k, boolean useIndex) {
+ 		// For each partation, build a priority queue that holds the topk
+ 		//@SuppressWarnings("serial")
+ 		if(useIndex)
+@@ -7,35 +7,25 @@ public static List<Envelope> SpatialKnnQuery(RectangleRDD spatialRDD, Point quer
+ 	            throw new NullPointerException("Need to invoke buildIndex() first, indexedRDDNoId is null");
+ 	        }
+ 			JavaRDD<Object> tmp = spatialRDD.indexedRawRDD.mapPartitions(new KnnJudgementUsingIndex(queryCenter,k));
+-			JavaRDD<Envelope> result = tmp.map(new Function<Object, Envelope>()
++			List<Object> result = tmp.takeOrdered(k, new GeometryDistanceComparator(queryCenter,true));
++			List<Polygon> geometryResult = new ArrayList<Polygon>();
++			for(Object spatialObject:result)
+ 			{
+-
+-				@Override
+-				public Envelope call(Object spatialObject) throws Exception {
+-					Envelope returnSpatialObject = ((Geometry)spatialObject).getEnvelopeInternal();
+-					if( ((Geometry)spatialObject).getUserData()!=null)
+-					{
+-						returnSpatialObject.setUserData(((Geometry)spatialObject).getUserData());
+-					}
+-					return returnSpatialObject;
+-				}
+-				
+-			});
++				geometryResult.add((Polygon)spatialObject);
++			}
+ 			// Take the top k
+-			return result.takeOrdered(k, new RectangleDistanceComparator(queryCenter));
++			return geometryResult;
+ 		}
+ 		else
+ 		{
+-			JavaRDD<Object> tmp = spatialRDD.getRawSpatialRDD().mapPartitions(new RectangleKnnJudgement(queryCenter,k));
+-			JavaRDD<Envelope> result = tmp.map(new Function<Object,Envelope>()
++			JavaRDD<Object> tmp = spatialRDD.getRawSpatialRDD().mapPartitions(new KnnJudgement(queryCenter,k));
++			List<Object> result = tmp.takeOrdered(k, new GeometryDistanceComparator(queryCenter,true));
++			List<Polygon> geometryResult = new ArrayList<Polygon>();
++			for(Object spatialObject:result)
+ 			{
+-
+-				@Override
+-				public Envelope call(Object spatialObject) throws Exception {
+-					return (Envelope) spatialObject;
+-				}
+-			});
++				geometryResult.add((Polygon)spatialObject);
++			}
+ 			// Take the top k
+-			return result.takeOrdered(k, new RectangleDistanceComparator(queryCenter));
++			return geometryResult;
+ 		}
+ 	}
+\ No newline at end of file

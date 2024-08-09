@@ -1,0 +1,142 @@
+diff --git a/old_product.java b/new_product.java
+index f4a2a6c..f8eddb8 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,88 +1,57 @@
+-public static List<String> parseQuery(String query)
++private static List<String> parseExecParameters(String paramText)
+     {
+-        if (query == null) {
+-            return null;
+-        }
+-
+-        //* enable to debug */ System.err.println("Parsing command queue:\n" + query);
+-        /*
+-         * Here begins the struggle between honoring comment starters and
+-         * honoring single quotes and honoring semicolons as statement separators.
+-         *
+-         * For example, whole-line comments are eliminated early -- assumed
+-         * never to be part of text literals, even though a text literal could
+-         * have been started on a prior line and could optionally be ended
+-         * with a quote on the current line and optionally followed by a
+-         * statement-ending semicolon all within the supposed comment line.
+-         */
+-        query = AnyWholeLineComments.matcher(query).replaceAll("");
+-
+-        /*
+-         * replace all escaped single quotes with the #(SQL_PARSER_ESCAPE_SINGLE_QUOTE) tag
+-         */
+-        query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
+-
+-        /*
+-         * Move all single quoted strings into the string fragments list, and do in place
+-         * replacements with numbered instances of the #(SQL_PARSER_STRING_FRAGMENT#[n]) tag
+-         *
+-         * WARNING: ENG-7594 This will find a quote (perhaps an informal
+-         * apostrophe) in an end-of-line comment and take it as the start
+-         * of a quoted string, hiding everything between it and the next
+-         * quote as literal text, including any semicolons or comment
+-         * starters in between.
+-         * Properly preserving semicolons and recognizing all comment
+-         * boundaries is tricky, especially in a way that preserves
+-         * quoted literals that contain "--", even literals that may be
+-         * started and/or terminated on a different line from the "--".
+-         * I (--paul) would find it comforting to rely on some interface
+-         * to HSQL parser technology for this,
+-         * The other possibility is to use SQLLexer.splitStatements
+-         * if it has already solved this problem.
+-         * And yet we don't yet know how compatible either of those is with
+-         * our intended free-form syntax for "exec" commands -- that may be
+-         * a bit TOO free form and may require tightening up before we can
+-         * find any reasonable solution.
+-         */
+-        Matcher stringFragmentMatcher = SingleQuotedString.matcher(query);
+-        ArrayList<String> stringFragments = new ArrayList<>();
+-        int i = 0;
+-        while (stringFragmentMatcher.find()) {
+-            stringFragments.add(stringFragmentMatcher.group());
+-            query = stringFragmentMatcher.replaceFirst("#(SQL_PARSER_STRING_FRAGMENT#" + i + ")");
+-            stringFragmentMatcher = SingleQuotedString.matcher(query);
+-            i++;
++        final String SafeParamStringValuePattern = "#(SQL_PARSER_SAFE_PARAMSTRING)";
++        // Find all quoted strings.
++        // Mask out strings that contain whitespace or commas
++        // that must not be confused with parameter separators.
++        // "Safe" strings that don't contain these characters don't need to be masked
++        // but they DO need to be found and explicitly skipped so that their closing
++        // quotes don't trigger a false positive for the START of an unsafe string.
++        // Skipping is accomplished by resetting paramText to an offset substring
++        // after copying the skipped (or substituted) text to a string builder.
++        ArrayList<String> originalString = new ArrayList<>();
++        Matcher stringMatcher = SingleQuotedString.matcher(paramText);
++        StringBuilder safeText = new StringBuilder();
++        while (stringMatcher.find()) {
++            // Save anything before the found string.
++            safeText.append(paramText.substring(0, stringMatcher.start()));
++            String asMatched = stringMatcher.group();
++            if (SingleQuotedStringContainingParameterSeparators.matcher(asMatched).matches()) {
++                // The matched string is unsafe, provide cover for it in safeText.
++                originalString.add(asMatched);
++                safeText.append(SafeParamStringValuePattern);
++            } else {
++                // The matched string is safe. Add it to safeText.
++                safeText.append(asMatched);
++            }
++            paramText = paramText.substring(stringMatcher.end());
++            stringMatcher = SingleQuotedString.matcher(paramText);
+         }
++        // Save anything after the last found string.
++        safeText.append(paramText);
+ 
+-        // Strip out inline comments
+-        // At this point, all the quoted strings have been pulled out of the
+-        // code mostly because they may contain semicolons.
+-        // They will not be restored until after the split.
+-        // So any user's quoted string containing ';' will be safe here.
+-        // OTOH, this next line MAY eliminate blocks of code after any
+-        // end-on-line comment that contains an unbalanced quote until
+-        // the following quote. ENG-7594
+-        // The reason for eliminating the comments here and now is to make sure that
+-        // comment text containing a semicolon does not cause an erroneous statement
+-        // split mid-comment.
+-        query = EndOfLineComment.matcher(query).replaceAll("");
+-
+-        String[] sqlFragments = query.split("\\s*;+\\s*");
+-
+-        ArrayList<String> queries = new ArrayList<>();
+-        for (String fragment : sqlFragments) {
++        ArrayList<String> params = new ArrayList<>();
++        int subCount = 0;
++        int neededSubs = originalString.size();
++        // Split the params at the separators
++        String[] split = safeText.toString().split("[\\s,]+");
++        for (String fragment : split) {
+             if (fragment.isEmpty()) {
+-                continue;
++                continue; // ignore effects of leading or trailing separators
+             }
+-            if (fragment.indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1) {
+-                int k = 0;
+-                for (String strFrag : stringFragments) {
+-                    fragment = fragment.replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", strFrag);
+-                    k++;
++            // Replace each substitution in order exactly once.
++            if (subCount < neededSubs) {
++                // Substituted strings will normally take up an entire parameter,
++                // but some cases like parameters containing escaped single quotes
++                // may require multiple serial substitutions.
++                while (fragment.indexOf(SafeParamStringValuePattern) > -1) {
++                    fragment = fragment.replace(SafeParamStringValuePattern,
++                            originalString.get(subCount));
++                    ++subCount;
+                 }
+             }
+-            fragment = fragment.replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
+-            queries.add(fragment);
++            params.add(fragment);
+         }
+-        return queries;
++        assert(subCount == neededSubs);
++        return params;
+     }
+\ No newline at end of file

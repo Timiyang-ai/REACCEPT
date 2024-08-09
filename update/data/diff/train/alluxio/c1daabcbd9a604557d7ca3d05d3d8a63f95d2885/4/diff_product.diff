@@ -1,0 +1,42 @@
+diff --git a/old_product.java b/new_product.java
+index 34e2768..6c7fc0b 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,16 +1,23 @@
+-@Override
+-  public void close() throws IOException {
+-    synchronized (CONTEXT_CACHE_LOCK) {
+-      if (mRefCount == 0) {
+-        LOG.warn("Attempted to close FileSystem Context that is already closed, have you called "
+-            + "close multiple times?");
+-        return;
+-      }
+-      if (--mRefCount != 0) {
+-        return;
+-      } else {
+-        CONTEXT_CACHE.remove(mParentSubject);
++public synchronized void close() throws IOException {
++    if (!mClosed.get()) {
++      mFileSystemMasterClientPool.close();
++      mFileSystemMasterClientPool = null;
++      mBlockMasterClientPool.close();
++      mBlockMasterClientPool = null;
++      mMasterInquireClient = null;
++
++      if (mMetricsMasterClient != null) {
++        ThreadUtils.shutdownAndAwaitTermination(mExecutorService,
++            mClientContext.getConf().getMs(PropertyKey.METRICS_CONTEXT_SHUTDOWN_TIMEOUT));
++        mMetricsMasterClient.close();
++        mMetricsMasterClient = null;
++        mClientMasterSync = null;
+       }
++      mLocalWorkerInitialized = false;
++      mLocalWorker = null;
++      mClosed.set(true);
++    } else {
++      LOG.warn("Attempted to close FileSystemContext with app ID {} which has already been closed"
++          + " or not initialized.", mAppId);
+     }
+-    closeInternal();
+   }
+\ No newline at end of file

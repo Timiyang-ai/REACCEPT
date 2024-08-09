@@ -1,0 +1,1 @@
+WorkerNetAddress getWorker(GetWorkerOptions options);

@@ -1,0 +1,316 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.9310344827586207
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 0
+----------------------------------------------------------------
+old description: 编译报错
+----------------------------------------------------------------
+old message
+COMPILATION ERROR : 
+\1\openmrs-core\api\src\test\java\org\openmrs\api\VisitServiceTest.java:[660,49] 无法将 org.openmrs.api.EncounterService 中的 getEncountersByVisit(org.openmrs.Visit,boolean) 应用于 (org.openmrs.Visit)
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:2.1:testCompile (default-testCompile) on project openmrs-api: Compilation failure
+\1\openmrs-core\api\src\test\java\org\openmrs\api\VisitServiceTest.java:[660,49] 无法将 org.openmrs.api.EncounterService 中的 getEncountersByVisit(org.openmrs.Visit,boolean) 应用于 (org.openmrs.Visit)
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :openmrs-api
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+@Override
+	public void purgeVisit(Visit visit) throws APIException {
+		if (visit.getVisitId() == null)
+			return;
+		//TODO there is a ticket for adding includeVoided argument to getEncountersByVisit for this not to fail
+		if (Context.getEncounterService().getEncountersByVisit(visit).size() > 0)
+			throw new APIException(Context.getMessageSourceService().getMessage("Visit.purge.inUse", null,
+			    "Cannot purge a visit that has encounters associated to it", Context.getLocale()));
+		dao.deleteVisit(visit);
+	}
+----------------------------------------------------------------
+old test
+@Test(expected = APIException.class)
+	@Verifies(value = "should fail if the visit has encounters associated to it", method = "purgeVisit(Visit)")
+	public void purgeVisit_shouldFailIfTheVisitHasEncountersAssociatedToIt() throws Exception {
+		Visit visit = Context.getVisitService().getVisit(1);
+		Encounter e = Context.getEncounterService().getEncounter(3);
+		e.setVisit(visit);
+		Context.getEncounterService().saveEncounter(e);
+		//sanity check
+		Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit).size() > 0);
+		Context.getVisitService().purgeVisit(visit);
+	}
+----------------------------------------------------------------
+new product
+@Override
+	public void purgeVisit(Visit visit) throws APIException {
+		if (visit.getVisitId() == null)
+			return;
+		//TODO there is a ticket for adding includeVoided argument to getEncountersByVisit for this not to fail
+		if (Context.getEncounterService().getEncountersByVisit(visit, true).size() > 0)
+			throw new APIException(Context.getMessageSourceService().getMessage("Visit.purge.inUse", null,
+			    "Cannot purge a visit that has encounters associated to it", Context.getLocale()));
+		dao.deleteVisit(visit);
+	}
+----------------------------------------------------------------
+new test
+@Test(expected = APIException.class)
+	@Verifies(value = "should fail if the visit has encounters associated to it", method = "purgeVisit(Visit)")
+	public void purgeVisit_shouldFailIfTheVisitHasEncountersAssociatedToIt() throws Exception {
+		Visit visit = Context.getVisitService().getVisit(1);
+		Encounter e = Context.getEncounterService().getEncounter(3);
+		e.setVisit(visit);
+		Context.getEncounterService().saveEncounter(e);
+		//sanity check
+		Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit, false).size() > 0);
+		Context.getVisitService().purgeVisit(visit);
+	}
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index 14b5567..73b5fe4 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -3,7 +3,7 @@
+ 		if (visit.getVisitId() == null)
+ 			return;
+ 		//TODO there is a ticket for adding includeVoided argument to getEncountersByVisit for this not to fail
+-		if (Context.getEncounterService().getEncountersByVisit(visit).size() > 0)
++		if (Context.getEncounterService().getEncountersByVisit(visit, true).size() > 0)
+ 			throw new APIException(Context.getMessageSourceService().getMessage("Visit.purge.inUse", null,
+ 			    "Cannot purge a visit that has encounters associated to it", Context.getLocale()));
+ 		dao.deleteVisit(visit);
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index 8b4a43a..0083fc5 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -6,6 +6,6 @@
+ 		e.setVisit(visit);
+ 		Context.getEncounterService().saveEncounter(e);
+ 		//sanity check
+-		Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit).size() > 0);
++		Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit, false).size() > 0);
+ 		Context.getVisitService().purgeVisit(visit);
+ 	}
+\ No newline at end of file
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index a40cbd2..b022ec3 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1 +1 @@
+-public void purgeVisit(Visit visit) throws DAOException;
+\ No newline at end of file
++public void deleteVisit(Visit visit) throws DAOException;
+\ No newline at end of file
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index 8768494..ee06cf1 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -2,8 +2,8 @@
+ 	@Verifies(value = "should erase the visit from the database", method = "purgeVisit(Visit)")
+ 	public void purgeVisit_shouldEraseTheVisitFromTheDatabase() throws Exception {
+ 		VisitService vs = Context.getVisitService();
+-		Integer originalSize = vs.getAllVisits().size();
++		Integer originalSize = vs.getVisits(null, null, null, null, null, null, null, null, true).size();
+ 		Visit visit = Context.getVisitService().getVisit(1);
+ 		vs.purgeVisit(visit);
+-		Assert.assertEquals(originalSize - 1, vs.getAllVisits().size());
++		Assert.assertEquals(originalSize - 1, vs.getVisits(null, null, null, null, null, null, null, null, true).size());
+ 	}
+\ No newline at end of file
+
+----------------------------------------------------------------
+coverage: 0.9310344827586207
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+Based on the information provided in the old test method and the changes in the production code, the key difference is the modification to include a boolean parameter in the call to `getEncountersByVisit` which likely specifies whether to include voided encounters in the result set. To update the test accordingly, it must reflect the change in the method signature and the expectation that voided encounters are considered when checking if a visit has associated encounters before it can be purged.
+
+Here's the revised version of the test method:
+
+```java
+<new_test>
+@Test(expected = APIException.class)
+public void purgeVisit_shouldFailIfTheVisitHasEncountersAssociatedToIt() throws Exception {
+    Visit visit = Context.getVisitService().getVisit(1);
+    Encounter e = Context.getEncounterService().getEncounter(3);
+    e.setVisit(visit);
+    Context.getEncounterService().saveEncounter(e);
+    
+    // Sanity check to ensure there are encounters associated with the visit, including voided ones
+    Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit, true).size() > 0);
+    
+    // Attempt to purge the visit should fail due to associated encounters
+    Context.getVisitService().purgeVisit(visit);
+}
+</new_test>
+```
+
+Adjustments made in the new test method:
+
+1. **Reflecting Production Code Changes**: The test now calls `getEncountersByVisit` with the added `true` boolean parameter consistent with the modified production method, ensuring it checks for encounters correctly under the new method definition.
+2. **Expectation and Behavior Alignment**: The expectation that an `APIException` is thrown if the visit has associated encounters (including potentially voided ones) remains valid and explicitly aligned with the updated production logic.
+3. **Sanity Check Confirmation**: The sanity check assertion ensures that there are indeed encounters tied to the visit, validating that the test setup is correct and will trigger the intended failure scenario.
+
+This updated test method presumes an appropriate setup in the testing environment where `Visit` and `Encounter` instances are correctly instantiated and related in a manner reflecting typical use cases. Moreover, it implies that the method `getEncountersByVisit(visit, true)` correctly handles the inclusion of both voided and non-voided encounters in its return.
+----------------------------------------------------------------
+generated test
+@Test(expected = APIException.class)
+public void purgeVisit_shouldFailIfTheVisitHasEncountersAssociatedToIt() throws Exception {
+    Visit visit = Context.getVisitService().getVisit(1);
+    Encounter e = Context.getEncounterService().getEncounter(3);
+    e.setVisit(visit);
+    Context.getEncounterService().saveEncounter(e);
+    
+    // Sanity check to ensure there are encounters associated with the visit, including voided ones
+    Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit, true).size() > 0);
+    
+    // Attempt to purge the visit should fail due to associated encounters
+    Context.getVisitService().purgeVisit(visit);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,11 +1,13 @@
+
+ @Test(expected = APIException.class)
+-	@Verifies(value = "should fail if the visit has encounters associated to it", method = "purgeVisit(Visit)")
+-	public void purgeVisit_shouldFailIfTheVisitHasEncountersAssociatedToIt() throws Exception {
+-		Visit visit = Context.getVisitService().getVisit(1);
+-		Encounter e = Context.getEncounterService().getEncounter(3);
+-		e.setVisit(visit);
+-		Context.getEncounterService().saveEncounter(e);
+-		//sanity check
+-		Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit).size() > 0);
+-		Context.getVisitService().purgeVisit(visit);
+-	}
++public void purgeVisit_shouldFailIfTheVisitHasEncountersAssociatedToIt() throws Exception {
++    Visit visit = Context.getVisitService().getVisit(1);
++    Encounter e = Context.getEncounterService().getEncounter(3);
++    e.setVisit(visit);
++    Context.getEncounterService().saveEncounter(e);
++    
++    // Sanity check to ensure there are encounters associated with the visit, including voided ones
++    Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit, true).size() > 0);
++    
++    // Attempt to purge the visit should fail due to associated encounters
++    Context.getVisitService().purgeVisit(visit);
++}
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.9310344827586207
+----------------------------------------------------------------
+message
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 1
+----------------------------------------------------------------
+generated test
+@Test(expected = APIException.class)
+public void purgeVisit_shouldFailIfTheVisitHasEncountersAssociatedToIt() throws Exception {
+    Visit visit = Context.getVisitService().getVisit(1);
+    Encounter e = Context.getEncounterService().getEncounter(3);
+    e.setVisit(visit);
+    Context.getEncounterService().saveEncounter(e);
+    
+    // Sanity check to ensure there are encounters associated with the visit, including voided ones
+    Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit, true).size() > 0);
+    
+    // Attempt to purge the visit should fail due to associated encounters
+    Context.getVisitService().purgeVisit(visit);
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,11 +1,13 @@
+
+ @Test(expected = APIException.class)
+-	@Verifies(value = "should fail if the visit has encounters associated to it", method = "purgeVisit(Visit)")
+-	public void purgeVisit_shouldFailIfTheVisitHasEncountersAssociatedToIt() throws Exception {
+-		Visit visit = Context.getVisitService().getVisit(1);
+-		Encounter e = Context.getEncounterService().getEncounter(3);
+-		e.setVisit(visit);
+-		Context.getEncounterService().saveEncounter(e);
+-		//sanity check
+-		Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit).size() > 0);
+-		Context.getVisitService().purgeVisit(visit);
+-	}
++public void purgeVisit_shouldFailIfTheVisitHasEncountersAssociatedToIt() throws Exception {
++    Visit visit = Context.getVisitService().getVisit(1);
++    Encounter e = Context.getEncounterService().getEncounter(3);
++    e.setVisit(visit);
++    Context.getEncounterService().saveEncounter(e);
++    
++    // Sanity check to ensure there are encounters associated with the visit, including voided ones
++    Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit, true).size() > 0);
++    
++    // Attempt to purge the visit should fail due to associated encounters
++    Context.getVisitService().purgeVisit(visit);
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,13 +1,11 @@
+
+ @Test(expected = APIException.class)
+-public void purgeVisit_shouldFailIfTheVisitHasEncountersAssociatedToIt() throws Exception {
+-    Visit visit = Context.getVisitService().getVisit(1);
+-    Encounter e = Context.getEncounterService().getEncounter(3);
+-    e.setVisit(visit);
+-    Context.getEncounterService().saveEncounter(e);
+-    
+-    // Sanity check to ensure there are encounters associated with the visit, including voided ones
+-    Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit, true).size() > 0);
+-    
+-    // Attempt to purge the visit should fail due to associated encounters
+-    Context.getVisitService().purgeVisit(visit);
+-}
++	@Verifies(value = "should fail if the visit has encounters associated to it", method = "purgeVisit(Visit)")
++	public void purgeVisit_shouldFailIfTheVisitHasEncountersAssociatedToIt() throws Exception {
++		Visit visit = Context.getVisitService().getVisit(1);
++		Encounter e = Context.getEncounterService().getEncounter(3);
++		e.setVisit(visit);
++		Context.getEncounterService().saveEncounter(e);
++		//sanity check
++		Assert.assertTrue(Context.getEncounterService().getEncountersByVisit(visit, false).size() > 0);
++		Context.getVisitService().purgeVisit(visit);
++	}
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.9310344827586207
+--------------------------------------------------------------------------------------------------------------------------------

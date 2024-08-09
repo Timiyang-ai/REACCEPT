@@ -1,0 +1,13 @@
+@Test(timeOut=30000)  // TODO: remove when time zone loading is faster
+    public void now() {
+        LocalDateTime expected = LocalDateTime.now(Clock.systemDefaultZone());
+        LocalDateTime test = LocalDateTime.now();
+        long diff = Math.abs(test.toLocalTime().toNanoOfDay() - expected.toLocalTime().toNanoOfDay());
+        if (diff >= 100000000) {
+            // may be date change
+            expected = LocalDateTime.now(Clock.systemDefaultZone());
+            test = LocalDateTime.now();
+            diff = Math.abs(test.toLocalTime().toNanoOfDay() - expected.toLocalTime().toNanoOfDay());
+        }
+        assertTrue(diff < 100000000);  // less than 0.1 secs
+    }

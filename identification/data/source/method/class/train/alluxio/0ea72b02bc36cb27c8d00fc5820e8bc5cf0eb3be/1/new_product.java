@@ -1,0 +1,1 @@
+Mode.Bits getPermission(LockedInodePath inodePath);

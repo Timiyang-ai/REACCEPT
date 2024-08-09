@@ -1,0 +1,37 @@
+diff --git a/old_product.java b/new_product.java
+index 2c716bd..d898eae 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,7 +1,6 @@
+ synchronized List<Write> getWritesToExecute(long maximumAccumulatedSize) {
+         Exceptions.checkNotClosed(this.closed, this);
+         long accumulatedSize = 0;
+-        int activeWriteCount = 0;
+ 
+         // Collect all remaining writes, as long as they are not currently in-progress and have the same ledger id
+         // as the first item in the ledger.
+@@ -10,7 +9,7 @@ synchronized List<Write> getWritesToExecute(long maximumAccumulatedSize) {
+ 
+         List<Write> result = new ArrayList<>();
+         for (Write write : this.writes) {
+-            if (accumulatedSize >= maximumAccumulatedSize || activeWriteCount >= this.maxParallelism) {
++            if (accumulatedSize >= maximumAccumulatedSize) {
+                 // Either reached the throttling limit or ledger max size limit.
+                 // If we try to send too many writes to this ledger, the writes are likely to be rejected with
+                 // LedgerClosedException and simply be retried again.
+@@ -20,7 +19,6 @@ synchronized List<Write> getWritesToExecute(long maximumAccumulatedSize) {
+             // Account for this write's size, even if it's complete or in progress.
+             accumulatedSize += write.data.getLength();
+             if (write.isInProgress()) {
+-                activeWriteCount++;
+                 if (!canSkip) {
+                     // We stumbled across an in-progress write after a not-in-progress write. We can't retry now.
+                     // This is likely due to a bunch of writes failing (i.e. due to a LedgerClosedEx), but we overlapped
+@@ -33,7 +31,6 @@ synchronized List<Write> getWritesToExecute(long maximumAccumulatedSize) {
+             } else if (!write.isDone()) {
+                 canSkip = false;
+                 result.add(write);
+-                activeWriteCount++;
+             }
+         }
+ 

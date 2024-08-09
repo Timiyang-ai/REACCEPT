@@ -1,0 +1,2 @@
+@Deprecated
+	public void triggerStateConversion(Patient patient, Concept reasonForExit, Date dateConverted) throws APIException;

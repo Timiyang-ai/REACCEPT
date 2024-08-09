@@ -1,0 +1,1 @@
+void freeSlot(SlotID slotId, AllocationID allocationId);

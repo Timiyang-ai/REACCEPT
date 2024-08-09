@@ -1,0 +1,1 @@
+void invalidate(@NonNull @CompatibleWith("K") Object key);

@@ -1,0 +1,25 @@
+@Test
+	public void computeClusterDistance() {
+		DummySlic alg = new DummySlic(4,1,10,1);
+
+		ImageUInt8 input = new ImageUInt8(7,9);
+		alg.initalize(input);
+
+		SegmentSlic.Cluster c0 = alg.clusters.grow();
+		SegmentSlic.Cluster c1 = alg.clusters.grow();
+		SegmentSlic.Cluster c2 = alg.clusters.grow();
+		SegmentSlic.Cluster c3 = alg.clusters.grow();
+
+		c0.x = 0; c0.y = 0;
+		c1.x = 6; c1.y = 0;
+		c2.x = 6; c2.y = 8;
+		c3.x = 0; c3.y = 8;
+
+		alg.gridInterval = 2;
+		alg.computeClusterDistance();
+
+		checkPixelContains(0,2,0,2,c0,alg);
+		checkPixelContains(5,7,0,2,c1,alg);
+		checkPixelContains(5,7,7,9,c2,alg);
+		checkPixelContains(0,2,7,9,c3,alg);
+	}

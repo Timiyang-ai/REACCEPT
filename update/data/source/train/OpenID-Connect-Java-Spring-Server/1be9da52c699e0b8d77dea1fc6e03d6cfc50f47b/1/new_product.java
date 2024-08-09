@@ -1,0 +1,1 @@
+public PermissionTicket createTicket(ResourceSet resourceSet, Set<String> scopes);

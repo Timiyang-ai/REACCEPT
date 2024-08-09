@@ -1,0 +1,1 @@
+List<SchemaDto> getConfigurationSchemaVersionsByApplicationId(String applicationId) throws ControlServiceException;

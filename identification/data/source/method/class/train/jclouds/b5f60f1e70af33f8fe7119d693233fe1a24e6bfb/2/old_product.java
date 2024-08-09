@@ -1,0 +1,1 @@
+Extension getExtensionByAlias(String alias);

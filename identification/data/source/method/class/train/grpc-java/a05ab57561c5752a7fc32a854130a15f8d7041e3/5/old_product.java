@@ -1,0 +1,1 @@
+public void handleResolvedAddresses(List<ResolvedServerInfo> servers, Attributes config) { }

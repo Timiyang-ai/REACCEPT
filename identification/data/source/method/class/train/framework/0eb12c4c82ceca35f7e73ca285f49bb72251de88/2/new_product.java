@@ -1,0 +1,1 @@
+void render(FlyweightCell cell, T data);

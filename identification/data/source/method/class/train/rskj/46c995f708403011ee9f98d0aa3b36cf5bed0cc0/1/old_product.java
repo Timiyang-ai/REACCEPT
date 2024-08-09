@@ -1,0 +1,1 @@
+void updateBatch(Map<byte[], byte[]> rows);

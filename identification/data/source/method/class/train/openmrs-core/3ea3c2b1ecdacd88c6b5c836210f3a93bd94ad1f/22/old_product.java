@@ -1,0 +1,11 @@
+public void validate(Object object, Errors errors) {
+		log.error(this.getClass().getName() + ".validate...");
+		PersonName personName = (PersonName) object;
+		try {
+			// Validate that the person name object is not null
+			if (personName == null) errors.reject("error.name");
+			if (!errors.hasErrors()) validatePersonName(personName, errors, true, false);
+		} catch (Exception e) {
+			errors.reject(e.getMessage());
+		}
+	}

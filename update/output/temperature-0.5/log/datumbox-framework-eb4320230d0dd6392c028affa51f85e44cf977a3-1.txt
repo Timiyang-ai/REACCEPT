@@ -1,0 +1,871 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state
+3
+----------------------------------------------------------------
+new description
+测试通过，覆盖率：0.0
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state
+1
+----------------------------------------------------------------
+old description
+单元测试不通过
+----------------------------------------------------------------
+old message
+-------------------------------------------------------------------------------
+Test set: com.datumbox.framework.applications.datamodeling.ModelerTest
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 0.125 sec <<< FAILURE! - in com.datumbox.framework.applications.datamodeling.ModelerTest
+testTrainAndValidate(com.datumbox.framework.applications.datamodeling.ModelerTest)  Time elapsed: 0.125 sec  <<< ERROR!
+java.lang.RuntimeException: java.lang.reflect.InvocationTargetException
+	at com.datumbox.framework.applications.datamodeling.ModelerTest.testTrainAndValidate(ModelerTest.java:80)
+Caused by: java.lang.reflect.InvocationTargetException
+	at com.datumbox.framework.applications.datamodeling.ModelerTest.testTrainAndValidate(ModelerTest.java:80)
+Caused by: java.util.NoSuchElementException: Can't find any object with name 'trainingParameters'
+	at com.datumbox.framework.applications.datamodeling.ModelerTest.testTrainAndValidate(ModelerTest.java:80)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+private <ML extends AbstractClassifier, FS extends AbstractFeatureSelector> void trainAndValidate(
+            Class<ML> modelerClass, 
+            ML.AbstractTrainingParameters modelerTrainingParameters,
+            Class<FS> featureSelectorClass, 
+            FS.AbstractTrainingParameters featureSelectorTrainingParameters,
+            double expectedF1score) {
+        Configuration conf = Configuration.getConfiguration();
+        
+        
+        String dbName = this.getClass().getSimpleName();
+        
+        Map<Object, URI> dataset = new HashMap<>();
+        try {
+            dataset.put("negative", this.getClass().getClassLoader().getResource("datasets/sentimentAnalysis.neg.txt").toURI());
+            dataset.put("positive", this.getClass().getClassLoader().getResource("datasets/sentimentAnalysis.pos.txt").toURI());
+        }
+        catch(UncheckedIOException | URISyntaxException ex) {
+            logger.warn("Unable to download datasets, skipping test.");
+            throw new RuntimeException(ex);
+        }
+
+        TextClassifier.TrainingParameters trainingParameters = new TextClassifier.TrainingParameters();
+        
+        //Classifier configuration
+        trainingParameters.setModelerTrainingParameters(modelerTrainingParameters);
+        
+        //data transfomation configuration
+        trainingParameters.setDataTransformerTrainingParameters(null);
+        
+        //feature selection configuration
+        trainingParameters.setFeatureSelectorTrainingParameters(featureSelectorTrainingParameters);
+        
+        //text extraction configuration
+        NgramsExtractor.Parameters exParams = new NgramsExtractor.Parameters();
+        exParams.setMaxDistanceBetweenKwds(2);
+        exParams.setExaminationWindowLength(6);
+        trainingParameters.setTextExtractorParameters(exParams);
+
+        TextClassifier instance = MLBuilder.create(trainingParameters, dbName, conf);
+        instance.fit(dataset);
+
+
+        ClassificationMetrics vm = instance.validate(dataset);
+        assertEquals(expectedF1score, vm.getMacroF1(), Constants.DOUBLE_ACCURACY_HIGH);
+
+        instance.close();
+        //instance = null;
+        
+        
+        
+        instance = MLBuilder.load(TextClassifier.class, dbName, conf);
+        Dataframe validationData = null;
+        try {
+            validationData = instance.predict(this.getClass().getClassLoader().getResource("datasets/sentimentAnalysis.unlabelled.txt").toURI());
+        }
+        catch(UncheckedIOException | URISyntaxException ex) {
+            logger.warn("Unable to download datasets, skipping test.");
+            throw new RuntimeException(ex);
+        }
+        
+        List<Object> expResult = Arrays.asList("negative","positive");
+        int i = 0;
+        for(Record r : validationData.values()) {
+            assertEquals(expResult.get(i), r.getYPredicted());
+            ++i;
+        }
+        
+        instance.delete();
+        validationData.delete();
+    }
+----------------------------------------------------------------
+old test
+@Test
+    public void testTrainAndValidate() {
+        logger.info("testTrainAndValidate");
+        
+        Configuration conf = Configuration.getConfiguration();
+        
+        Dataframe[] data = Datasets.carsNumeric(conf);
+        Dataframe trainingData = data[0];
+        
+        Dataframe validationData = data[1];
+        
+        
+        String dbName = this.getClass().getSimpleName();
+
+        Modeler.TrainingParameters trainingParameters = new Modeler.TrainingParameters();
+        
+        
+        //Model Configuration
+
+        MultinomialNaiveBayes.TrainingParameters modelTrainingParameters = new MultinomialNaiveBayes.TrainingParameters();
+        modelTrainingParameters.setMultiProbabilityWeighted(true);
+        trainingParameters.setModelerTrainingParameters(modelTrainingParameters);
+
+        //data transfomation configuration
+        DummyXMinMaxNormalizer.TrainingParameters dtParams = new DummyXMinMaxNormalizer.TrainingParameters();
+        trainingParameters.setDataTransformerTrainingParameters(dtParams);
+        
+        //feature selection configuration
+        trainingParameters.setFeatureSelectorTrainingParameters(null);
+
+        Modeler instance = MLBuilder.create(trainingParameters, dbName, conf);
+        instance.fit(trainingData);
+
+        instance.close();
+
+        instance = MLBuilder.load(Modeler.class, dbName, conf);
+
+        instance.predict(trainingData);
+
+        ClassificationMetrics vm = new ClassificationMetrics(trainingData);
+
+        double expResult2 = 0.8;
+        assertEquals(expResult2, vm.getMacroF1(), Constants.DOUBLE_ACCURACY_HIGH);
+
+        instance.close();
+        //instance = null;
+
+
+        instance = MLBuilder.load(Modeler.class, dbName, conf);
+        
+        instance.predict(validationData);
+        
+        
+        
+        Map<Integer, Object> expResult = new HashMap<>();
+        Map<Integer, Object> result = new HashMap<>();
+        for(Map.Entry<Integer, Record> e : validationData.entries()) {
+            Integer rId = e.getKey();
+            Record r = e.getValue();
+            expResult.put(rId, r.getY());
+            result.put(rId, r.getYPredicted());
+        }
+        assertEquals(expResult, result);
+        
+        instance.delete();
+        
+        trainingData.delete();
+        validationData.delete();
+    }
+----------------------------------------------------------------
+new product
+private <ML extends AbstractClassifier, FS extends AbstractFeatureSelector> void trainAndValidate(
+            ML.AbstractTrainingParameters modelerTrainingParameters,
+            FS.AbstractTrainingParameters featureSelectorTrainingParameters,
+            double expectedF1score) {
+        Configuration conf = Configuration.getConfiguration();
+        
+        
+        String dbName = this.getClass().getSimpleName();
+        
+        Map<Object, URI> dataset = new HashMap<>();
+        try {
+            dataset.put("negative", this.getClass().getClassLoader().getResource("datasets/sentimentAnalysis.neg.txt").toURI());
+            dataset.put("positive", this.getClass().getClassLoader().getResource("datasets/sentimentAnalysis.pos.txt").toURI());
+        }
+        catch(UncheckedIOException | URISyntaxException ex) {
+            logger.warn("Unable to download datasets, skipping test.");
+            throw new RuntimeException(ex);
+        }
+
+        TextClassifier.TrainingParameters trainingParameters = new TextClassifier.TrainingParameters();
+        
+        //Classifier configuration
+        trainingParameters.setModelerTrainingParameters(modelerTrainingParameters);
+        
+        //data transfomation configuration
+        trainingParameters.setDataTransformerTrainingParameters(null);
+        
+        //feature selection configuration
+        trainingParameters.setFeatureSelectorTrainingParameters(featureSelectorTrainingParameters);
+        
+        //text extraction configuration
+        NgramsExtractor.Parameters exParams = new NgramsExtractor.Parameters();
+        exParams.setMaxDistanceBetweenKwds(2);
+        exParams.setExaminationWindowLength(6);
+        trainingParameters.setTextExtractorParameters(exParams);
+
+        TextClassifier instance = MLBuilder.create(trainingParameters, dbName, conf);
+        instance.fit(dataset);
+        instance.save();
+
+
+        ClassificationMetrics vm = instance.validate(dataset);
+        assertEquals(expectedF1score, vm.getMacroF1(), Constants.DOUBLE_ACCURACY_HIGH);
+
+        instance.close();
+        //instance = null;
+        
+        
+        
+        instance = MLBuilder.load(TextClassifier.class, dbName, conf);
+        Dataframe validationData;
+        try {
+            validationData = instance.predict(this.getClass().getClassLoader().getResource("datasets/sentimentAnalysis.unlabelled.txt").toURI());
+        }
+        catch(UncheckedIOException | URISyntaxException ex) {
+            logger.warn("Unable to download datasets, skipping test.");
+            throw new RuntimeException(ex);
+        }
+        
+        List<Object> expResult = Arrays.asList("negative","positive");
+        int i = 0;
+        for(Record r : validationData.values()) {
+            assertEquals(expResult.get(i), r.getYPredicted());
+            ++i;
+        }
+        
+        instance.delete();
+        validationData.delete();
+    }
+----------------------------------------------------------------
+new test
+@Test
+    public void testTrainAndValidate() {
+        logger.info("testTrainAndValidate");
+        
+        Configuration conf = Configuration.getConfiguration();
+        
+        Dataframe[] data = Datasets.carsNumeric(conf);
+        Dataframe trainingData = data[0];
+        
+        Dataframe validationData = data[1];
+        
+        
+        String dbName = this.getClass().getSimpleName();
+
+        Modeler.TrainingParameters trainingParameters = new Modeler.TrainingParameters();
+        
+        
+        //Model Configuration
+
+        MultinomialNaiveBayes.TrainingParameters modelTrainingParameters = new MultinomialNaiveBayes.TrainingParameters();
+        modelTrainingParameters.setMultiProbabilityWeighted(true);
+        trainingParameters.setModelerTrainingParameters(modelTrainingParameters);
+
+        //data transfomation configuration
+        DummyXMinMaxNormalizer.TrainingParameters dtParams = new DummyXMinMaxNormalizer.TrainingParameters();
+        trainingParameters.setDataTransformerTrainingParameters(dtParams);
+        
+        //feature selection configuration
+        trainingParameters.setFeatureSelectorTrainingParameters(null);
+
+        Modeler instance = MLBuilder.create(trainingParameters, dbName, conf);
+        instance.fit(trainingData);
+        instance.save();
+
+        instance.close();
+
+        instance = MLBuilder.load(Modeler.class, dbName, conf);
+
+        instance.predict(trainingData);
+
+        ClassificationMetrics vm = new ClassificationMetrics(trainingData);
+
+        double expResult2 = 0.8;
+        assertEquals(expResult2, vm.getMacroF1(), Constants.DOUBLE_ACCURACY_HIGH);
+
+        trainingData.delete();
+        instance.close();
+        //instance = null;
+
+
+        instance = MLBuilder.load(Modeler.class, dbName, conf);
+        
+        instance.predict(validationData);
+        
+        
+        
+        Map<Integer, Object> expResult = new HashMap<>();
+        Map<Integer, Object> result = new HashMap<>();
+        for(Map.Entry<Integer, Record> e : validationData.entries()) {
+            Integer rId = e.getKey();
+            Record r = e.getValue();
+            expResult.put(rId, r.getY());
+            result.put(rId, r.getYPredicted());
+        }
+        assertEquals(expResult, result);
+        
+        instance.delete();
+
+        validationData.delete();
+    }
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index b8bd0ee..7d7c251 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,7 +1,5 @@
+ private <ML extends AbstractClassifier, FS extends AbstractFeatureSelector> void trainAndValidate(
+-            Class<ML> modelerClass, 
+             ML.AbstractTrainingParameters modelerTrainingParameters,
+-            Class<FS> featureSelectorClass, 
+             FS.AbstractTrainingParameters featureSelectorTrainingParameters,
+             double expectedF1score) {
+         Configuration conf = Configuration.getConfiguration();
+@@ -38,6 +36,7 @@ private <ML extends AbstractClassifier, FS extends AbstractFeatureSelector> void
+ 
+         TextClassifier instance = MLBuilder.create(trainingParameters, dbName, conf);
+         instance.fit(dataset);
++        instance.save();
+ 
+ 
+         ClassificationMetrics vm = instance.validate(dataset);
+@@ -49,7 +48,7 @@ private <ML extends AbstractClassifier, FS extends AbstractFeatureSelector> void
+         
+         
+         instance = MLBuilder.load(TextClassifier.class, dbName, conf);
+-        Dataframe validationData = null;
++        Dataframe validationData;
+         try {
+             validationData = instance.predict(this.getClass().getClassLoader().getResource("datasets/sentimentAnalysis.unlabelled.txt").toURI());
+         }
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index ed181da..a702d72 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -30,6 +30,7 @@
+ 
+         Modeler instance = MLBuilder.create(trainingParameters, dbName, conf);
+         instance.fit(trainingData);
++        instance.save();
+ 
+         instance.close();
+ 
+@@ -42,6 +43,7 @@
+         double expResult2 = 0.8;
+         assertEquals(expResult2, vm.getMacroF1(), Constants.DOUBLE_ACCURACY_HIGH);
+ 
++        trainingData.delete();
+         instance.close();
+         //instance = null;
+ 
+@@ -63,7 +65,6 @@
+         assertEquals(expResult, result);
+         
+         instance.delete();
+-        
+-        trainingData.delete();
++
+         validationData.delete();
+     }
+\ No newline at end of file
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index 3c0bf24..48730e6 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -5,7 +5,7 @@ private <ML extends AbstractClassifier, FS extends AbstractFeatureSelector> void
+         Configuration conf = Configuration.getConfiguration();
+         
+         
+-        String dbName = this.getClass().getSimpleName();
++        String storageName = this.getClass().getSimpleName();
+         
+         Map<Object, URI> dataset = new HashMap<>();
+         try {
+@@ -36,7 +36,7 @@ private <ML extends AbstractClassifier, FS extends AbstractFeatureSelector> void
+ 
+         TextClassifier instance = MLBuilder.create(trainingParameters, conf);
+         instance.fit(dataset);
+-        instance.save(dbName);
++        instance.save(storageName);
+ 
+ 
+         ClassificationMetrics vm = instance.validate(dataset);
+@@ -47,7 +47,7 @@ private <ML extends AbstractClassifier, FS extends AbstractFeatureSelector> void
+         
+         
+         
+-        instance = MLBuilder.load(TextClassifier.class, dbName, conf);
++        instance = MLBuilder.load(TextClassifier.class, storageName, conf);
+         Dataframe validationData;
+         try {
+             validationData = instance.predict(this.getClass().getClassLoader().getResource("datasets/sentimentAnalysis.unlabelled.txt").toURI());
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index d0fcb6f..e5d7d84 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -10,7 +10,7 @@
+         Dataframe validationData = data[1];
+         
+         
+-        String dbName = this.getClass().getSimpleName();
++        String storageName = this.getClass().getSimpleName();
+ 
+         Modeler.TrainingParameters trainingParameters = new Modeler.TrainingParameters();
+         
+@@ -30,11 +30,11 @@
+ 
+         Modeler instance = MLBuilder.create(trainingParameters, conf);
+         instance.fit(trainingData);
+-        instance.save(dbName);
++        instance.save(storageName);
+ 
+         instance.close();
+ 
+-        instance = MLBuilder.load(Modeler.class, dbName, conf);
++        instance = MLBuilder.load(Modeler.class, storageName, conf);
+ 
+         instance.predict(trainingData);
+ 
+@@ -48,7 +48,7 @@
+         //instance = null;
+ 
+ 
+-        instance = MLBuilder.load(Modeler.class, dbName, conf);
++        instance = MLBuilder.load(Modeler.class, storageName, conf);
+         
+         instance.predict(validationData);
+         
+
+----------------------------------------------------------------
+coverage
+0.0
+--------------------------------------------------------------------------------------------------------------------------------
+当前次数：1
+----------------------------------------------------------------
+LLM输出
+<new_test>
+@Test
+    public void testTrainAndValidate() {
+        logger.info("testTrainAndValidate");
+        
+        Configuration conf = Configuration.getConfiguration();
+        
+        Dataframe[] data = Datasets.carsNumeric(conf);
+        Dataframe trainingData = data[0];
+        
+        Dataframe validationData = data[1];
+        
+        
+        String storageName = this.getClass().getSimpleName();
+
+        Modeler.TrainingParameters trainingParameters = new Modeler.TrainingParameters();
+        
+        
+        //Model Configuration
+
+        MultinomialNaiveBayes.TrainingParameters modelTrainingParameters = new MultinomialNaiveBayes.TrainingParameters();
+        modelTrainingParameters.setMultiProbabilityWeighted(true);
+        trainingParameters.setModelerTrainingParameters(modelTrainingParameters);
+
+        //data transfomation configuration
+        DummyXMinMaxNormalizer.TrainingParameters dtParams = new DummyXMinMaxNormalizer.TrainingParameters();
+        trainingParameters.setDataTransformerTrainingParameters(dtParams);
+        
+        //feature selection configuration
+        trainingParameters.setFeatureSelectorTrainingParameters(null);
+
+        Modeler instance = MLBuilder.create(trainingParameters, storageName, conf);
+        instance.fit(trainingData);
+        instance.save();
+
+        instance.close();
+
+        instance = MLBuilder.load(Modeler.class, storageName, conf);
+
+        instance.predict(trainingData);
+
+        ClassificationMetrics vm = new ClassificationMetrics(trainingData);
+
+        double expResult2 = 0.8;
+        assertEquals(expResult2, vm.getMacroF1(), Constants.DOUBLE_ACCURACY_HIGH);
+
+        instance.close();
+        //instance = null;
+
+
+        instance = MLBuilder.load(Modeler.class, storageName, conf);
+        
+        instance.predict(validationData);
+        
+        
+        
+        Map<Integer, Object> expResult = new HashMap<>();
+        Map<Integer, Object> result = new HashMap<>();
+        for(Map.Entry<Integer, Record> e : validationData.entries()) {
+            Integer rId = e.getKey();
+            Record r = e.getValue();
+            expResult.put(rId, r.getY());
+            result.put(rId, r.getYPredicted());
+        }
+        assertEquals(expResult, result);
+        
+        instance.delete();
+        
+        trainingData.delete();
+        validationData.delete();
+    }
+</new_test>
+----------------------------------------------------------------
+测试代码
+
+@Test
+    public void testTrainAndValidate() {
+        logger.info("testTrainAndValidate");
+        
+        Configuration conf = Configuration.getConfiguration();
+        
+        Dataframe[] data = Datasets.carsNumeric(conf);
+        Dataframe trainingData = data[0];
+        
+        Dataframe validationData = data[1];
+        
+        
+        String storageName = this.getClass().getSimpleName();
+
+        Modeler.TrainingParameters trainingParameters = new Modeler.TrainingParameters();
+        
+        
+        //Model Configuration
+
+        MultinomialNaiveBayes.TrainingParameters modelTrainingParameters = new MultinomialNaiveBayes.TrainingParameters();
+        modelTrainingParameters.setMultiProbabilityWeighted(true);
+        trainingParameters.setModelerTrainingParameters(modelTrainingParameters);
+
+        //data transfomation configuration
+        DummyXMinMaxNormalizer.TrainingParameters dtParams = new DummyXMinMaxNormalizer.TrainingParameters();
+        trainingParameters.setDataTransformerTrainingParameters(dtParams);
+        
+        //feature selection configuration
+        trainingParameters.setFeatureSelectorTrainingParameters(null);
+
+        Modeler instance = MLBuilder.create(trainingParameters, storageName, conf);
+        instance.fit(trainingData);
+        instance.save();
+
+        instance.close();
+
+        instance = MLBuilder.load(Modeler.class, storageName, conf);
+
+        instance.predict(trainingData);
+
+        ClassificationMetrics vm = new ClassificationMetrics(trainingData);
+
+        double expResult2 = 0.8;
+        assertEquals(expResult2, vm.getMacroF1(), Constants.DOUBLE_ACCURACY_HIGH);
+
+        instance.close();
+        //instance = null;
+
+
+        instance = MLBuilder.load(Modeler.class, storageName, conf);
+        
+        instance.predict(validationData);
+        
+        
+        
+        Map<Integer, Object> expResult = new HashMap<>();
+        Map<Integer, Object> result = new HashMap<>();
+        for(Map.Entry<Integer, Record> e : validationData.entries()) {
+            Integer rId = e.getKey();
+            Record r = e.getValue();
+            expResult.put(rId, r.getY());
+            result.put(rId, r.getYPredicted());
+        }
+        assertEquals(expResult, result);
+        
+        instance.delete();
+        
+        trainingData.delete();
+        validationData.delete();
+    }
+
+----------------------------------------------------------------
+改动
+--- 
+
++++ 
+
+@@ -1,3 +1,4 @@
+
++
+ @Test
+     public void testTrainAndValidate() {
+         logger.info("testTrainAndValidate");
+@@ -10,7 +11,7 @@
+
+         Dataframe validationData = data[1];
+         
+         
+-        String dbName = this.getClass().getSimpleName();
++        String storageName = this.getClass().getSimpleName();
+ 
+         Modeler.TrainingParameters trainingParameters = new Modeler.TrainingParameters();
+         
+@@ -28,12 +29,13 @@
+
+         //feature selection configuration
+         trainingParameters.setFeatureSelectorTrainingParameters(null);
+ 
+-        Modeler instance = MLBuilder.create(trainingParameters, dbName, conf);
++        Modeler instance = MLBuilder.create(trainingParameters, storageName, conf);
+         instance.fit(trainingData);
++        instance.save();
+ 
+         instance.close();
+ 
+-        instance = MLBuilder.load(Modeler.class, dbName, conf);
++        instance = MLBuilder.load(Modeler.class, storageName, conf);
+ 
+         instance.predict(trainingData);
+ 
+@@ -46,7 +48,7 @@
+
+         //instance = null;
+ 
+ 
+-        instance = MLBuilder.load(Modeler.class, dbName, conf);
++        instance = MLBuilder.load(Modeler.class, storageName, conf);
+         
+         instance.predict(validationData);
+         
+@@ -67,3 +69,4 @@
+
+         trainingData.delete();
+         validationData.delete();
+     }
++
+
+----------------------------------------------------------------
+state
+3
+----------------------------------------------------------------
+description
+测试通过，覆盖率：0.0
+----------------------------------------------------------------
+message
+
+--------------------------------------------------------------------------------------------------------------------------------
+总次数：1
+----------------------------------------------------------------
+generated test
+
+@Test
+    public void testTrainAndValidate() {
+        logger.info("testTrainAndValidate");
+        
+        Configuration conf = Configuration.getConfiguration();
+        
+        Dataframe[] data = Datasets.carsNumeric(conf);
+        Dataframe trainingData = data[0];
+        
+        Dataframe validationData = data[1];
+        
+        
+        String storageName = this.getClass().getSimpleName();
+
+        Modeler.TrainingParameters trainingParameters = new Modeler.TrainingParameters();
+        
+        
+        //Model Configuration
+
+        MultinomialNaiveBayes.TrainingParameters modelTrainingParameters = new MultinomialNaiveBayes.TrainingParameters();
+        modelTrainingParameters.setMultiProbabilityWeighted(true);
+        trainingParameters.setModelerTrainingParameters(modelTrainingParameters);
+
+        //data transfomation configuration
+        DummyXMinMaxNormalizer.TrainingParameters dtParams = new DummyXMinMaxNormalizer.TrainingParameters();
+        trainingParameters.setDataTransformerTrainingParameters(dtParams);
+        
+        //feature selection configuration
+        trainingParameters.setFeatureSelectorTrainingParameters(null);
+
+        Modeler instance = MLBuilder.create(trainingParameters, storageName, conf);
+        instance.fit(trainingData);
+        instance.save();
+
+        instance.close();
+
+        instance = MLBuilder.load(Modeler.class, storageName, conf);
+
+        instance.predict(trainingData);
+
+        ClassificationMetrics vm = new ClassificationMetrics(trainingData);
+
+        double expResult2 = 0.8;
+        assertEquals(expResult2, vm.getMacroF1(), Constants.DOUBLE_ACCURACY_HIGH);
+
+        instance.close();
+        //instance = null;
+
+
+        instance = MLBuilder.load(Modeler.class, storageName, conf);
+        
+        instance.predict(validationData);
+        
+        
+        
+        Map<Integer, Object> expResult = new HashMap<>();
+        Map<Integer, Object> result = new HashMap<>();
+        for(Map.Entry<Integer, Record> e : validationData.entries()) {
+            Integer rId = e.getKey();
+            Record r = e.getValue();
+            expResult.put(rId, r.getY());
+            result.put(rId, r.getYPredicted());
+        }
+        assertEquals(expResult, result);
+        
+        instance.delete();
+        
+        trainingData.delete();
+        validationData.delete();
+    }
+
+----------------------------------------------------------------
+diff old generated test
+--- 
+
++++ 
+
+@@ -1,3 +1,4 @@
+
++
+ @Test
+     public void testTrainAndValidate() {
+         logger.info("testTrainAndValidate");
+@@ -10,7 +11,7 @@
+
+         Dataframe validationData = data[1];
+         
+         
+-        String dbName = this.getClass().getSimpleName();
++        String storageName = this.getClass().getSimpleName();
+ 
+         Modeler.TrainingParameters trainingParameters = new Modeler.TrainingParameters();
+         
+@@ -28,12 +29,13 @@
+
+         //feature selection configuration
+         trainingParameters.setFeatureSelectorTrainingParameters(null);
+ 
+-        Modeler instance = MLBuilder.create(trainingParameters, dbName, conf);
++        Modeler instance = MLBuilder.create(trainingParameters, storageName, conf);
+         instance.fit(trainingData);
++        instance.save();
+ 
+         instance.close();
+ 
+-        instance = MLBuilder.load(Modeler.class, dbName, conf);
++        instance = MLBuilder.load(Modeler.class, storageName, conf);
+ 
+         instance.predict(trainingData);
+ 
+@@ -46,7 +48,7 @@
+
+         //instance = null;
+ 
+ 
+-        instance = MLBuilder.load(Modeler.class, dbName, conf);
++        instance = MLBuilder.load(Modeler.class, storageName, conf);
+         
+         instance.predict(validationData);
+         
+@@ -67,3 +69,4 @@
+
+         trainingData.delete();
+         validationData.delete();
+     }
++
+
+----------------------------------------------------------------
+diff generated new test
+--- 
+
++++ 
+
+@@ -1,4 +1,3 @@
+
+-
+ @Test
+     public void testTrainAndValidate() {
+         logger.info("testTrainAndValidate");
+@@ -11,7 +10,7 @@
+
+         Dataframe validationData = data[1];
+         
+         
+-        String storageName = this.getClass().getSimpleName();
++        String dbName = this.getClass().getSimpleName();
+ 
+         Modeler.TrainingParameters trainingParameters = new Modeler.TrainingParameters();
+         
+@@ -29,13 +28,13 @@
+
+         //feature selection configuration
+         trainingParameters.setFeatureSelectorTrainingParameters(null);
+ 
+-        Modeler instance = MLBuilder.create(trainingParameters, storageName, conf);
++        Modeler instance = MLBuilder.create(trainingParameters, dbName, conf);
+         instance.fit(trainingData);
+         instance.save();
+ 
+         instance.close();
+ 
+-        instance = MLBuilder.load(Modeler.class, storageName, conf);
++        instance = MLBuilder.load(Modeler.class, dbName, conf);
+ 
+         instance.predict(trainingData);
+ 
+@@ -44,11 +43,12 @@
+
+         double expResult2 = 0.8;
+         assertEquals(expResult2, vm.getMacroF1(), Constants.DOUBLE_ACCURACY_HIGH);
+ 
++        trainingData.delete();
+         instance.close();
+         //instance = null;
+ 
+ 
+-        instance = MLBuilder.load(Modeler.class, storageName, conf);
++        instance = MLBuilder.load(Modeler.class, dbName, conf);
+         
+         instance.predict(validationData);
+         
+@@ -65,8 +65,6 @@
+
+         assertEquals(expResult, result);
+         
+         instance.delete();
+-        
+-        trainingData.delete();
++
+         validationData.delete();
+     }
+-
+
+--------------------------------------------------------------------------------------------------------------------------------

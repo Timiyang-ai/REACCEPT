@@ -1,0 +1,1 @@
+void changeReplicationFactor(Topic topic, Handler<AsyncResult<Void>> handler);

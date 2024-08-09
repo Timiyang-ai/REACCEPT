@@ -1,0 +1,1 @@
+Set<Flavor> listFlavorsInDetail();

@@ -1,0 +1,1 @@
+ScoredLongList recommend(long user);

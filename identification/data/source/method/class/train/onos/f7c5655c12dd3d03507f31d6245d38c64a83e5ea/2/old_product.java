@@ -1,0 +1,1 @@
+List<OspfInterface> getInterfacesLst();

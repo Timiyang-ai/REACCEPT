@@ -1,0 +1,1 @@
+public void writeUdp(final int port, final TimeUnit precision, final Serie... series);

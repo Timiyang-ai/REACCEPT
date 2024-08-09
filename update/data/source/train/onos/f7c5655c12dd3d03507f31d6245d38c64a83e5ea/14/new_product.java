@@ -1,0 +1,1 @@
+void processOspfMessage(OspfMessage ospfMessage, ChannelHandlerContext ctx) throws Exception;

@@ -1,0 +1,1 @@
+VmPendingQuestion getPendingQuestion(URI vmURI);

@@ -1,0 +1,1 @@
+public abstract Era<C> eraOf(int eraValue);

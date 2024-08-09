@@ -1,0 +1,1 @@
+public abstract void cache(InputInfo info, boolean lazy) throws QueryException;

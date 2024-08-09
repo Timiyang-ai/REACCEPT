@@ -1,0 +1,1 @@
+public void setWorkflowGroup(Collection collection, int step, Group group);

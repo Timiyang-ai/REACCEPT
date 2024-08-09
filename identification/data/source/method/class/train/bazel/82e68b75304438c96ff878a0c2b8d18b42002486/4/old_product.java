@@ -1,0 +1,1 @@
+protected abstract void setExecutable(LocalPath path, boolean executable) throws IOException;

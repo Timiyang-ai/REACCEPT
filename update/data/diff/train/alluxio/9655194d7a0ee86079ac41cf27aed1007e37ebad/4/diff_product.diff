@@ -1,0 +1,41 @@
+diff --git a/old_product.java b/new_product.java
+index 6e34590..9b7e2bd 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,4 +1,4 @@
+-public CreatePathResult createPath(InodePath inodePath, CreatePathOptions<?> options)
++public CreatePathResult createPath(LockedInodePath inodePath, CreatePathOptions<?> options)
+       throws FileAlreadyExistsException, BlockInfoException, InvalidPathException, IOException,
+       FileDoesNotExistException {
+     AlluxioURI path = inodePath.getUri();
+@@ -13,8 +13,9 @@ public CreatePathResult createPath(InodePath inodePath, CreatePathOptions<?> opt
+       }
+     }
+ 
+-    if (!(inodePath instanceof ExtensibleInodePath)) {
+-      throw new InvalidPathException("Not an ExtensibleInodePath: " + inodePath.getUri());
++    if (!(inodePath instanceof MutableLockedInodePath)) {
++      throw new InvalidPathException(
++          ExceptionMessage.NOT_MUTABLE_INODE_PATH.getMessage(inodePath.getUri()));
+     }
+ 
+     LOG.debug("createPath {}", path);
+@@ -22,7 +23,7 @@ public CreatePathResult createPath(InodePath inodePath, CreatePathOptions<?> opt
+     TraversalResult traversalResult = traverseToInode(inodePath, LockMode.WRITE_PARENT);
+     InodeLockGroup lockGroup = traversalResult.getInodeLockGroup();
+ 
+-    ExtensibleInodePath extensibleInodePath = (ExtensibleInodePath) inodePath;
++    MutableLockedInodePath extensibleInodePath = (MutableLockedInodePath) inodePath;
+     String[] pathComponents = extensibleInodePath.getPathComponents();
+     String name = path.getName();
+ 
+@@ -67,6 +68,9 @@ public CreatePathResult createPath(InodePath inodePath, CreatePathOptions<?> opt
+       modifiedInodes.add(currentInodeDirectory);
+     }
+ 
++    // TODO(gpang): We may not have to lock the newly created inodes if the last inode is write
++    // locked. This could improve performance. Further investigation is needed.
++
+     // Fill in the ancestor directories that were missing.
+     CreateDirectoryOptions missingDirOptions = CreateDirectoryOptions.defaults()
+         .setMountPoint(false)

@@ -1,0 +1,1 @@
+public OrderFrequency getOrderFrequency(Integer orderFrequencyId);

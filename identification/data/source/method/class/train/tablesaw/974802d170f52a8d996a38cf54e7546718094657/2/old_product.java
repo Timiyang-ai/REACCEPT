@@ -1,0 +1,1 @@
+void addRange(int start, int end);

@@ -1,0 +1,1 @@
+DmnDecisionTableResult evaluateDecisionTableById(String decisionDefinitionId, Map<String, Object> variables);

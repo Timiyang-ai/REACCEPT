@@ -1,0 +1,1 @@
+INamedParameters add(final String name, final Object value, Type type);

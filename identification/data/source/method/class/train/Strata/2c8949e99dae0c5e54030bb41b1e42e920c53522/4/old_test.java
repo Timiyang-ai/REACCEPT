@@ -1,0 +1,1 @@
+  abstract VolatilityFunctionProvider<T> getModel();

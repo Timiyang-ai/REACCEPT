@@ -1,0 +1,123 @@
+diff --git a/old_product.java b/new_product.java
+index f00e7d9..fe05e2b 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,10 +1,12 @@
+ @Override
+     public void close() throws IOException {
+ 
++        flushCacheAttrToTempFile();
++
+         String className = getYangName();
+         className = JavaIdentifierSyntax.getCaptialCase(className);
+-        String filePath = getFilePath();
+-        GeneratedFileType fileType = getGeneratedFileTypes();
++        String path = getRelativeFilePath();
++        int fileType = getGeneratedFileTypes();
+ 
+         /*
+          * TODO: add the file header using
+@@ -12,45 +14,46 @@
+          */
+ 
+         List<String> imports = new LinkedList<>();
++        String importString;
+ 
+-        if (getCachedAttributeList() != null) {
+-            MethodsGenerator.setAttrInfo(getCachedAttributeList());
+-            for (AttributeInfo attr : getCachedAttributeList()) {
+-
+-                if (getImportSet() != null) {
+-                    imports = new ArrayList<>(getImportSet());
+-                }
++        for (ImportInfo importInfo : getImportSet()) {
++            importString = "";
++            if (importInfo.getPkgInfo() != null) {
++                importString = importString + importInfo.getPkgInfo() + ".";
+             }
++            importString = importString + importInfo.getClassInfo();
++            imports.add(importString);
+         }
+ 
+         /**
+          * Start generation of files.
+          */
+-        if (fileType.equals(GeneratedFileType.INTERFACE) || fileType.equals(GeneratedFileType.ALL)) {
++        if ((fileType & GeneratedFileType.INTERFACE_MASK) != 0
++                || fileType == GeneratedFileType.GENERATE_INTERFACE_WITH_BUILDER) {
+ 
+             /**
+              * Create interface file.
+              */
+             String interfaceFileName = className;
+-            File interfaceFile = new File(filePath + File.separator + interfaceFileName + JAVA_FILE_EXTENSION);
++            File interfaceFile = JavaFileGenerator.getFileObject(path, interfaceFileName, JAVA_FILE_EXTENSION);
+             interfaceFile = JavaFileGenerator.generateInterfaceFile(interfaceFile, className, imports,
+-                    getCachedAttributeList(), getPackage());
++                    getCachedAttributeList(), path.replace('/', '.'));
+ 
+             /**
+              * Create temp builder interface file.
+              */
+             String builderInterfaceFileName = className + UtilConstants.BUILDER + UtilConstants.INTERFACE;
+-            File builderInterfaceFile = new File(
+-                    filePath + File.separator + builderInterfaceFileName + TEMP_FILE_EXTENSION);
++            File builderInterfaceFile = JavaFileGenerator.getFileObject(path, builderInterfaceFileName,
++                    TEMP_FILE_EXTENSION);
+             builderInterfaceFile = JavaFileGenerator.generateBuilderInterfaceFile(builderInterfaceFile, className,
+-                    getPackage(), getCachedAttributeList());
++                    path.replace('/', '.'), getCachedAttributeList());
+ 
+             /**
+              * Append builder interface file to interface file and close it.
+              */
+             JavaFileGenerator.appendFileContents(builderInterfaceFile, interfaceFile);
+             JavaFileGenerator.insert(interfaceFile,
+-                    JavaFileGenerator.closeFile(GeneratedFileType.INTERFACE, interfaceFileName));
++                    JavaFileGenerator.closeFile(GeneratedFileType.INTERFACE_MASK, interfaceFileName));
+ 
+             /**
+              * Remove temp files.
+@@ -58,33 +61,32 @@
+             JavaFileGenerator.clean(builderInterfaceFile);
+         }
+ 
+-        if (fileType.equals(GeneratedFileType.BUILDER_CLASS) || fileType.equals(GeneratedFileType.ALL)) {
++        if ((fileType & GeneratedFileType.BUILDER_CLASS_MASK) != 0
++                || fileType == GeneratedFileType.GENERATE_INTERFACE_WITH_BUILDER) {
+ 
+             /**
+              * Create builder class file.
+              */
+             String builderFileName = className + UtilConstants.BUILDER;
+-            File builderFile = new File(filePath + File.separator + builderFileName + JAVA_FILE_EXTENSION);
+-            MethodsGenerator.setBuilderClassName(className + UtilConstants.BUILDER);
+-
+-            builderFile = JavaFileGenerator.generateBuilderClassFile(builderFile, className, imports, getPackage(),
+-                    getCachedAttributeList());
++            File builderFile = JavaFileGenerator.getFileObject(path, builderFileName, JAVA_FILE_EXTENSION);
++            builderFile = JavaFileGenerator.generateBuilderClassFile(builderFile, className, imports,
++                    path.replace('/', '.'), getCachedAttributeList());
+ 
+             /**
+              * Create temp impl class file.
+              */
+ 
+             String implFileName = className + UtilConstants.IMPL;
+-            File implTempFile = new File(filePath + File.separator + implFileName + TEMP_FILE_EXTENSION);
+-            implTempFile = JavaFileGenerator.generateImplClassFile(implTempFile, className, getPackage(),
+-                    getCachedAttributeList());
++            File implTempFile = JavaFileGenerator.getFileObject(path, implFileName, TEMP_FILE_EXTENSION);
++            implTempFile = JavaFileGenerator.generateImplClassFile(implTempFile, className,
++                    path.replace('/', '.'), getCachedAttributeList());
+ 
+             /**
+              * Append impl class to builder class and close it.
+              */
+             JavaFileGenerator.appendFileContents(implTempFile, builderFile);
+             JavaFileGenerator.insert(builderFile,
+-                    JavaFileGenerator.closeFile(GeneratedFileType.BUILDER_CLASS, builderFileName));
++                    JavaFileGenerator.closeFile(GeneratedFileType.BUILDER_CLASS_MASK, builderFileName));
+ 
+             /**
+              * Remove temp files.

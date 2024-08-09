@@ -1,0 +1,1201 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.3575757575757576
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 3
+----------------------------------------------------------------
+old description: 测试通过，覆盖率：0.3575757575757576
+----------------------------------------------------------------
+old message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+public Concept saveConcept(Concept concept) throws APIException {
+		ConceptMapType defaultConceptMapType = null;
+		for (ConceptMap map : concept.getConceptMappings()) {
+			if (map.getConceptMapType() == null) {
+				if (defaultConceptMapType == null) {
+					defaultConceptMapType = Context.getConceptService().getDefaultConceptMapType();
+				}
+				map.setConceptMapType(defaultConceptMapType);
+			}
+		}
+		
+		// make sure the administrator hasn't turned off concept editing
+		checkIfLocked();
+		checkIfDatatypeCanBeChanged(concept);
+		
+		List<ConceptName> changedConceptNames = null;
+		Map<String, ConceptName> uuidClonedConceptNameMap = null;
+		
+		if (concept.getConceptId() != null) {
+			uuidClonedConceptNameMap = new HashMap<String, ConceptName>();
+			for (ConceptName conceptName : concept.getNames()) {
+				// ignore newly added names
+				if (conceptName.getConceptNameId() != null) {
+					ConceptName clone = cloneConceptName(conceptName);
+					clone.setConceptNameId(null);
+					uuidClonedConceptNameMap.put(conceptName.getUuid(), clone);
+					
+					if (hasNameChanged(conceptName)) {
+						if (changedConceptNames == null) {
+							changedConceptNames = new ArrayList<ConceptName>();
+						}
+						changedConceptNames.add(conceptName);
+					} else {
+						// put back the concept name id
+						clone.setConceptNameId(conceptName.getConceptNameId());
+						// Use the cloned version
+						try {
+							BeanUtils.copyProperties(conceptName, clone);
+						}
+						catch (IllegalAccessException e) {
+							log.error("Error generated", e);
+						}
+						catch (InvocationTargetException e) {
+							log.error("Error generated", e);
+						}
+					}
+				}
+			}
+		}
+		
+		if (CollectionUtils.isNotEmpty(changedConceptNames)) {
+			for (ConceptName changedName : changedConceptNames) {
+				// void old concept name
+				ConceptName nameInDB = changedName;
+				nameInDB.setVoided(true);
+				nameInDB.setDateVoided(new Date());
+				nameInDB.setVoidedBy(Context.getAuthenticatedUser());
+				nameInDB.setVoidReason(Context.getMessageSourceService().getMessage("Concept.name.voidReason.nameChanged"));
+				
+				// Make the voided name a synonym, this would help to avoid
+				// having multiple fully specified or preferred
+				// names in a locale incase the name is unvoided
+				if (!nameInDB.isSynonym()) {
+					nameInDB.setConceptNameType(null);
+				}
+				if (nameInDB.isLocalePreferred()) {
+					nameInDB.setLocalePreferred(false);
+				}
+				
+				// create a new concept name from the matching cloned
+				// conceptName
+				ConceptName clone = uuidClonedConceptNameMap.get(nameInDB.getUuid());
+				clone.setUuid(UUID.randomUUID().toString());
+				clone.setDateCreated(null);
+				clone.setCreator(null);
+				concept.addName(clone);
+			}
+		}
+		
+		//Ensure if there's a name for a locale that at least one suitable name is marked preferred in that locale
+		//Order of preference is:
+		// 1) any name that concept.getPreferredName returns
+		// 2) fully specified name
+		// 3) any synonym
+		// short name and index terms are never preferred.
+		
+		Set<Locale> checkedLocales = new HashSet<Locale>();
+		for (ConceptName n : concept.getNames()) {
+			Locale locale = n.getLocale();
+			if (checkedLocales.contains(locale)) {
+				continue; //we've already checked this locale
+			}
+			
+			//getPreferredName(locale) returns any name marked preferred,
+			//or the fullySpecifiedName even if not marked preferred
+			ConceptName possiblePreferredName = concept.getPreferredName(locale);
+			
+			if (possiblePreferredName != null) {
+				//do nothing yet, but stick around to setLocalePreferred(true)
+			} else if (concept.getFullySpecifiedName(locale) != null) {
+				possiblePreferredName = concept.getFullySpecifiedName(locale);
+			} else if (!CollectionUtils.isEmpty(concept.getSynonyms(locale))) {
+				concept.getSynonyms(locale).iterator().next().setLocalePreferred(true);
+			}
+			//index terms are never used as preferred name
+			
+			if (possiblePreferredName != null) { //there may have been none
+				possiblePreferredName.setLocalePreferred(true);
+			}
+			checkedLocales.add(locale);
+		}
+		
+		//See TRUNK-3337 for why we set changed by and date changed every time we save a concept.
+		concept.setDateChanged(new Date());
+		concept.setChangedBy(Context.getAuthenticatedUser());
+		
+		Concept conceptToReturn = dao.saveConcept(concept);
+		
+		return conceptToReturn;
+	}
+----------------------------------------------------------------
+old test
+@Test
+	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() throws Exception {
+		Locale loc = new Locale("fr", "CA");
+		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+		ConceptName shortName = new ConceptName("short name", loc);
+		shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
+		ConceptName synonym = new ConceptName("synonym", loc);
+		synonym.setConceptNameType(null); //synonyms are id'd by a null type
+		ConceptName indexTerm = new ConceptName("indexTerm", loc);
+		indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
+		
+		//saveConcept never picks an index term for default, so we'll use it for the test
+		indexTerm.setLocalePreferred(true);
+		
+		Concept c = new Concept();
+		c.addName(fullySpecifiedName);
+		c.addName(synonym);
+		c.addName(indexTerm);
+		c.addName(shortName);
+		
+		//ignore it so we can test the set default preferred name  functionality
+		try {
+			Context.getConceptService().saveConcept(c);
+		}
+		catch (org.openmrs.api.APIException e) {
+			//ignore it
+		}
+		assertNotNull("there's a preferred name", c.getPreferredName(loc));
+		assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
+		assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
+	}
+----------------------------------------------------------------
+new product
+public Concept saveConcept(Concept concept) throws APIException {
+		ConceptMapType defaultConceptMapType = null;
+		for (ConceptMap map : concept.getConceptMappings()) {
+			if (map.getConceptMapType() == null) {
+				if (defaultConceptMapType == null) {
+					defaultConceptMapType = Context.getConceptService().getDefaultConceptMapType();
+				}
+				map.setConceptMapType(defaultConceptMapType);
+			}
+		}
+		
+		// make sure the administrator hasn't turned off concept editing
+		checkIfLocked();
+		checkIfDatatypeCanBeChanged(concept);
+		
+		List<ConceptName> changedConceptNames = null;
+		Map<String, ConceptName> uuidClonedConceptNameMap = null;
+		
+		if (concept.getConceptId() != null) {
+			uuidClonedConceptNameMap = new HashMap<String, ConceptName>();
+			for (ConceptName conceptName : concept.getNames()) {
+				// ignore newly added names
+				if (conceptName.getConceptNameId() != null) {
+					ConceptName clone = cloneConceptName(conceptName);
+					clone.setConceptNameId(null);
+					uuidClonedConceptNameMap.put(conceptName.getUuid(), clone);
+					
+					if (hasNameChanged(conceptName)) {
+						if (changedConceptNames == null) {
+							changedConceptNames = new ArrayList<ConceptName>();
+						}
+						changedConceptNames.add(conceptName);
+					} else {
+						// put back the concept name id
+						clone.setConceptNameId(conceptName.getConceptNameId());
+						// Use the cloned version
+						try {
+							BeanUtils.copyProperties(conceptName, clone);
+						}
+						catch (IllegalAccessException e) {
+							log.error("Error generated", e);
+						}
+						catch (InvocationTargetException e) {
+							log.error("Error generated", e);
+						}
+					}
+				}
+			}
+		}
+		
+		if (CollectionUtils.isNotEmpty(changedConceptNames)) {
+			for (ConceptName changedName : changedConceptNames) {
+				// void old concept name
+				ConceptName nameInDB = changedName;
+				nameInDB.setVoided(true);
+				nameInDB.setDateVoided(new Date());
+				nameInDB.setVoidedBy(Context.getAuthenticatedUser());
+				nameInDB.setVoidReason(Context.getMessageSourceService().getMessage("Concept.name.voidReason.nameChanged"));
+				
+				// Make the voided name a synonym, this would help to avoid
+				// having multiple fully specified or preferred
+				// names in a locale incase the name is unvoided
+				if (!nameInDB.isSynonym()) {
+					nameInDB.setConceptNameType(null);
+				}
+				if (nameInDB.isLocalePreferred()) {
+					nameInDB.setLocalePreferred(false);
+				}
+				
+				// create a new concept name from the matching cloned
+				// conceptName
+				ConceptName clone = uuidClonedConceptNameMap.get(nameInDB.getUuid());
+				clone.setUuid(UUID.randomUUID().toString());
+				clone.setDateCreated(null);
+				clone.setCreator(null);
+				concept.addName(clone);
+			}
+		}
+		
+		//Ensure if there's a name for a locale that at least one suitable name is marked preferred in that locale
+		//Order of preference is:
+		// 1) any name that concept.getPreferredName returns
+		// 2) fully specified name
+		// 3) any synonym
+		// short name and index terms are never preferred.
+		
+		Set<Locale> checkedLocales = new HashSet<Locale>();
+		for (ConceptName n : concept.getNames()) {
+			Locale locale = n.getLocale();
+			if (checkedLocales.contains(locale)) {
+				continue; //we've already checked this locale
+			}
+			
+			//getPreferredName(locale) returns any name marked preferred,
+			//or the fullySpecifiedName even if not marked preferred
+			ConceptName possiblePreferredName = concept.getPreferredName(locale);
+			
+			if (possiblePreferredName != null) {
+				//do nothing yet, but stick around to setLocalePreferred(true)
+			} else if (concept.getFullySpecifiedName(locale) != null) {
+				possiblePreferredName = concept.getFullySpecifiedName(locale);
+			} else if (!CollectionUtils.isEmpty(concept.getSynonyms(locale))) {
+				concept.getSynonyms(locale).iterator().next().setLocalePreferred(true);
+			}
+			//index terms are never used as preferred name
+			
+			if (possiblePreferredName != null) { //there may have been none
+				possiblePreferredName.setLocalePreferred(true);
+			}
+			checkedLocales.add(locale);
+		}
+		
+		//See TRUNK-3337 for why we set changed by and date changed every time we save a concept.
+		concept.setDateChanged(new Date());
+		concept.setChangedBy(Context.getAuthenticatedUser());
+		
+		// force isSet when concept has members
+		if (!concept.isSet() && (concept.getSetMembers().size() > 0)) {
+                    concept.setSet(true);
+		}
+
+		Concept conceptToReturn = dao.saveConcept(concept);
+		
+		return conceptToReturn;
+	}
+----------------------------------------------------------------
+new test
+@Test
+	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
+		Locale loc = new Locale("fr", "CA");
+		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+		ConceptName shortName = new ConceptName("short name", loc);
+		shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
+		ConceptName synonym = new ConceptName("synonym", loc);
+		synonym.setConceptNameType(null); //synonyms are id'd by a null type
+		ConceptName indexTerm = new ConceptName("indexTerm", loc);
+		indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
+		
+		//saveConcept never picks an index term for default, so we'll use it for the test
+		indexTerm.setLocalePreferred(true);
+		
+		Concept c = new Concept();
+		c.addName(fullySpecifiedName);
+		c.addName(synonym);
+		c.addName(indexTerm);
+		c.addName(shortName);
+		
+		//ignore it so we can test the set default preferred name  functionality
+		try {
+			Context.getConceptService().saveConcept(c);
+		}
+		catch (org.openmrs.api.APIException e) {
+			//ignore it
+		}
+		assertNotNull("there's a preferred name", c.getPreferredName(loc));
+		assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
+		assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
+	}
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index 5d0e560..2b25348 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -114,6 +114,11 @@ public Concept saveConcept(Concept concept) throws APIException {
+ 		concept.setDateChanged(new Date());
+ 		concept.setChangedBy(Context.getAuthenticatedUser());
+ 		
++		// force isSet when concept has members
++		if (!concept.isSet() && (concept.getSetMembers().size() > 0)) {
++                    concept.setSet(true);
++		}
++
+ 		Concept conceptToReturn = dao.saveConcept(concept);
+ 		
+ 		return conceptToReturn;
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index 6b0f421..4d644c1 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,5 +1,5 @@
+ @Test
+-	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() throws Exception {
++	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
+ 		Locale loc = new Locale("fr", "CA");
+ 		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+ 		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index 7de06ea..3ab52d3 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -114,6 +114,11 @@ public Concept saveConcept(Concept concept) throws APIException {
+ 		concept.setDateChanged(new Date());
+ 		concept.setChangedBy(Context.getAuthenticatedUser());
+ 		
++		// force isSet when concept has members
++		if (!concept.isSet() && (concept.getSetMembers().size() > 0)) {
++                    concept.setSet(true);
++		}
++
+ 		Concept conceptToReturn = dao.saveConcept(concept);
+ 		
+ 		// add/remove entries in the concept_word table (used for searching)
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index 6b0f421..4d644c1 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,5 +1,5 @@
+ @Test
+-	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() throws Exception {
++	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
+ 		Locale loc = new Locale("fr", "CA");
+ 		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+ 		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+
+----------------------------------------------------------------
+coverage: 0.3575757575757576
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() {
+    Concept concept = new Concept();
+    Concept setMemberOne = new Concept();
+    Concept setMemberTwo = new Concept();
+
+    concept.addSetMember(setMemberOne);
+    concept.addSetMember(setMemberTwo);
+
+    assertFalse("Initially, concept should not be marked as a set", concept.isSet());
+
+    Context.getConceptService().saveConcept(concept);
+
+    assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() {
+    Concept concept = new Concept();
+    Concept setMemberOne = new Concept();
+    Concept setMemberTwo = new Concept();
+
+    concept.addSetMember(setMemberOne);
+    concept.addSetMember(setMemberTwo);
+
+    assertFalse("Initially, concept should not be marked as a set", concept.isSet());
+
+    Context.getConceptService().saveConcept(concept);
+
+    assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,32 +1,15 @@
+
+ @Test
+-	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() throws Exception {
+-		Locale loc = new Locale("fr", "CA");
+-		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+-		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+-		ConceptName shortName = new ConceptName("short name", loc);
+-		shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
+-		ConceptName synonym = new ConceptName("synonym", loc);
+-		synonym.setConceptNameType(null); //synonyms are id'd by a null type
+-		ConceptName indexTerm = new ConceptName("indexTerm", loc);
+-		indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
+-		
+-		//saveConcept never picks an index term for default, so we'll use it for the test
+-		indexTerm.setLocalePreferred(true);
+-		
+-		Concept c = new Concept();
+-		c.addName(fullySpecifiedName);
+-		c.addName(synonym);
+-		c.addName(indexTerm);
+-		c.addName(shortName);
+-		
+-		//ignore it so we can test the set default preferred name  functionality
+-		try {
+-			Context.getConceptService().saveConcept(c);
+-		}
+-		catch (org.openmrs.api.APIException e) {
+-			//ignore it
+-		}
+-		assertNotNull("there's a preferred name", c.getPreferredName(loc));
+-		assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
+-		assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
+-	}
++public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() {
++    Concept concept = new Concept();
++    Concept setMemberOne = new Concept();
++    Concept setMemberTwo = new Concept();
++
++    concept.addSetMember(setMemberOne);
++    concept.addSetMember(setMemberTwo);
++
++    assertFalse("Initially, concept should not be marked as a set", concept.isSet());
++
++    Context.getConceptService().saveConcept(concept);
++
++    assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
++}
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.openmrs.api.impl.ConceptServiceImplTest
+-------------------------------------------------------------------------------
+Tests run: 55, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 7.661 sec <<< FAILURE! - in org.openmrs.api.impl.ConceptServiceImplTest
+saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers(org.openmrs.api.impl.ConceptServiceImplTest)  Time elapsed: 0.031 sec  <<< ERROR!
+org.openmrs.api.ValidationException: 'Concept #null' failed to validate with reason: At least one non-empty name is required
+	at org.openmrs.validator.ValidateUtil.validate(ValidateUtil.java:79)
+	at org.openmrs.aop.RequiredDataAdvice.before(RequiredDataAdvice.java:125)
+	at org.springframework.aop.framework.adapter.MethodBeforeAdviceInterceptor.invoke(MethodBeforeAdviceInterceptor.java:51)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.adapter.MethodBeforeAdviceInterceptor.invoke(MethodBeforeAdviceInterceptor.java:52)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:207)
+	at com.sun.proxy.$Proxy68.saveConcept(Unknown Source)
+	at org.openmrs.api.impl.ConceptServiceImplTest.saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers(ConceptServiceImplTest.java:119)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 2
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() {
+    Locale locale = new Locale("en", "US");
+    Concept concept = new Concept();
+    ConceptName conceptName = new ConceptName("Test Concept", locale);
+    concept.addName(conceptName);
+
+    Concept setMemberOne = new Concept();
+    ConceptName setMemberOneName = new ConceptName("Set Member One", locale);
+    setMemberOne.addName(setMemberOneName);
+
+    Concept setMemberTwo = new Concept();
+    ConceptName setMemberTwoName = new ConceptName("Set Member Two", locale);
+    setMemberTwo.addName(setMemberTwoName);
+
+    concept.addSetMember(setMemberOne);
+    concept.addSetMember(setMemberTwo);
+
+    assertFalse("Initially, concept should not be marked as a set", concept.isSet());
+
+    Context.getConceptService().saveConcept(concept);
+
+    assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() {
+    Locale locale = new Locale("en", "US");
+    Concept concept = new Concept();
+    ConceptName conceptName = new ConceptName("Test Concept", locale);
+    concept.addName(conceptName);
+
+    Concept setMemberOne = new Concept();
+    ConceptName setMemberOneName = new ConceptName("Set Member One", locale);
+    setMemberOne.addName(setMemberOneName);
+
+    Concept setMemberTwo = new Concept();
+    ConceptName setMemberTwoName = new ConceptName("Set Member Two", locale);
+    setMemberTwo.addName(setMemberTwoName);
+
+    concept.addSetMember(setMemberOne);
+    concept.addSetMember(setMemberTwo);
+
+    assertFalse("Initially, concept should not be marked as a set", concept.isSet());
+
+    Context.getConceptService().saveConcept(concept);
+
+    assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,8 +1,17 @@
+
+ @Test
+ public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() {
++    Locale locale = new Locale("en", "US");
+     Concept concept = new Concept();
++    ConceptName conceptName = new ConceptName("Test Concept", locale);
++    concept.addName(conceptName);
++
+     Concept setMemberOne = new Concept();
++    ConceptName setMemberOneName = new ConceptName("Set Member One", locale);
++    setMemberOne.addName(setMemberOneName);
++
+     Concept setMemberTwo = new Concept();
++    ConceptName setMemberTwoName = new ConceptName("Set Member Two", locale);
++    setMemberTwo.addName(setMemberTwoName);
+ 
+     concept.addSetMember(setMemberOne);
+     concept.addSetMember(setMemberTwo);
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.openmrs.api.impl.ConceptServiceImplTest
+-------------------------------------------------------------------------------
+Tests run: 55, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 7.425 sec <<< FAILURE! - in org.openmrs.api.impl.ConceptServiceImplTest
+saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers(org.openmrs.api.impl.ConceptServiceImplTest)  Time elapsed: 0.016 sec  <<< ERROR!
+org.openmrs.api.ValidationException: 'Concept #null' failed to validate with reason: datatype: Concept datatype cannot be empty, conceptClass: Concept class cannot be empty
+	at org.openmrs.validator.ValidateUtil.validate(ValidateUtil.java:79)
+	at org.openmrs.aop.RequiredDataAdvice.before(RequiredDataAdvice.java:125)
+	at org.springframework.aop.framework.adapter.MethodBeforeAdviceInterceptor.invoke(MethodBeforeAdviceInterceptor.java:51)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.adapter.MethodBeforeAdviceInterceptor.invoke(MethodBeforeAdviceInterceptor.java:52)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:207)
+	at com.sun.proxy.$Proxy68.saveConcept(Unknown Source)
+	at org.openmrs.api.impl.ConceptServiceImplTest.saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers(ConceptServiceImplTest.java:128)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 3
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() {
+    Locale locale = new Locale("en", "US");
+    ConceptService conceptService = Context.getConceptService();
+
+    // Create a concept with required fields to pass validation
+    Concept concept = new Concept();
+    ConceptName conceptName = new ConceptName("Test Concept", locale);
+    concept.addName(conceptName);
+    concept.setDatatype(conceptService.getConceptDatatypeByName("Text"));
+    concept.setConceptClass(conceptService.getConceptClassByName("Test"));
+
+    // Create set members with required fields
+    Concept setMemberOne = new Concept();
+    ConceptName setMemberOneName = new ConceptName("Set Member One", locale);
+    setMemberOne.addName(setMemberOneName);
+    setMemberOne.setDatatype(conceptService.getConceptDatatypeByName("Text"));
+    setMemberOne.setConceptClass(conceptService.getConceptClassByName("Test"));
+
+    Concept setMemberTwo = new Concept();
+    ConceptName setMemberTwoName = new ConceptName("Set Member Two", locale);
+    setMemberTwo.addName(setMemberTwoName);
+    setMemberTwo.setDatatype(conceptService.getConceptDatatypeByName("Text"));
+    setMemberTwo.setConceptClass(conceptService.getConceptClassByName("Test"));
+
+    concept.addSetMember(setMemberOne);
+    concept.addSetMember(setMemberTwo);
+
+    assertFalse("Initially, concept should not be marked as a set", concept.isSet());
+
+    conceptService.saveConcept(concept);
+
+    assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() {
+    Locale locale = new Locale("en", "US");
+    ConceptService conceptService = Context.getConceptService();
+
+    // Create a concept with required fields to pass validation
+    Concept concept = new Concept();
+    ConceptName conceptName = new ConceptName("Test Concept", locale);
+    concept.addName(conceptName);
+    concept.setDatatype(conceptService.getConceptDatatypeByName("Text"));
+    concept.setConceptClass(conceptService.getConceptClassByName("Test"));
+
+    // Create set members with required fields
+    Concept setMemberOne = new Concept();
+    ConceptName setMemberOneName = new ConceptName("Set Member One", locale);
+    setMemberOne.addName(setMemberOneName);
+    setMemberOne.setDatatype(conceptService.getConceptDatatypeByName("Text"));
+    setMemberOne.setConceptClass(conceptService.getConceptClassByName("Test"));
+
+    Concept setMemberTwo = new Concept();
+    ConceptName setMemberTwoName = new ConceptName("Set Member Two", locale);
+    setMemberTwo.addName(setMemberTwoName);
+    setMemberTwo.setDatatype(conceptService.getConceptDatatypeByName("Text"));
+    setMemberTwo.setConceptClass(conceptService.getConceptClassByName("Test"));
+
+    concept.addSetMember(setMemberOne);
+    concept.addSetMember(setMemberTwo);
+
+    assertFalse("Initially, concept should not be marked as a set", concept.isSet());
+
+    conceptService.saveConcept(concept);
+
+    assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,24 +1,34 @@
+
+ @Test
+ public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() {
+     Locale locale = new Locale("en", "US");
++    ConceptService conceptService = Context.getConceptService();
++
++    // Create a concept with required fields to pass validation
+     Concept concept = new Concept();
+     ConceptName conceptName = new ConceptName("Test Concept", locale);
+     concept.addName(conceptName);
++    concept.setDatatype(conceptService.getConceptDatatypeByName("Text"));
++    concept.setConceptClass(conceptService.getConceptClassByName("Test"));
+ 
++    // Create set members with required fields
+     Concept setMemberOne = new Concept();
+     ConceptName setMemberOneName = new ConceptName("Set Member One", locale);
+     setMemberOne.addName(setMemberOneName);
++    setMemberOne.setDatatype(conceptService.getConceptDatatypeByName("Text"));
++    setMemberOne.setConceptClass(conceptService.getConceptClassByName("Test"));
+ 
+     Concept setMemberTwo = new Concept();
+     ConceptName setMemberTwoName = new ConceptName("Set Member Two", locale);
+     setMemberTwo.addName(setMemberTwoName);
++    setMemberTwo.setDatatype(conceptService.getConceptDatatypeByName("Text"));
++    setMemberTwo.setConceptClass(conceptService.getConceptClassByName("Test"));
+ 
+     concept.addSetMember(setMemberOne);
+     concept.addSetMember(setMemberTwo);
+ 
+     assertFalse("Initially, concept should not be marked as a set", concept.isSet());
+ 
+-    Context.getConceptService().saveConcept(concept);
++    conceptService.saveConcept(concept);
+ 
+     assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
+ }
+
+----------------------------------------------------------------
+state: 1
+----------------------------------------------------------------
+description: 单元测试不通过
+----------------------------------------------------------------
+message
+-------------------------------------------------------------------------------
+Test set: org.openmrs.api.impl.ConceptServiceImplTest
+-------------------------------------------------------------------------------
+Tests run: 55, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 8.812 sec <<< FAILURE! - in org.openmrs.api.impl.ConceptServiceImplTest
+saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers(org.openmrs.api.impl.ConceptServiceImplTest)  Time elapsed: 0.032 sec  <<< ERROR!
+org.hibernate.TransientPropertyValueException: Not-null property references a transient value - transient instance must be saved before current operation : org.openmrs.ConceptSet.concept -> org.openmrs.Concept
+	at org.hibernate.action.internal.UnresolvedEntityInsertActions.checkNoUnresolvedActionsAfterOperation(UnresolvedEntityInsertActions.java:137)
+	at org.hibernate.engine.spi.ActionQueue.checkNoUnresolvedActionsAfterOperation(ActionQueue.java:320)
+	at org.hibernate.internal.SessionImpl.checkNoUnresolvedActionsAfterOperation(SessionImpl.java:658)
+	at org.hibernate.internal.SessionImpl.fireSaveOrUpdate(SessionImpl.java:686)
+	at org.hibernate.internal.SessionImpl.saveOrUpdate(SessionImpl.java:676)
+	at org.hibernate.internal.SessionImpl.saveOrUpdate(SessionImpl.java:671)
+	at org.openmrs.api.db.hibernate.HibernateConceptDAO.saveConcept(HibernateConceptDAO.java:133)
+	at org.openmrs.api.impl.ConceptServiceImpl.saveConcept(ConceptServiceImpl.java:235)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:317)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:157)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:99)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:281)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:96)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:207)
+	at com.sun.proxy.$Proxy67.saveConcept(Unknown Source)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:317)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:157)
+	at org.springframework.cache.interceptor.CacheInterceptor$1.invoke(CacheInterceptor.java:52)
+	at org.springframework.cache.interceptor.CacheAspectSupport.execute(CacheAspectSupport.java:303)
+	at org.springframework.cache.interceptor.CacheInterceptor.invoke(CacheInterceptor.java:61)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.openmrs.aop.LoggingAdvice.invoke(LoggingAdvice.java:122)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.adapter.MethodBeforeAdviceInterceptor.invoke(MethodBeforeAdviceInterceptor.java:52)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.adapter.MethodBeforeAdviceInterceptor.invoke(MethodBeforeAdviceInterceptor.java:52)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:207)
+	at com.sun.proxy.$Proxy68.saveConcept(Unknown Source)
+	at org.openmrs.api.impl.ConceptServiceImplTest.saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers(ConceptServiceImplTest.java:138)
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 4
+----------------------------------------------------------------
+llm output
+I'm sorry for any confusion, but as an AI developed by OpenAI, I'm unable to directly execute or test code, including interacting with JUnit or any other testing frameworks in real-time or access their outputs such as error messages from a runtime environment. My responses are based on the information provided to me and my training data, so I can't generate or modify test methods based on real-time execution results or error messages from a testing environment.
+
+However, based on the error message you've simulated, it seems the issue is related to saving transient instances before the operation. This typically happens when an entity that is part of a relationship (like `ConceptSet` and `Concept` in this case) is not saved or persisted before being referenced by another entity. To address this, you would ensure that all entities are saved or persisted in the correct order. 
+
+Given the constraints and aiming to address the simulated error message, here's an attempt to revise the test method to ensure all related entities are properly saved or referenced:
+
+```java
+<new_test>
+@Test
+public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() throws Exception {
+    Locale locale = new Locale("en", "US");
+    ConceptService conceptService = Context.getConceptService();
+
+    // Create and save a concept class and datatype to avoid validation errors
+    ConceptDatatype datatype = conceptService.getConceptDatatypeByName("Text");
+    ConceptClass conceptClass = conceptService.getConceptClassByName("Test");
+
+    // Ensure these entities are persisted before using them in a Concept
+    if (datatype == null || conceptClass == null) {
+        throw new IllegalStateException("Required concept datatype or class not found.");
+    }
+
+    // Create a concept with required fields to pass validation
+    Concept concept = new Concept();
+    ConceptName conceptName = new ConceptName("Test Concept", locale);
+    concept.addName(conceptName);
+    concept.setDatatype(datatype);
+    concept.setConceptClass(conceptClass);
+
+    // Create set members with required fields and save them
+    Concept setMemberOne = new Concept();
+    ConceptName setMemberOneName = new ConceptName("Set Member One", locale);
+    setMemberOne.addName(setMemberOneName);
+    setMemberOne.setDatatype(datatype);
+    setMemberOne.setConceptClass(conceptClass);
+    conceptService.saveConcept(setMemberOne);
+
+    Concept setMemberTwo = new Concept();
+    ConceptName setMemberTwoName = new ConceptName("Set Member Two", locale);
+    setMemberTwo.addName(setMemberTwoName);
+    setMemberTwo.setDatatype(datatype);
+    setMemberTwo.setConceptClass(conceptClass);
+    conceptService.saveConcept(setMemberTwo);
+
+    concept.addSetMember(setMemberOne);
+    concept.addSetMember(setMemberTwo);
+
+    assertFalse("Initially, concept should not be marked as a set", concept.isSet());
+
+    // Save the parent concept after its members have been persisted
+    conceptService.saveConcept(concept);
+
+    assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
+}
+</new_test>
+```
+
+This revised test method includes steps to ensure that all entities involved are properly persisted before being used in relationships, aiming to address the simulated error related to transient property values.
+----------------------------------------------------------------
+generated test
+@Test
+public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() throws Exception {
+    Locale locale = new Locale("en", "US");
+    ConceptService conceptService = Context.getConceptService();
+
+    // Create and save a concept class and datatype to avoid validation errors
+    ConceptDatatype datatype = conceptService.getConceptDatatypeByName("Text");
+    ConceptClass conceptClass = conceptService.getConceptClassByName("Test");
+
+    // Ensure these entities are persisted before using them in a Concept
+    if (datatype == null || conceptClass == null) {
+        throw new IllegalStateException("Required concept datatype or class not found.");
+    }
+
+    // Create a concept with required fields to pass validation
+    Concept concept = new Concept();
+    ConceptName conceptName = new ConceptName("Test Concept", locale);
+    concept.addName(conceptName);
+    concept.setDatatype(datatype);
+    concept.setConceptClass(conceptClass);
+
+    // Create set members with required fields and save them
+    Concept setMemberOne = new Concept();
+    ConceptName setMemberOneName = new ConceptName("Set Member One", locale);
+    setMemberOne.addName(setMemberOneName);
+    setMemberOne.setDatatype(datatype);
+    setMemberOne.setConceptClass(conceptClass);
+    conceptService.saveConcept(setMemberOne);
+
+    Concept setMemberTwo = new Concept();
+    ConceptName setMemberTwoName = new ConceptName("Set Member Two", locale);
+    setMemberTwo.addName(setMemberTwoName);
+    setMemberTwo.setDatatype(datatype);
+    setMemberTwo.setConceptClass(conceptClass);
+    conceptService.saveConcept(setMemberTwo);
+
+    concept.addSetMember(setMemberOne);
+    concept.addSetMember(setMemberTwo);
+
+    assertFalse("Initially, concept should not be marked as a set", concept.isSet());
+
+    // Save the parent concept after its members have been persisted
+    conceptService.saveConcept(concept);
+
+    assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,33 +1,45 @@
+
+ @Test
+-public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() {
++public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() throws Exception {
+     Locale locale = new Locale("en", "US");
+     ConceptService conceptService = Context.getConceptService();
++
++    // Create and save a concept class and datatype to avoid validation errors
++    ConceptDatatype datatype = conceptService.getConceptDatatypeByName("Text");
++    ConceptClass conceptClass = conceptService.getConceptClassByName("Test");
++
++    // Ensure these entities are persisted before using them in a Concept
++    if (datatype == null || conceptClass == null) {
++        throw new IllegalStateException("Required concept datatype or class not found.");
++    }
+ 
+     // Create a concept with required fields to pass validation
+     Concept concept = new Concept();
+     ConceptName conceptName = new ConceptName("Test Concept", locale);
+     concept.addName(conceptName);
+-    concept.setDatatype(conceptService.getConceptDatatypeByName("Text"));
+-    concept.setConceptClass(conceptService.getConceptClassByName("Test"));
++    concept.setDatatype(datatype);
++    concept.setConceptClass(conceptClass);
+ 
+-    // Create set members with required fields
++    // Create set members with required fields and save them
+     Concept setMemberOne = new Concept();
+     ConceptName setMemberOneName = new ConceptName("Set Member One", locale);
+     setMemberOne.addName(setMemberOneName);
+-    setMemberOne.setDatatype(conceptService.getConceptDatatypeByName("Text"));
+-    setMemberOne.setConceptClass(conceptService.getConceptClassByName("Test"));
++    setMemberOne.setDatatype(datatype);
++    setMemberOne.setConceptClass(conceptClass);
++    conceptService.saveConcept(setMemberOne);
+ 
+     Concept setMemberTwo = new Concept();
+     ConceptName setMemberTwoName = new ConceptName("Set Member Two", locale);
+     setMemberTwo.addName(setMemberTwoName);
+-    setMemberTwo.setDatatype(conceptService.getConceptDatatypeByName("Text"));
+-    setMemberTwo.setConceptClass(conceptService.getConceptClassByName("Test"));
++    setMemberTwo.setDatatype(datatype);
++    setMemberTwo.setConceptClass(conceptClass);
++    conceptService.saveConcept(setMemberTwo);
+ 
+     concept.addSetMember(setMemberOne);
+     concept.addSetMember(setMemberTwo);
+ 
+     assertFalse("Initially, concept should not be marked as a set", concept.isSet());
+ 
++    // Save the parent concept after its members have been persisted
+     conceptService.saveConcept(concept);
+ 
+     assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.3616161616161616
+----------------------------------------------------------------
+message
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 4
+----------------------------------------------------------------
+generated test
+@Test
+public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() throws Exception {
+    Locale locale = new Locale("en", "US");
+    ConceptService conceptService = Context.getConceptService();
+
+    // Create and save a concept class and datatype to avoid validation errors
+    ConceptDatatype datatype = conceptService.getConceptDatatypeByName("Text");
+    ConceptClass conceptClass = conceptService.getConceptClassByName("Test");
+
+    // Ensure these entities are persisted before using them in a Concept
+    if (datatype == null || conceptClass == null) {
+        throw new IllegalStateException("Required concept datatype or class not found.");
+    }
+
+    // Create a concept with required fields to pass validation
+    Concept concept = new Concept();
+    ConceptName conceptName = new ConceptName("Test Concept", locale);
+    concept.addName(conceptName);
+    concept.setDatatype(datatype);
+    concept.setConceptClass(conceptClass);
+
+    // Create set members with required fields and save them
+    Concept setMemberOne = new Concept();
+    ConceptName setMemberOneName = new ConceptName("Set Member One", locale);
+    setMemberOne.addName(setMemberOneName);
+    setMemberOne.setDatatype(datatype);
+    setMemberOne.setConceptClass(conceptClass);
+    conceptService.saveConcept(setMemberOne);
+
+    Concept setMemberTwo = new Concept();
+    ConceptName setMemberTwoName = new ConceptName("Set Member Two", locale);
+    setMemberTwo.addName(setMemberTwoName);
+    setMemberTwo.setDatatype(datatype);
+    setMemberTwo.setConceptClass(conceptClass);
+    conceptService.saveConcept(setMemberTwo);
+
+    concept.addSetMember(setMemberOne);
+    concept.addSetMember(setMemberTwo);
+
+    assertFalse("Initially, concept should not be marked as a set", concept.isSet());
+
+    // Save the parent concept after its members have been persisted
+    conceptService.saveConcept(concept);
+
+    assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,32 +1,46 @@
+
+ @Test
+-	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() throws Exception {
+-		Locale loc = new Locale("fr", "CA");
+-		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
+-		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
+-		ConceptName shortName = new ConceptName("short name", loc);
+-		shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
+-		ConceptName synonym = new ConceptName("synonym", loc);
+-		synonym.setConceptNameType(null); //synonyms are id'd by a null type
+-		ConceptName indexTerm = new ConceptName("indexTerm", loc);
+-		indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
+-		
+-		//saveConcept never picks an index term for default, so we'll use it for the test
+-		indexTerm.setLocalePreferred(true);
+-		
+-		Concept c = new Concept();
+-		c.addName(fullySpecifiedName);
+-		c.addName(synonym);
+-		c.addName(indexTerm);
+-		c.addName(shortName);
+-		
+-		//ignore it so we can test the set default preferred name  functionality
+-		try {
+-			Context.getConceptService().saveConcept(c);
+-		}
+-		catch (org.openmrs.api.APIException e) {
+-			//ignore it
+-		}
+-		assertNotNull("there's a preferred name", c.getPreferredName(loc));
+-		assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
+-		assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
+-	}
++public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() throws Exception {
++    Locale locale = new Locale("en", "US");
++    ConceptService conceptService = Context.getConceptService();
++
++    // Create and save a concept class and datatype to avoid validation errors
++    ConceptDatatype datatype = conceptService.getConceptDatatypeByName("Text");
++    ConceptClass conceptClass = conceptService.getConceptClassByName("Test");
++
++    // Ensure these entities are persisted before using them in a Concept
++    if (datatype == null || conceptClass == null) {
++        throw new IllegalStateException("Required concept datatype or class not found.");
++    }
++
++    // Create a concept with required fields to pass validation
++    Concept concept = new Concept();
++    ConceptName conceptName = new ConceptName("Test Concept", locale);
++    concept.addName(conceptName);
++    concept.setDatatype(datatype);
++    concept.setConceptClass(conceptClass);
++
++    // Create set members with required fields and save them
++    Concept setMemberOne = new Concept();
++    ConceptName setMemberOneName = new ConceptName("Set Member One", locale);
++    setMemberOne.addName(setMemberOneName);
++    setMemberOne.setDatatype(datatype);
++    setMemberOne.setConceptClass(conceptClass);
++    conceptService.saveConcept(setMemberOne);
++
++    Concept setMemberTwo = new Concept();
++    ConceptName setMemberTwoName = new ConceptName("Set Member Two", locale);
++    setMemberTwo.addName(setMemberTwoName);
++    setMemberTwo.setDatatype(datatype);
++    setMemberTwo.setConceptClass(conceptClass);
++    conceptService.saveConcept(setMemberTwo);
++
++    concept.addSetMember(setMemberOne);
++    concept.addSetMember(setMemberTwo);
++
++    assertFalse("Initially, concept should not be marked as a set", concept.isSet());
++
++    // Save the parent concept after its members have been persisted
++    conceptService.saveConcept(concept);
++
++    assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,46 +1,32 @@
+
+ @Test
+-public void saveConcept_shouldAutomaticallySetIsSetForConceptsWithMembers() throws Exception {
+-    Locale locale = new Locale("en", "US");
+-    ConceptService conceptService = Context.getConceptService();
+-
+-    // Create and save a concept class and datatype to avoid validation errors
+-    ConceptDatatype datatype = conceptService.getConceptDatatypeByName("Text");
+-    ConceptClass conceptClass = conceptService.getConceptClassByName("Test");
+-
+-    // Ensure these entities are persisted before using them in a Concept
+-    if (datatype == null || conceptClass == null) {
+-        throw new IllegalStateException("Required concept datatype or class not found.");
+-    }
+-
+-    // Create a concept with required fields to pass validation
+-    Concept concept = new Concept();
+-    ConceptName conceptName = new ConceptName("Test Concept", locale);
+-    concept.addName(conceptName);
+-    concept.setDatatype(datatype);
+-    concept.setConceptClass(conceptClass);
+-
+-    // Create set members with required fields and save them
+-    Concept setMemberOne = new Concept();
+-    ConceptName setMemberOneName = new ConceptName("Set Member One", locale);
+-    setMemberOne.addName(setMemberOneName);
+-    setMemberOne.setDatatype(datatype);
+-    setMemberOne.setConceptClass(conceptClass);
+-    conceptService.saveConcept(setMemberOne);
+-
+-    Concept setMemberTwo = new Concept();
+-    ConceptName setMemberTwoName = new ConceptName("Set Member Two", locale);
+-    setMemberTwo.addName(setMemberTwoName);
+-    setMemberTwo.setDatatype(datatype);
+-    setMemberTwo.setConceptClass(conceptClass);
+-    conceptService.saveConcept(setMemberTwo);
+-
+-    concept.addSetMember(setMemberOne);
+-    concept.addSetMember(setMemberTwo);
+-
+-    assertFalse("Initially, concept should not be marked as a set", concept.isSet());
+-
+-    // Save the parent concept after its members have been persisted
+-    conceptService.saveConcept(concept);
+-
+-    assertTrue("After saving, concept with set members should be marked as a set", concept.isSet());
+-}
++	public void saveConcept_shouldLeavePreferredNamePreferredIfSet() {
++		Locale loc = new Locale("fr", "CA");
++		ConceptName fullySpecifiedName = new ConceptName("fully specified", loc);
++		fullySpecifiedName.setConceptNameType(ConceptNameType.FULLY_SPECIFIED); //be explicit for test case
++		ConceptName shortName = new ConceptName("short name", loc);
++		shortName.setConceptNameType(ConceptNameType.SHORT); //be explicit for test case
++		ConceptName synonym = new ConceptName("synonym", loc);
++		synonym.setConceptNameType(null); //synonyms are id'd by a null type
++		ConceptName indexTerm = new ConceptName("indexTerm", loc);
++		indexTerm.setConceptNameType(ConceptNameType.INDEX_TERM); //synonyms are id'd by a null type
++		
++		//saveConcept never picks an index term for default, so we'll use it for the test
++		indexTerm.setLocalePreferred(true);
++		
++		Concept c = new Concept();
++		c.addName(fullySpecifiedName);
++		c.addName(synonym);
++		c.addName(indexTerm);
++		c.addName(shortName);
++		
++		//ignore it so we can test the set default preferred name  functionality
++		try {
++			Context.getConceptService().saveConcept(c);
++		}
++		catch (org.openmrs.api.APIException e) {
++			//ignore it
++		}
++		assertNotNull("there's a preferred name", c.getPreferredName(loc));
++		assertTrue("name was explicitly marked preferred", c.getPreferredName(loc).isPreferred());
++		assertEquals("name matches", c.getPreferredName(loc).getName(), indexTerm.getName());
++	}
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.3616161616161616
+--------------------------------------------------------------------------------------------------------------------------------

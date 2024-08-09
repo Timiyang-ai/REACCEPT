@@ -1,0 +1,1 @@
+public void addProperty(String property);

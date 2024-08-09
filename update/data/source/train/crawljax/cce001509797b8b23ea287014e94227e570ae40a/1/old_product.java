@@ -1,0 +1,1 @@
+void goToUrl(URL url);

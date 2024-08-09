@@ -1,0 +1,1 @@
+void setPollInterval(int pollInterval);

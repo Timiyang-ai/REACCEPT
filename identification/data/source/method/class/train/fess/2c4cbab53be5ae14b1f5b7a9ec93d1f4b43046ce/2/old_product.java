@@ -1,0 +1,1 @@
+SearchQuery build(String query, boolean envCondition);

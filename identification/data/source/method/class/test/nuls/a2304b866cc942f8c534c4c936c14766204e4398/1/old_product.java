@@ -1,0 +1,1 @@
+Result<Boolean> removeAccount(String accountId, String password);

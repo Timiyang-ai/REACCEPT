@@ -1,0 +1,52 @@
+diff --git a/old_product.java b/new_product.java
+index 5f64c8c..a80126b 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -5,30 +5,26 @@
+         checkNotNull(egress);
+         log.info("setupConnectivity({}, {}, {}, {})", ingress, egress, bandwidth, latency);
+ 
+-        bandwidth = (bandwidth == null) ? NO_BW_REQUIREMENT : bandwidth;
++        Bandwidth bw = (bandwidth == null) ? NO_BW_REQUIREMENT : bandwidth;
+ 
+-        Set<Path> paths = pathService.getPaths(ingress.deviceId(), egress.deviceId(),
++        Stream<Path> paths = topologyService.getKShortestPaths(
++                topologyService.currentTopology(),
++                ingress.deviceId(), egress.deviceId(),
+                 new BandwidthLinkWeight(bandwidth));
+-        if (paths.isEmpty()) {
+-            log.warn("Unable to find multi-layer path.");
+-            return null;
+-        }
+ 
+-        // Search path with available cross connect points
+-        for (Path path : paths) {
+-            // Path service calculates from node to node, we're only interested in port to port
+-            if (!path.src().equals(ingress) || !path.dst().equals(egress)) {
+-                continue;
+-            }
++        // Path service calculates from node to node, we're only interested in port to port
++        Optional<OpticalConnectivityId> id =
++                paths.filter(p -> p.src().equals(ingress) && p.dst().equals(egress))
++                        .limit(maxPaths)
++                        .map(p -> setupPath(p, bw, latency))
++                        .filter(Objects::nonNull)
++                        .findFirst();
+ 
+-            OpticalConnectivityId id = setupPath(path, bandwidth, latency);
+-            if (id != null) {
+-                log.info("Assigned OpticalConnectivityId: {}", id);
+-                return id;
+-            }
++        if (id.isPresent()) {
++            log.info("Assigned OpticalConnectivityId: {}", id);
++        } else {
++            log.error("setupConnectivity({}, {}, {}, {}) failed.", ingress, egress, bandwidth, latency);
+         }
+ 
+-        log.error("setupConnectivity({}, {}, {}, {}) failed.", ingress, egress, bandwidth, latency);
+-
+-        return null;
++        return id.orElse(null);
+     }
+\ No newline at end of file

@@ -1,0 +1,51 @@
+diff --git a/old_product.java b/new_product.java
+index 0945d52..2527b60 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,9 +1,29 @@
+ public void buildIndex(String indexType) {
+ 
+         if (this.gridPolygonRDD == null) {
+-            throw new IllegalClassException("To build index, you must build grid first");
++        	
++        	//This index is built on top of unpartitioned SRDD
++            this.indexedRDDNoId =  this.rawPolygonRDD.mapPartitions(new FlatMapFunction<Iterator<Polygon>,STRtree>()
++            		{
++						@Override
++						public Iterable<STRtree> call(Iterator<Polygon> t)
++								throws Exception {
++							// TODO Auto-generated method stub
++							 STRtree rt = new STRtree();
++							while(t.hasNext()){
++								Polygon polygon=t.next();
++			                    rt.insert(polygon.getEnvelopeInternal(), polygon);
++							}
++							HashSet<STRtree> result = new HashSet<STRtree>();
++			                    result.add(rt);
++			                    return result;
++						}
++            	
++            		});
++            this.indexedRDDNoId.persist(StorageLevel.MEMORY_ONLY());
+         }
+-
++        else
++        {
+         //Use GroupByKey, since I have repartition data, it should be much faster.
+         //todo: Need to test performance here...
+         JavaPairRDD<Integer, Iterable<Polygon>> gridedRectangleListRDD = this.gridPolygonRDD.groupByKey();
+@@ -14,10 +34,11 @@ public void buildIndex(String indexType) {
+                 STRtree rt = new STRtree();
+                 for (Polygon p : polygons)
+                     rt.insert(p.getEnvelopeInternal(), p);
+-                ArrayList<STRtree> result = new ArrayList<STRtree>();
++                HashSet<STRtree> result = new HashSet<STRtree>();
+                 result.add(rt);
+                 return result;
+             }
+         });
+-        this.indexedRDD.cache();
++        this.indexedRDD.persist(StorageLevel.MEMORY_ONLY());
++        }
+     }
+\ No newline at end of file

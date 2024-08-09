@@ -1,0 +1,1 @@
+ValidationResult validateProperties(String uri) throws URISyntaxException;

@@ -1,0 +1,78 @@
+diff --git a/old_product.java b/new_product.java
+index 4777ea3..7815fc3 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -5,36 +5,42 @@
+ 		final ResourceID resourceID,
+ 		final SlotReport slotReport) {
+ 
+-		return getRpcService().execute(new Callable<TaskExecutorGateway>() {
+-			@Override
+-			public TaskExecutorGateway call() throws Exception {
+-				if (!leaderSessionID.equals(resourceManagerLeaderId)) {
+-					log.warn("Discard registration from TaskExecutor {} at ({}) because the expected leader session ID {} did " +
+-							"not equal the received leader session ID  {}",
+-						resourceID, taskExecutorAddress, leaderSessionID, resourceManagerLeaderId);
+-					throw new Exception("Invalid leader session id");
+-				}
+-				return getRpcService().connect(taskExecutorAddress, TaskExecutorGateway.class)
+-					.get(timeout.toMilliseconds(), timeout.getUnit());
+-			}
+-		}).handleAsync(new BiFunction<TaskExecutorGateway, Throwable, RegistrationResponse>() {
+-			@Override
+-			public RegistrationResponse apply(TaskExecutorGateway taskExecutorGateway, Throwable throwable) {
+-				if (throwable != null) {
+-					return new RegistrationResponse.Decline(throwable.getMessage());
+-				} else {
+-					WorkerRegistration oldRegistration = taskExecutors.remove(resourceID);
+-					if (oldRegistration != null) {
+-						// TODO :: suggest old taskExecutor to stop itself
+-						log.info("Replacing old instance of worker for ResourceID {}", resourceID);
++		if (leaderSessionID.equals(resourceManagerLeaderId)) {
++			Future<TaskExecutorGateway> taskExecutorGatewayFuture = getRpcService().connect(taskExecutorAddress, TaskExecutorGateway.class);
++
++			return taskExecutorGatewayFuture.handleAsync(new BiFunction<TaskExecutorGateway, Throwable, RegistrationResponse>() {
++				@Override
++				public RegistrationResponse apply(TaskExecutorGateway taskExecutorGateway, Throwable throwable) {
++					if (throwable != null) {
++						return new RegistrationResponse.Decline(throwable.getMessage());
++					} else {
++						WorkerRegistration<WorkerType> oldRegistration = taskExecutors.remove(resourceID);
++						if (oldRegistration != null) {
++							// TODO :: suggest old taskExecutor to stop itself
++							log.info("Replacing old instance of worker for ResourceID {}", resourceID);
++						}
++
++						WorkerType newWorker = workerStarted(resourceID);
++						WorkerRegistration<WorkerType> registration =
++							new WorkerRegistration<>(taskExecutorGateway, newWorker);
++
++						taskExecutors.put(resourceID, registration);
++						slotManager.registerTaskExecutor(resourceID, registration, slotReport);
++
++						return new TaskExecutorRegistrationSuccess(
++							registration.getInstanceID(),
++							resourceManagerConfiguration.getHeartbeatInterval().toMilliseconds());
+ 					}
+-					WorkerType newWorker = workerStarted(resourceID);
+-					WorkerRegistration<WorkerType> registration =
+-						new WorkerRegistration<>(taskExecutorGateway, newWorker);
+-					taskExecutors.put(resourceID, registration);
+-					slotManager.registerTaskExecutor(resourceID, registration, slotReport);
+-					return new TaskExecutorRegistrationSuccess(registration.getInstanceID(), 5000);
+ 				}
+-			}
+-		}, getMainThreadExecutor());
++			}, getMainThreadExecutor());
++		} else {
++			log.warn("Discard registration from TaskExecutor {} at ({}) because the expected leader session ID {} did " +
++					"not equal the received leader session ID  {}",
++				resourceID, taskExecutorAddress, leaderSessionID, resourceManagerLeaderId);
++
++			return FlinkCompletableFuture.<RegistrationResponse>completed(
++				new RegistrationResponse.Decline("Discard registration because the leader id " +
++					resourceManagerLeaderId + " does not match the expected leader id " +
++					leaderSessionID + '.'));
++		}
+ 	}
+\ No newline at end of file

@@ -1,0 +1,59 @@
+diff --git a/old_product.java b/new_product.java
+index a20e1b0..4171143 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -16,11 +16,12 @@
+ 					highAvailabilityServices.getJobManagerLeaderRetriever(jobID);
+ 				jobIdLeaderListener = new JobIdLeaderListener(jobID, jobMasterLeaderRetriever);
+ 			} catch (Exception e) {
+-				log.warn("Failed to start JobMasterLeaderRetriever for JobID {}", jobID);
+-				FlinkCompletableFuture<RegistrationResponse> responseFuture = new FlinkCompletableFuture<>();
+-				responseFuture.complete(new RegistrationResponse.Decline("Failed to retrieve JobMasterLeaderRetriever"));
+-				return responseFuture;
++				log.warn("Failed to start JobMasterLeaderRetriever for job id {}", jobID, e);
++
++				return FlinkCompletableFuture.<RegistrationResponse>completed(
++					new RegistrationResponse.Decline("Failed to retrieve JobMasterLeaderRetriever"));
+ 			}
++
+ 			leaderListeners.put(jobID, jobIdLeaderListener);
+ 		}
+ 
+@@ -36,6 +37,8 @@
+ 						throw new Exception("Invalid leader session id");
+ 					}
+ 
++					final Time timeout = resourceManagerConfiguration.getTimeout();
++
+ 					if (!jobIdLeaderListener.getLeaderID().get(timeout.getSize(), timeout.getUnit())
+ 							.equals(jobMasterLeaderId)) {
+ 						throw new Exception("Leader Id did not match");
+@@ -49,10 +52,9 @@
+ 				@Override
+ 				public RegistrationResponse apply(JobMasterGateway jobMasterGateway, Throwable throwable) {
+ 
+-					if (throwable != null) {
+-						return new RegistrationResponse.Decline(throwable.getMessage());
+-					}
+-
++				if (throwable != null) {
++					return new RegistrationResponse.Decline(throwable.getMessage());
++				} else {
+ 					if (!leaderSessionID.equals(resourceManagerLeaderId)) {
+ 						log.warn("Discard registration from JobMaster {} at ({}) because the expected leader session ID {}" +
+ 								" did not equal the received leader session ID  {}",
+@@ -77,8 +79,10 @@
+ 					if (existingRegistration != null) {
+ 						log.info("Replacing JobMaster registration for newly registered JobMaster with JobID {}.", jobID);
+ 					}
+-					return new JobMasterRegistrationSuccess(5000, resourceManagerLeaderId);
+-
++					return new JobMasterRegistrationSuccess(
++						resourceManagerConfiguration.getHeartbeatInterval().toMilliseconds(),
++						resourceManagerLeaderId);
+ 				}
+-			}, getMainThreadExecutor());
++			}
++		}, getMainThreadExecutor());
+ 	}
+\ No newline at end of file

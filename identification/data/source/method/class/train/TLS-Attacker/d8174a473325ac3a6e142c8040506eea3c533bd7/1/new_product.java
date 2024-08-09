@@ -1,0 +1,1 @@
+public abstract Result collectResults(File branchTrace, TestVector vector);

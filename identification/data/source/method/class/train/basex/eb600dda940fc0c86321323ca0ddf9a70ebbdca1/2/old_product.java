@@ -1,0 +1,1 @@
+IndexIterator iter(final IndexToken token);

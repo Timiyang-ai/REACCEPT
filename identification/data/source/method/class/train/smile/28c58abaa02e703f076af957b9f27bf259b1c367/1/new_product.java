@@ -1,0 +1,1 @@
+double[] apply(double[][] x, int[] y);

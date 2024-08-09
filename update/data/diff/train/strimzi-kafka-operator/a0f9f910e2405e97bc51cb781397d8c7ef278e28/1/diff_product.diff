@@ -1,0 +1,107 @@
+diff --git a/old_product.java b/new_product.java
+index 3e9eb6d..2d392f7 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,7 +1,6 @@
+-void reconcile(final LogContext logContext, final HasMetadata involvedObject,
+-                   final Topic k8sTopic, final Topic kafkaTopic, final Topic privateTopic,
+-                   final Handler<AsyncResult<Void>> reconciliationResultHandler) {
+-
++Future<Void> reconcile(Reconciliation reconciliation, final LogContext logContext, final HasMetadata involvedObject,
++                   final Topic k8sTopic, final Topic kafkaTopic, final Topic privateTopic) {
++        final Future<Void> reconciliationResultHandler;
+         {
+             TopicName topicName = k8sTopic != null ? k8sTopic.getTopicName() : kafkaTopic != null ? kafkaTopic.getTopicName() : privateTopic != null ? privateTopic.getTopicName() : null;
+             LOGGER.info("{}: Reconciling topic {}, k8sTopic:{}, kafkaTopic:{}, privateTopic:{}", logContext, topicName, k8sTopic == null ? "null" : "nonnull", kafkaTopic == null ? "null" : "nonnull", privateTopic == null ? "null" : "nonnull");
+@@ -11,65 +10,55 @@ void reconcile(final LogContext logContext, final HasMetadata involvedObject,
+                 if (kafkaTopic == null) {
+                     // All three null: This happens reentrantly when a topic or KafkaTopic is deleted
+                     LOGGER.debug("{}: All three topics null during reconciliation.", logContext);
+-                    reconciliationResultHandler.handle(Future.succeededFuture());
++                    reconciliationResultHandler = Future.succeededFuture();
+                 } else {
+                     // it's been created in Kafka => create in k8s and privateState
+                     LOGGER.debug("{}: topic created in kafka, will create KafkaTopic in k8s and topicStore", logContext);
+-                    enqueue(new CreateResource(logContext, kafkaTopic, ar -> {
+-                        // In all cases, create in privateState
+-                        if (ar.succeeded()) {
+-                            enqueue(new CreateInTopicStore(logContext, kafkaTopic, involvedObject, reconciliationResultHandler));
+-                        } else {
+-                            reconciliationResultHandler.handle(ar);
+-                        }
+-                    }));
++                    reconciliationResultHandler = createResource(logContext, kafkaTopic)
++                            .compose(createdKt -> {
++                                reconciliation.observedTopicFuture(createdKt);
++                                return createInTopicStore(logContext, kafkaTopic, involvedObject);
++                            });
+                 }
+             } else if (kafkaTopic == null) {
+                 // it's been created in k8s => create in Kafka and privateState
+                 LOGGER.debug("{}: KafkaTopic created in k8s, will create topic in kafka and topicStore", logContext);
+-                enqueue(new CreateKafkaTopic(logContext, k8sTopic, involvedObject, ar -> {
+-                    // In all cases, create in privateState
+-                    if (ar.succeeded()) {
+-                        enqueue(new CreateInTopicStore(logContext, k8sTopic, involvedObject, reconciliationResultHandler));
+-                    } else {
+-                        reconciliationResultHandler.handle(ar);
+-                    }
+-                }));
++                reconciliationResultHandler = createKafkaTopic(logContext, k8sTopic, involvedObject)
++                    .compose(ignore -> createInTopicStore(logContext, k8sTopic, involvedObject))
++                    // Kafka will set the message.format.version, so we need to update the KafkaTopic to reflect
++                    // that to avoid triggering another reconciliation
++                    .compose(ignored -> getFromKafka(k8sTopic.getTopicName()))
++                    .compose(kafkaTopic2 -> {
++                        LOGGER.debug("Post-create kafka {}", kafkaTopic2);
++                        return update3Way(reconciliation, logContext, involvedObject, k8sTopic, kafkaTopic2, k8sTopic);
++                    });
++                    //.compose(createdKafkaTopic -> update3Way(logContext, involvedObject, k8sTopic, createdKafkaTopic, k8sTopic));
+             } else {
+-                update2Way(logContext, involvedObject, k8sTopic, kafkaTopic, reconciliationResultHandler);
++                reconciliationResultHandler = update2Way(reconciliation, logContext, involvedObject, k8sTopic, kafkaTopic);
+             }
+         } else {
+             if (k8sTopic == null) {
+                 if (kafkaTopic == null) {
+                     // delete privateState
+                     LOGGER.debug("{}: KafkaTopic deleted in k8s and topic deleted in kafka => delete from topicStore", logContext);
+-                    enqueue(new DeleteFromTopicStore(logContext, privateTopic.getTopicName(), involvedObject, reconciliationResultHandler));
++                    reconciliationResultHandler = deleteFromTopicStore(logContext, involvedObject, privateTopic.getTopicName());
+                 } else {
+                     // it was deleted in k8s so delete in kafka and privateState
+                     LOGGER.debug("{}: KafkaTopic deleted in k8s => delete topic from kafka and from topicStore", logContext);
+-                    enqueue(new DeleteKafkaTopic(logContext, kafkaTopic.getTopicName(), ar -> {
+-                        if (ar.succeeded()) {
+-                            enqueue(new DeleteFromTopicStore(logContext, privateTopic.getTopicName(), involvedObject, reconciliationResultHandler));
+-                        } else {
+-                            reconciliationResultHandler.handle(ar);
+-                        }
+-                    }));
+-
++                    reconciliationResultHandler = deleteKafkaTopic(logContext, kafkaTopic.getTopicName())
++                        .compose(ignored -> deleteFromTopicStore(logContext, involvedObject, privateTopic.getTopicName()));
+                 }
+             } else if (kafkaTopic == null) {
+                 // it was deleted in kafka so delete in k8s and privateState
+                 LOGGER.debug("{}: topic deleted in kafkas => delete KafkaTopic from k8s and from topicStore", logContext);
+-                enqueue(new DeleteResource(logContext, privateTopic.getOrAsKubeName(), ar -> {
+-                    if (ar.succeeded()) {
+-                        enqueue(new DeleteFromTopicStore(logContext, privateTopic.getTopicName(), involvedObject, reconciliationResultHandler));
+-                    } else {
+-                        reconciliationResultHandler.handle(ar);
+-                    }
+-                }));
++                reconciliationResultHandler = deleteResource(logContext, privateTopic.getOrAsKubeName())
++                        .compose(ignore -> deleteFromTopicStore(logContext, involvedObject, privateTopic.getTopicName()));
+             } else {
+                 // all three exist
+                 LOGGER.debug("{}: 3 way diff", logContext);
+-                update3Way(logContext, involvedObject, k8sTopic, kafkaTopic, privateTopic, reconciliationResultHandler);
++                reconciliationResultHandler = update3Way(reconciliation, logContext, involvedObject,
++                        k8sTopic, kafkaTopic, privateTopic);
+             }
+         }
++        return reconciliationResultHandler;
+     }
+\ No newline at end of file

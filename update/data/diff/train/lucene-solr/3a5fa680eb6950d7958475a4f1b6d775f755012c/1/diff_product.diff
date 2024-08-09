@@ -1,0 +1,104 @@
+diff --git a/old_product.java b/new_product.java
+index d67b1d3..faf6cc7 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,64 +1,50 @@
+ public static Evaluator getDateFormatEvaluator() {
+     return new Evaluator() {
+       public String evaluate(String expression, Context context) {
+-        CacheEntry e = getCachedData(expression);
+-        String expr = e.key;
+-        SimpleDateFormat fmt = e.format;
+-        Matcher m = IN_SINGLE_QUOTES.matcher(expr);
+-        if (m.find()) {
+-          String datemathExpr = m.group(1);
+-          try {
+-            Date date = dateMathParser.parseMath(datemathExpr);
+-            return fmt.format(date);
+-          } catch (ParseException exp) {
+-            throw new DataImportHandlerException(
+-                    DataImportHandlerException.SEVERE,
+-                    "Invalid expression for date", exp);
++        List l = parseParams(expression, context.getVariableResolver());
++        if (l.size() != 2) {
++          throw new DataImportHandlerException(SEVERE, "'formatDate()' must have two parameters ");
++        }
++        Object o = l.get(0);
++        Object format = l.get(1);
++        if (format instanceof VariableWrapper) {
++          VariableWrapper wrapper = (VariableWrapper) format;
++          o = wrapper.resolve();
++          if (o == null)  {
++            format = wrapper.varName;
++            LOG.warn("Deprecated syntax used. The syntax of formatDate has been changed to formatDate(<var>, '<date_format_string>'). " +
++                    "The old syntax will stop working in Solr 1.5");
++          } else  {
++            format = o.toString();
+           }
+-        } else {
+-          Object o = context.getVariableResolver().resolve(expr);
+-          if (o == null)
+-            return "";
+-          Date date = null;
+-          if (o instanceof Date) {
+-            date = (Date) o;
++        }
++        String dateFmt = format.toString();
++        SimpleDateFormat fmt = new SimpleDateFormat(dateFmt);
++        Date date = null;
++        if (o instanceof VariableWrapper) {
++          VariableWrapper variableWrapper = (VariableWrapper) o;
++          Object variableval = variableWrapper.resolve();
++          if (variableval instanceof Date) {
++            date = (Date) variableval;
+           } else {
+-            String s = o.toString();
++            String s = variableval.toString();
+             try {
+               date = DataImporter.DATE_TIME_FORMAT.get().parse(s);
+             } catch (ParseException exp) {
+-              throw new DataImportHandlerException(
+-                      DataImportHandlerException.SEVERE,
+-                      "Invalid expression for date", exp);
++              wrapAndThrow(SEVERE, exp, "Invalid expression for date");
+             }
+           }
+-          return fmt.format(date);
+-        }
+-      }
+-
+-      private CacheEntry getCachedData(String str) {
+-        CacheEntry result = cache.get(str);
+-        if (result != null)
+-          return result;
+-        Matcher m = FORMAT_METHOD.matcher(str);
+-        String expr, pattern;
+-        if (m.find()) {
+-          expr = m.group(1).trim();
+-          if (IN_SINGLE_QUOTES.matcher(expr).find()) {
+-            expr = expr.replaceAll("NOW", "");
+-          }
+-          pattern = m.group(2).trim();
+-          cache.put(str, new CacheEntry(expr, new SimpleDateFormat(pattern)));
+-          return cache.get(str);
+         } else {
+-          throw new DataImportHandlerException(
+-                  DataImportHandlerException.SEVERE, "Invalid format String : "
+-                  + "${dataimporter.functions." + str + "}");
++          String datemathfmt = o.toString();
++          datemathfmt = datemathfmt.replaceAll("NOW", "");
++          try {
++            date = dateMathParser.parseMath(datemathfmt);
++          } catch (ParseException e) {
++            wrapAndThrow(SEVERE, e, "Invalid expression for date");
++          }
+         }
++        return fmt.format(date);
+       }
+ 
+-      Map<String, CacheEntry> cache = new HashMap<String, CacheEntry>();
+-
+-      Pattern FORMAT_METHOD = Pattern.compile("^(.*?),(.*?)$");
+     };
+   }
+\ No newline at end of file

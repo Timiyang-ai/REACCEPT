@@ -1,0 +1,1 @@
+public abstract int parseField(byte[] bytes, int startPos, int limit, char delim, T reuse);

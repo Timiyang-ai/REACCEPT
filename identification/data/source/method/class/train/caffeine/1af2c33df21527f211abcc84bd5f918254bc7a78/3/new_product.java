@@ -1,0 +1,1 @@
+void setPrevious(E e, E prev);

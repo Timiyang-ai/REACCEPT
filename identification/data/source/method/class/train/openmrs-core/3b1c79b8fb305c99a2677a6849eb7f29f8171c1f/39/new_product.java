@@ -1,0 +1,1 @@
+public PatientState getPatientStateByUuid(String uuid);

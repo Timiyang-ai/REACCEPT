@@ -1,0 +1,1 @@
+VisitType unretireVisitType(VisitType visitType);

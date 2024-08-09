@@ -1,0 +1,1 @@
+Task editNetworkConnectionSection(URI vmHref, NetworkConnectionSection section);

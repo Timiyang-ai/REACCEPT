@@ -1,0 +1,1 @@
+public abstract Result collectResults(File branchTrace, WorkflowTrace trace, WorkflowTrace executedTrace);

@@ -1,0 +1,2 @@
+@Authorized( { OpenmrsConstants.PRIV_MANAGE_LOCATIONS })
+	public Location retireLocation(Location location, String reason) throws APIException;

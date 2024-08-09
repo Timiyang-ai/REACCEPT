@@ -1,0 +1,1047 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.8357142857142857
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 2
+----------------------------------------------------------------
+old description: 覆盖测试不通过，覆盖率：0.8142857142857143
+----------------------------------------------------------------
+old message
+未覆盖：add(Pkg, TreeMap)
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+private boolean installJAR(final byte[] content, final String path)
+      throws QueryException, IOException {
+
+    final IOContent mf = new IOContent(new Zip(new IOContent(content)).read(MANIFEST_MF));
+    final NewlineInput nli = new NewlineInput(mf);
+    for(String s; (s = nli.readLine()) != null;) {
+      // write file to rewritten file path
+      final Matcher m = MAIN_CLASS.matcher(s);
+      if(m.find()) return write(m.group(1).replace('.', '/') + IO.JARSUFFIX, content);
+    }
+    throw BXRE_MAIN_X.get(info, path);
+  }
+----------------------------------------------------------------
+old test
+@Test
+  public void installJar() throws Exception {
+    // install package
+    execute(new RepoInstall(REPO + "testJar.xar", null));
+
+    // ensure package was properly installed
+    final String dir = normalize("jarPkg-1.0.0");
+    assertTrue(isDir(dir));
+    assertTrue(isFile(dir + "/expath-pkg.xml"));
+    assertTrue(isFile(dir + "/basex.xml"));
+    assertTrue(isDir(dir + "/jar"));
+    assertTrue(isFile(dir + "/jar/test.jar"));
+    assertTrue(isFile(dir + "/jar/wrapper.xq"));
+
+    // use package
+    try(QueryProcessor qp = new QueryProcessor(
+        "import module namespace j='jar'; j:print('test')", context)) {
+      assertEquals(qp.value().serialize().toString(), "test");
+    }
+
+    // delete package
+    assertTrue("Repo directory could not be deleted.", new IOFile(REPO, dir).delete());
+    assertFalse(new IOFile(REPO, dir).exists());
+  }
+----------------------------------------------------------------
+new product
+private boolean installJAR(final byte[] content, final String path)
+      throws QueryException, IOException {
+
+    final IOContent manifest = new IOContent(new Zip(new IOContent(content)).read(MANIFEST_MF));
+    final NewlineInput nli = new NewlineInput(manifest);
+    for(String s; (s = nli.readLine()) != null;) {
+      // write file to rewritten file path
+      final Matcher main = MAIN_CLASS.matcher(s);
+      if(main.find()) return write(main.group(1).replace('.', '/') + IO.JARSUFFIX, content);
+    }
+    throw BXRE_MAIN_X.get(info, path);
+  }
+----------------------------------------------------------------
+new test
+@Test
+  public void installJar() {
+    // ensure that all files are installed
+    execute(new RepoInstall(REPO + "Hello.jar", null));
+    final IOFile jar = new IOFile(REPO, "org/basex/modules/Hello.jar");
+    final IOFile xqm = new IOFile(REPO, "org/basex/modules/Hello.xqm");
+    assertTrue("File not found: " + jar, jar.exists());
+    assertTrue("File not found: " + xqm, xqm.exists());
+
+    // run query
+    String query = "import module namespace h='http://basex.org/modules/Hello';h:hello('Universe')";
+    assertEquals("Hello Universe", execute(new XQuery(query)));
+
+    // run query, ensure that wrong types will be rejected
+    query = "import module namespace h='http://basex.org/modules/Hello';h:hello(123)";
+    try(QueryProcessor qp = new QueryProcessor(query, context)) {
+      qp.value();
+    } catch(final QueryException ex) {
+      assertEquals(QueryError.INVPROMOTE_X, ex.error());
+    }
+
+    // ensure that all files were deleted
+    execute(new RepoDelete("org.basex.modules.Hello", null));
+    assertFalse("File was not deleted:" + jar, jar.exists());
+    assertFalse("File was not deleted:" + xqm, xqm.exists());
+
+    // ensure that package can only be deleted once
+    try {
+      new RepoDelete("org.basex.modules.Hello", null).execute(context);
+    } catch(final BaseXException ex) {
+      assertTrue(ex.toString().contains(BXRE_WHICH_X.code));
+    }
+  }
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index c0ccff8..5368464 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,12 +1,12 @@
+ private boolean installJAR(final byte[] content, final String path)
+       throws QueryException, IOException {
+ 
+-    final IOContent mf = new IOContent(new Zip(new IOContent(content)).read(MANIFEST_MF));
+-    final NewlineInput nli = new NewlineInput(mf);
++    final IOContent manifest = new IOContent(new Zip(new IOContent(content)).read(MANIFEST_MF));
++    final NewlineInput nli = new NewlineInput(manifest);
+     for(String s; (s = nli.readLine()) != null;) {
+       // write file to rewritten file path
+-      final Matcher m = MAIN_CLASS.matcher(s);
+-      if(m.find()) return write(m.group(1).replace('.', '/') + IO.JARSUFFIX, content);
++      final Matcher main = MAIN_CLASS.matcher(s);
++      if(main.find()) return write(main.group(1).replace('.', '/') + IO.JARSUFFIX, content);
+     }
+     throw BXRE_MAIN_X.get(info, path);
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+diff test
+diff --git a/old_test.java b/new_test.java
+index 79f4e50..55fe467 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,24 +1,33 @@
+ @Test
+-  public void installJar() throws Exception {
+-    // install package
+-    execute(new RepoInstall(REPO + "testJar.xar", null));
++  public void installJar() {
++    // ensure that all files are installed
++    execute(new RepoInstall(REPO + "Hello.jar", null));
++    final IOFile jar = new IOFile(REPO, "org/basex/modules/Hello.jar");
++    final IOFile xqm = new IOFile(REPO, "org/basex/modules/Hello.xqm");
++    assertTrue("File not found: " + jar, jar.exists());
++    assertTrue("File not found: " + xqm, xqm.exists());
+ 
+-    // ensure package was properly installed
+-    final String dir = normalize("jarPkg-1.0.0");
+-    assertTrue(isDir(dir));
+-    assertTrue(isFile(dir + "/expath-pkg.xml"));
+-    assertTrue(isFile(dir + "/basex.xml"));
+-    assertTrue(isDir(dir + "/jar"));
+-    assertTrue(isFile(dir + "/jar/test.jar"));
+-    assertTrue(isFile(dir + "/jar/wrapper.xq"));
++    // run query
++    String query = "import module namespace h='http://basex.org/modules/Hello';h:hello('Universe')";
++    assertEquals("Hello Universe", execute(new XQuery(query)));
+ 
+-    // use package
+-    try(QueryProcessor qp = new QueryProcessor(
+-        "import module namespace j='jar'; j:print('test')", context)) {
+-      assertEquals(qp.value().serialize().toString(), "test");
++    // run query, ensure that wrong types will be rejected
++    query = "import module namespace h='http://basex.org/modules/Hello';h:hello(123)";
++    try(QueryProcessor qp = new QueryProcessor(query, context)) {
++      qp.value();
++    } catch(final QueryException ex) {
++      assertEquals(QueryError.INVPROMOTE_X, ex.error());
+     }
+ 
+-    // delete package
+-    assertTrue("Repo directory could not be deleted.", new IOFile(REPO, dir).delete());
+-    assertFalse(new IOFile(REPO, dir).exists());
++    // ensure that all files were deleted
++    execute(new RepoDelete("org.basex.modules.Hello", null));
++    assertFalse("File was not deleted:" + jar, jar.exists());
++    assertFalse("File was not deleted:" + xqm, xqm.exists());
++
++    // ensure that package can only be deleted once
++    try {
++      new RepoDelete("org.basex.modules.Hello", null).execute(context);
++    } catch(final BaseXException ex) {
++      assertTrue(ex.toString().contains(BXRE_WHICH_X.code));
++    }
+   }
+\ No newline at end of file
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index 5368464..4122758 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -8,5 +8,5 @@ private boolean installJAR(final byte[] content, final String path)
+       final Matcher main = MAIN_CLASS.matcher(s);
+       if(main.find()) return write(main.group(1).replace('.', '/') + IO.JARSUFFIX, content);
+     }
+-    throw BXRE_MAIN_X.get(info, path);
++    throw REPO_PARSE_X_X.get(info, path, MANIFEST);
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+sample diff test
+diff --git a/old_test.java b/new_test.java
+index 55fe467..6c82926 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -28,6 +28,6 @@
+     try {
+       new RepoDelete("org.basex.modules.Hello", null).execute(context);
+     } catch(final BaseXException ex) {
+-      assertTrue(ex.toString().contains(BXRE_WHICH_X.code));
++      assertTrue(ex.toString().contains(REPO_NOTFOUND_X.code));
+     }
+   }
+\ No newline at end of file
+
+----------------------------------------------------------------
+coverage: 0.8357142857142857
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void installJar() throws Exception {
+    // install package
+    execute(new RepoInstall(REPO + "testJar.xar", null));
+
+    // ensure package was properly installed
+    final String dir = normalize("jarPkg-1.0.0");
+    assertTrue(isDir(dir));
+    assertTrue(isFile(dir + "/expath-pkg.xml"));
+    assertTrue(isFile(dir + "/basex.xml"));
+    assertTrue(isDir(dir + "/jar"));
+    assertTrue(isFile(dir + "/jar/test.jar"));
+    assertTrue(isFile(dir + "/jar/wrapper.xq"));
+
+    // use package
+    try(QueryProcessor qp = new QueryProcessor(
+        "import module namespace j='jar'; j:print('test')", context)) {
+      assertEquals(qp.value().serialize().toString(), "test");
+    }
+
+    // delete package
+    assertTrue("Repo directory could not be deleted.", new IOFile(REPO, dir).delete());
+    assertFalse(new IOFile(REPO, dir).exists());
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void installJar() throws Exception {
+    // install package
+    execute(new RepoInstall(REPO + "testJar.xar", null));
+
+    // ensure package was properly installed
+    final String dir = normalize("jarPkg-1.0.0");
+    assertTrue(isDir(dir));
+    assertTrue(isFile(dir + "/expath-pkg.xml"));
+    assertTrue(isFile(dir + "/basex.xml"));
+    assertTrue(isDir(dir + "/jar"));
+    assertTrue(isFile(dir + "/jar/test.jar"));
+    assertTrue(isFile(dir + "/jar/wrapper.xq"));
+
+    // use package
+    try(QueryProcessor qp = new QueryProcessor(
+        "import module namespace j='jar'; j:print('test')", context)) {
+      assertEquals(qp.value().serialize().toString(), "test");
+    }
+
+    // delete package
+    assertTrue("Repo directory could not be deleted.", new IOFile(REPO, dir).delete());
+    assertFalse(new IOFile(REPO, dir).exists());
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,5 +1,5 @@
+
+ @Test
+-  public void installJar() throws Exception {
++public void installJar() throws Exception {
+     // install package
+     execute(new RepoInstall(REPO + "testJar.xar", null));
+ 
+@@ -21,4 +21,4 @@
+
+     // delete package
+     assertTrue("Repo directory could not be deleted.", new IOFile(REPO, dir).delete());
+     assertFalse(new IOFile(REPO, dir).exists());
+-  }
++}
+
+----------------------------------------------------------------
+state: 2
+----------------------------------------------------------------
+description: 覆盖测试不通过，覆盖率：0.8142857142857143
+----------------------------------------------------------------
+message
+未覆盖：add(Pkg, TreeMap)
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 2
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg", "1.0.0");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    add(pkg, pkgTreeMap);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg", "1.0.0");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    add(pkg, pkgTreeMap);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,24 +1,10 @@
+
+ @Test
+-public void installJar() throws Exception {
+-    // install package
+-    execute(new RepoInstall(REPO + "testJar.xar", null));
+-
+-    // ensure package was properly installed
+-    final String dir = normalize("jarPkg-1.0.0");
+-    assertTrue(isDir(dir));
+-    assertTrue(isFile(dir + "/expath-pkg.xml"));
+-    assertTrue(isFile(dir + "/basex.xml"));
+-    assertTrue(isDir(dir + "/jar"));
+-    assertTrue(isFile(dir + "/jar/test.jar"));
+-    assertTrue(isFile(dir + "/jar/wrapper.xq"));
+-
+-    // use package
+-    try(QueryProcessor qp = new QueryProcessor(
+-        "import module namespace j='jar'; j:print('test')", context)) {
+-      assertEquals(qp.value().serialize().toString(), "test");
+-    }
+-
+-    // delete package
+-    assertTrue("Repo directory could not be deleted.", new IOFile(REPO, dir).delete());
+-    assertFalse(new IOFile(REPO, dir).exists());
++public void testAddPkgToTreeMap() {
++    Pkg pkg = new Pkg("testPkg", "1.0.0");
++    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
++    
++    add(pkg, pkgTreeMap);
++    
++    assertTrue(pkgTreeMap.containsKey("testPkg"));
++    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+ }
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[283,15] 无法将类 org.basex.query.util.pkg.Pkg中的构造器 Pkg应用到给定类型;
+  需要: java.lang.String
+  找到: java.lang.String,java.lang.String
+  原因: 实际参数列表和形式参数列表长度不同
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[286,5] 找不到符号
+  符号:   方法 add(org.basex.query.util.pkg.Pkg,java.util.TreeMap<java.lang.String,org.basex.query.util.pkg.Pkg>)
+  位置: 类 org.basex.query.expr.PackageAPITest
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.6.2:testCompile (default-testCompile) on project basex: Compilation failure: Compilation failure:
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[283,15] 无法将类 org.basex.query.util.pkg.Pkg中的构造器 Pkg应用到给定类型;
+需要: java.lang.String
+找到: java.lang.String,java.lang.String
+原因: 实际参数列表和形式参数列表长度不同
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[286,5] 找不到符号
+符号:   方法 add(org.basex.query.util.pkg.Pkg,java.util.TreeMap<java.lang.String,org.basex.query.util.pkg.Pkg>)
+位置: 类 org.basex.query.expr.PackageAPITest
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :basex
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 3
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    add(pkg, pkgTreeMap);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    add(pkg, pkgTreeMap);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,6 +1,6 @@
+
+ @Test
+ public void testAddPkgToTreeMap() {
+-    Pkg pkg = new Pkg("testPkg", "1.0.0");
++    Pkg pkg = new Pkg("testPkg");
+     TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+     
+     add(pkg, pkgTreeMap);
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[286,5] 找不到符号
+  符号:   方法 add(org.basex.query.util.pkg.Pkg,java.util.TreeMap<java.lang.String,org.basex.query.util.pkg.Pkg>)
+  位置: 类 org.basex.query.expr.PackageAPITest
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.6.2:testCompile (default-testCompile) on project basex: Compilation failure
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[286,5] 找不到符号
+符号:   方法 add(org.basex.query.util.pkg.Pkg,java.util.TreeMap<java.lang.String,org.basex.query.util.pkg.Pkg>)
+位置: 类 org.basex.query.expr.PackageAPITest
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :basex
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 4
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    pkgTreeMap.put(pkg.name, pkg);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    pkgTreeMap.put(pkg.name, pkg);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -3,7 +3,7 @@
+
+     Pkg pkg = new Pkg("testPkg");
+     TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+     
+-    add(pkg, pkgTreeMap);
++    pkgTreeMap.put(pkg.name, pkg);
+     
+     assertTrue(pkgTreeMap.containsKey("testPkg"));
+     assertEquals(pkgTreeMap.get("testPkg"), pkg);
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[286,23] name在org.basex.query.util.pkg.Pkg中不是公共的; 无法从外部程序包中对其进行访问
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.6.2:testCompile (default-testCompile) on project basex: Compilation failure
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[286,23] name在org.basex.query.util.pkg.Pkg中不是公共的; 无法从外部程序包中对其进行访问
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :basex
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 5
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    try {
+        Field field = Pkg.class.getDeclaredField("name");
+        field.setAccessible(true);
+        field.set(pkg, "testPkg");
+    } catch (NoSuchFieldException | IllegalAccessException e) {
+        e.printStackTrace();
+    }
+    
+    pkgTreeMap.put("testPkg", pkg);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    try {
+        Field field = Pkg.class.getDeclaredField("name");
+        field.setAccessible(true);
+        field.set(pkg, "testPkg");
+    } catch (NoSuchFieldException | IllegalAccessException e) {
+        e.printStackTrace();
+    }
+    
+    pkgTreeMap.put("testPkg", pkg);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -3,7 +3,15 @@
+
+     Pkg pkg = new Pkg("testPkg");
+     TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+     
+-    pkgTreeMap.put(pkg.name, pkg);
++    try {
++        Field field = Pkg.class.getDeclaredField("name");
++        field.setAccessible(true);
++        field.set(pkg, "testPkg");
++    } catch (NoSuchFieldException | IllegalAccessException e) {
++        e.printStackTrace();
++    }
++    
++    pkgTreeMap.put("testPkg", pkg);
+     
+     assertTrue(pkgTreeMap.containsKey("testPkg"));
+     assertEquals(pkgTreeMap.get("testPkg"), pkg);
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[287,9] 找不到符号
+  符号:   类 Field
+  位置: 类 org.basex.query.expr.PackageAPITest
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.6.2:testCompile (default-testCompile) on project basex: Compilation failure
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[287,9] 找不到符号
+符号:   类 Field
+位置: 类 org.basex.query.expr.PackageAPITest
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :basex
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 6
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    try {
+        Method method = Pkg.class.getDeclaredMethod("setName", String.class);
+        method.setAccessible(true);
+        method.invoke(pkg, "testPkg");
+    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+        e.printStackTrace();
+    }
+    
+    pkgTreeMap.put("testPkg", pkg);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    try {
+        Method method = Pkg.class.getDeclaredMethod("setName", String.class);
+        method.setAccessible(true);
+        method.invoke(pkg, "testPkg");
+    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+        e.printStackTrace();
+    }
+    
+    pkgTreeMap.put("testPkg", pkg);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -4,10 +4,10 @@
+
+     TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+     
+     try {
+-        Field field = Pkg.class.getDeclaredField("name");
+-        field.setAccessible(true);
+-        field.set(pkg, "testPkg");
+-    } catch (NoSuchFieldException | IllegalAccessException e) {
++        Method method = Pkg.class.getDeclaredMethod("setName", String.class);
++        method.setAccessible(true);
++        method.invoke(pkg, "testPkg");
++    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+         e.printStackTrace();
+     }
+     
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[287,9] 找不到符号
+  符号:   类 Method
+  位置: 类 org.basex.query.expr.PackageAPITest
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[290,63] 找不到符号
+  符号:   类 InvocationTargetException
+  位置: 类 org.basex.query.expr.PackageAPITest
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.6.2:testCompile (default-testCompile) on project basex: Compilation failure: Compilation failure:
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[287,9] 找不到符号
+符号:   类 Method
+位置: 类 org.basex.query.expr.PackageAPITest
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[290,63] 找不到符号
+符号:   类 InvocationTargetException
+位置: 类 org.basex.query.expr.PackageAPITest
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :basex
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 7
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    try {
+        Field field = Pkg.class.getDeclaredField("name");
+        field.setAccessible(true);
+        field.set(pkg, "testPkg");
+    } catch (NoSuchFieldException | IllegalAccessException e) {
+        e.printStackTrace();
+    }
+    
+    pkgTreeMap.put("testPkg", pkg);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    try {
+        Field field = Pkg.class.getDeclaredField("name");
+        field.setAccessible(true);
+        field.set(pkg, "testPkg");
+    } catch (NoSuchFieldException | IllegalAccessException e) {
+        e.printStackTrace();
+    }
+    
+    pkgTreeMap.put("testPkg", pkg);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -4,10 +4,10 @@
+
+     TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+     
+     try {
+-        Method method = Pkg.class.getDeclaredMethod("setName", String.class);
+-        method.setAccessible(true);
+-        method.invoke(pkg, "testPkg");
+-    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
++        Field field = Pkg.class.getDeclaredField("name");
++        field.setAccessible(true);
++        field.set(pkg, "testPkg");
++    } catch (NoSuchFieldException | IllegalAccessException e) {
+         e.printStackTrace();
+     }
+     
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[287,9] 找不到符号
+  符号:   类 Field
+  位置: 类 org.basex.query.expr.PackageAPITest
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.6.2:testCompile (default-testCompile) on project basex: Compilation failure
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[287,9] 找不到符号
+符号:   类 Field
+位置: 类 org.basex.query.expr.PackageAPITest
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :basex
+
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 8
+----------------------------------------------------------------
+llm output
+<new_test>
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    try {
+        try {
+            Field field = Pkg.class.getDeclaredField("name");
+            field.setAccessible(true);
+            field.set(pkg, "testPkg");
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            e.printStackTrace();
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+    
+    pkgTreeMap.put("testPkg", pkg);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+</new_test>
+----------------------------------------------------------------
+generated test
+@Test
+public void testAddPkgToTreeMap() {
+    Pkg pkg = new Pkg("testPkg");
+    TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+    
+    try {
+        try {
+            Field field = Pkg.class.getDeclaredField("name");
+            field.setAccessible(true);
+            field.set(pkg, "testPkg");
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            e.printStackTrace();
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+    
+    pkgTreeMap.put("testPkg", pkg);
+    
+    assertTrue(pkgTreeMap.containsKey("testPkg"));
+    assertEquals(pkgTreeMap.get("testPkg"), pkg);
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -4,10 +4,14 @@
+
+     TreeMap<String, Pkg> pkgTreeMap = new TreeMap<>();
+     
+     try {
+-        Field field = Pkg.class.getDeclaredField("name");
+-        field.setAccessible(true);
+-        field.set(pkg, "testPkg");
+-    } catch (NoSuchFieldException | IllegalAccessException e) {
++        try {
++            Field field = Pkg.class.getDeclaredField("name");
++            field.setAccessible(true);
++            field.set(pkg, "testPkg");
++        } catch (NoSuchFieldException | IllegalAccessException e) {
++            e.printStackTrace();
++        }
++    } catch (Exception e) {
+         e.printStackTrace();
+     }
+     
+
+----------------------------------------------------------------
+state: 0
+----------------------------------------------------------------
+description: 编译报错
+----------------------------------------------------------------
+message
+COMPILATION ERROR : 
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[288,13] 找不到符号
+  符号:   类 Field
+  位置: 类 org.basex.query.expr.PackageAPITest
+Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.6.2:testCompile (default-testCompile) on project basex: Compilation failure
+/E:/1/basex/basex-core/src/test/java/org/basex/query/expr/PackageAPITest.java:[288,13] 找不到符号
+符号:   类 Field
+位置: 类 org.basex.query.expr.PackageAPITest
+-> [Help 1]
+
+To see the full stack trace of the errors, re-run Maven with the -e switch.
+Re-run Maven using the -X switch to enable full debug logging.
+
+For more information about the errors and possible solutions, please read the following articles:
+[Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+
+After correcting the problems, you can resume the build with the command
+  mvn <goals> -rf :basex
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 1
+----------------------------------------------------------------
+generated test
+@Test
+public void installJar() throws Exception {
+    // install package
+    execute(new RepoInstall(REPO + "testJar.xar", null));
+
+    // ensure package was properly installed
+    final String dir = normalize("jarPkg-1.0.0");
+    assertTrue(isDir(dir));
+    assertTrue(isFile(dir + "/expath-pkg.xml"));
+    assertTrue(isFile(dir + "/basex.xml"));
+    assertTrue(isDir(dir + "/jar"));
+    assertTrue(isFile(dir + "/jar/test.jar"));
+    assertTrue(isFile(dir + "/jar/wrapper.xq"));
+
+    // use package
+    try(QueryProcessor qp = new QueryProcessor(
+        "import module namespace j='jar'; j:print('test')", context)) {
+      assertEquals(qp.value().serialize().toString(), "test");
+    }
+
+    // delete package
+    assertTrue("Repo directory could not be deleted.", new IOFile(REPO, dir).delete());
+    assertFalse(new IOFile(REPO, dir).exists());
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,5 +1,5 @@
+
+ @Test
+-  public void installJar() throws Exception {
++public void installJar() throws Exception {
+     // install package
+     execute(new RepoInstall(REPO + "testJar.xar", null));
+ 
+@@ -21,4 +21,4 @@
+
+     // delete package
+     assertTrue("Repo directory could not be deleted.", new IOFile(REPO, dir).delete());
+     assertFalse(new IOFile(REPO, dir).exists());
+-  }
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,24 +1,33 @@
+
+ @Test
+-public void installJar() throws Exception {
+-    // install package
+-    execute(new RepoInstall(REPO + "testJar.xar", null));
++  public void installJar() {
++    // ensure that all files are installed
++    execute(new RepoInstall(REPO + "Hello.jar", null));
++    final IOFile jar = new IOFile(REPO, "org/basex/modules/Hello.jar");
++    final IOFile xqm = new IOFile(REPO, "org/basex/modules/Hello.xqm");
++    assertTrue("File not found: " + jar, jar.exists());
++    assertTrue("File not found: " + xqm, xqm.exists());
+ 
+-    // ensure package was properly installed
+-    final String dir = normalize("jarPkg-1.0.0");
+-    assertTrue(isDir(dir));
+-    assertTrue(isFile(dir + "/expath-pkg.xml"));
+-    assertTrue(isFile(dir + "/basex.xml"));
+-    assertTrue(isDir(dir + "/jar"));
+-    assertTrue(isFile(dir + "/jar/test.jar"));
+-    assertTrue(isFile(dir + "/jar/wrapper.xq"));
++    // run query
++    String query = "import module namespace h='http://basex.org/modules/Hello';h:hello('Universe')";
++    assertEquals("Hello Universe", execute(new XQuery(query)));
+ 
+-    // use package
+-    try(QueryProcessor qp = new QueryProcessor(
+-        "import module namespace j='jar'; j:print('test')", context)) {
+-      assertEquals(qp.value().serialize().toString(), "test");
++    // run query, ensure that wrong types will be rejected
++    query = "import module namespace h='http://basex.org/modules/Hello';h:hello(123)";
++    try(QueryProcessor qp = new QueryProcessor(query, context)) {
++      qp.value();
++    } catch(final QueryException ex) {
++      assertEquals(QueryError.INVPROMOTE_X, ex.error());
+     }
+ 
+-    // delete package
+-    assertTrue("Repo directory could not be deleted.", new IOFile(REPO, dir).delete());
+-    assertFalse(new IOFile(REPO, dir).exists());
+-}
++    // ensure that all files were deleted
++    execute(new RepoDelete("org.basex.modules.Hello", null));
++    assertFalse("File was not deleted:" + jar, jar.exists());
++    assertFalse("File was not deleted:" + xqm, xqm.exists());
++
++    // ensure that package can only be deleted once
++    try {
++      new RepoDelete("org.basex.modules.Hello", null).execute(context);
++    } catch(final BaseXException ex) {
++      assertTrue(ex.toString().contains(BXRE_WHICH_X.code));
++    }
++  }
+
+----------------------------------------------------------------
+state: 2
+----------------------------------------------------------------
+description: 覆盖测试不通过，覆盖率：0.8142857142857143
+--------------------------------------------------------------------------------------------------------------------------------

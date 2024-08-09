@@ -1,0 +1,1 @@
+Cmd send(String cmdId, boolean shouldResetStatus);

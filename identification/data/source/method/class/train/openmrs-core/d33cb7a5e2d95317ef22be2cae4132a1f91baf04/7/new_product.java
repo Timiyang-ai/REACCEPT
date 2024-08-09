@@ -1,0 +1,1 @@
+public void unvoidEncounter(Encounter encounter) throws APIException;

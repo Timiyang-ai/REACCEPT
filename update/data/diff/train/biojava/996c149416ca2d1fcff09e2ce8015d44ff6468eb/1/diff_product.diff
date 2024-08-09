@@ -1,0 +1,88 @@
+diff --git a/old_product.java b/new_product.java
+index 99bb756..b639088 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,7 +1,7 @@
+-public boolean mergeSequence(SubunitCluster other, double minSeqid,
+-			double minCoverage, PairwiseSequenceAlignerType alignerType,
+-			GapPenalty gapPenalty,
+-			SubstitutionMatrix<AminoAcidCompound> subsMatrix)
++public boolean mergeSequence(SubunitCluster other, SubunitClustererParameters params,
++								 PairwiseSequenceAlignerType alignerType,
++								 GapPenalty gapPenalty,
++								 SubstitutionMatrix<AminoAcidCompound> subsMatrix)
+ 			throws CompoundNotFoundException {
+ 
+ 		// Extract the protein sequences as BioJava alignment objects
+@@ -15,28 +15,36 @@ public boolean mergeSequence(SubunitCluster other, double minSeqid,
+ 				.getPairwiseAligner(thisSequence, otherSequence, alignerType,
+ 						gapPenalty, subsMatrix);
+ 
+-		// Calculate real coverage (subtract gaps in both sequences)
+-		double gaps1 = aligner.getPair().getAlignedSequence(1)
+-				.getNumGapPositions();
+-		double gaps2 = aligner.getPair().getAlignedSequence(2)
+-				.getNumGapPositions();
+-		double lengthAlignment = aligner.getPair().getLength();
+-		double lengthThis = aligner.getQuery().getLength();
+-		double lengthOther = aligner.getTarget().getLength();
+-		double coverage = (lengthAlignment - gaps1 - gaps2)
+-				/ Math.max(lengthThis, lengthOther);
+-
+-		if (coverage < minCoverage)
+-			return false;
+-
+-		double seqid = aligner.getPair().getPercentageOfIdentity();
++		double sequenceIdentity;
++		if(params.isUseGlobalMetrics()) {
++			sequenceIdentity = aligner.getPair().getPercentageOfIdentity(true);
++		} else {
++			sequenceIdentity = aligner.getPair().getPercentageOfIdentity(false);
++		}
+ 
+-		if (seqid < minSeqid)
++		if (sequenceIdentity < params.getSequenceIdentityThreshold())
+ 			return false;
+ 
++		double sequenceCoverage = 0;
++		if(params.isUseSequenceCoverage()) {
++			// Calculate real coverage (subtract gaps in both sequences)
++			double gaps1 = aligner.getPair().getAlignedSequence(1)
++					.getNumGapPositions();
++			double gaps2 = aligner.getPair().getAlignedSequence(2)
++					.getNumGapPositions();
++			double lengthAlignment = aligner.getPair().getLength();
++			double lengthThis = aligner.getQuery().getLength();
++			double lengthOther = aligner.getTarget().getLength();
++			sequenceCoverage = (lengthAlignment - gaps1 - gaps2)
++					/ Math.max(lengthThis, lengthOther);
++
++			if (sequenceCoverage < params.getSequenceCoverageThreshold())
++				return false;
++		}
++
+ 		logger.info(String.format("SubunitClusters are similar in sequence "
+-				+ "with %.2f sequence identity and %.2f coverage", seqid,
+-				coverage));
++						+ "with %.2f sequence identity and %.2f coverage", sequenceIdentity,
++				sequenceCoverage));
+ 
+ 		// If coverage and sequence identity sufficient, merge other and this
+ 		List<Integer> thisAligned = new ArrayList<Integer>();
+@@ -80,7 +88,6 @@ public boolean mergeSequence(SubunitCluster other, double minSeqid,
+ 					other.representative).get(t)))
+ 				otherRemove.add(t);
+ 		}
+-
+ 		// Now remove unaligned columns, from end to start
+ 		Collections.sort(thisRemove);
+ 		Collections.reverse(thisRemove);
+@@ -111,5 +118,7 @@ public boolean mergeSequence(SubunitCluster other, double minSeqid,
+ 
+ 		this.method = SubunitClustererMethod.SEQUENCE;
+ 
++		pseudoStoichiometric = !params.isHighConfidenceScores(sequenceIdentity,sequenceCoverage);
++
+ 		return true;
+ 	}
+\ No newline at end of file

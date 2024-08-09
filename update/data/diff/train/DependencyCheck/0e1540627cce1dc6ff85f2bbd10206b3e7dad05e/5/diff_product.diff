@@ -1,0 +1,130 @@
+diff --git a/old_product.java b/new_product.java
+index 1bd40a7..cb82ed0 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,117 +1,10 @@
+ public void fetchFile(URL url, File outputPath, boolean useProxy) throws DownloadFailedException {
+-        if ("file".equalsIgnoreCase(url.getProtocol())) {
+-            final File file;
+-            try {
+-                file = new File(url.toURI());
+-            } catch (URISyntaxException ex) {
+-                final String msg = format("Download failed, unable to locate '%s'", url.toString());
+-                throw new DownloadFailedException(msg);
+-            }
+-            if (file.exists()) {
+-                try {
+-                    org.apache.commons.io.FileUtils.copyFile(file, outputPath);
+-                } catch (IOException ex) {
+-                    final String msg = format("Download failed, unable to copy '%s' to '%s'", url.toString(), outputPath.getAbsolutePath());
+-                    throw new DownloadFailedException(msg, ex);
+-                }
+-            } else {
+-                final String msg = format("Download failed, file ('%s') does not exist", url.toString());
+-                throw new DownloadFailedException(msg);
+-            }
+-        } else {
+-            HttpURLConnection conn = null;
+-            try {
+-                LOGGER.debug("Attempting download of {}", url.toString());
+-                conn = connFactory.createHttpURLConnection(url, useProxy);
+-                conn.setRequestProperty("Accept-Encoding", "gzip, deflate");
+-                conn.connect();
+-                int status = conn.getResponseCode();
+-                int redirectCount = 0;
+-                while ((status == HttpURLConnection.HTTP_MOVED_TEMP
+-                        || status == HttpURLConnection.HTTP_MOVED_PERM
+-                        || status == HttpURLConnection.HTTP_SEE_OTHER)
+-                        && MAX_REDIRECT_ATTEMPTS > redirectCount++) {
+-                    final String location = conn.getHeaderField("Location");
+-                    try {
+-                        conn.disconnect();
+-                    } finally {
+-                        conn = null;
+-                    }
+-                    LOGGER.debug("Download is being redirected from {} to {}", url.toString(), location);
+-                    conn = connFactory.createHttpURLConnection(new URL(location), useProxy);
+-                    conn.setRequestProperty("Accept-Encoding", "gzip, deflate");
+-                    conn.connect();
+-                    status = conn.getResponseCode();
+-                }
+-                if (status != 200) {
+-                    try {
+-                        conn.disconnect();
+-                    } finally {
+-                        conn = null;
+-                    }
+-                    final String msg = format("Error downloading file %s; received response code %s.", url.toString(), status);
+-                    throw new DownloadFailedException(msg);
+-
+-                }
+-            } catch (IOException ex) {
+-                try {
+-                    if (conn != null) {
+-                        conn.disconnect();
+-                    }
+-                } finally {
+-                    conn = null;
+-                }
+-                if ("Connection reset".equalsIgnoreCase(ex.getMessage())) {
+-                    final String msg = format("TLS Connection Reset%nPlease see "
+-                            + "http://jeremylong.github.io/DependencyCheck/data/tlsfailure.html "
+-                            + "for more information regarding how to resolve the issue.");
+-                    LOGGER.error(msg);
+-                    throw new DownloadFailedException(msg, ex);
+-                }
+-                final String msg = format("Error downloading file %s; unable to connect.", url.toString());
+-                throw new DownloadFailedException(msg, ex);
+-            }
+-
+-            final String encoding = conn.getContentEncoding();
+-            InputStream reader = null;
+-            try (OutputStream out = new FileOutputStream(outputPath);
+-                    BufferedOutputStream writer = new BufferedOutputStream(out)) {
+-                if (encoding != null && "gzip".equalsIgnoreCase(encoding)) {
+-                    reader = new GZIPInputStream(conn.getInputStream());
+-                } else if (encoding != null && "deflate".equalsIgnoreCase(encoding)) {
+-                    reader = new InflaterInputStream(conn.getInputStream());
+-                } else {
+-                    reader = conn.getInputStream();
+-                }
+-
+-                final byte[] buffer = new byte[4096];
+-                int bytesRead;
+-                while ((bytesRead = reader.read(buffer)) > 0) {
+-                    writer.write(buffer, 0, bytesRead);
+-                }
+-                LOGGER.debug("Download of {} complete", url.toString());
+-            } catch (IOException ex) {
+-                checkForCommonExceptionTypes(ex);
+-                final String msg = format("Error saving '%s' to file '%s'%nConnection Timeout: %d%nEncoding: %s%n",
+-                        url.toString(), outputPath.getAbsolutePath(), conn.getConnectTimeout(), encoding);
+-                throw new DownloadFailedException(msg, ex);
+-            } catch (Exception ex) {
+-                final String msg = format("Unexpected exception saving '%s' to file '%s'%nConnection Timeout: %d%nEncoding: %s%n",
+-                        url.toString(), outputPath.getAbsolutePath(), conn.getConnectTimeout(), encoding);
+-                throw new DownloadFailedException(msg, ex);
+-            } finally {
+-                if (reader != null) {
+-                    try {
+-                        reader.close();
+-                    } catch (IOException ex) {
+-                        LOGGER.trace("Error closing the reader in Downloader.", ex);
+-                    }
+-                }
+-                try {
+-                    conn.disconnect();
+-                } finally {
+-                    conn = null;
+-                }
+-            }
++        try (HttpResourceConnection conn = new HttpResourceConnection(settings, useProxy);
++                OutputStream out = new FileOutputStream(outputPath)) {
++            final InputStream in = conn.fetch(url);
++            IOUtils.copy(in, out);
++        } catch (IOException ex) {
++            final String msg = format("Download failed, unable to copy '%s' to '%s'", url.toString(), outputPath.getAbsolutePath());
++            throw new DownloadFailedException(msg, ex);
+         }
+     }
+\ No newline at end of file

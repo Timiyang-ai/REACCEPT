@@ -1,0 +1,62 @@
+diff --git a/old_product.java b/new_product.java
+index 0cded19..28f6644 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,10 +1,10 @@
+ void score( int x0 , int y0 , int dx , int dy ) {
+-		// there is no previous score so simply fill
++		// there is no previous disparity score so simply fill the cost for d=0
+ 		GrayU16 costXD = costYXD.getBand(y0);
+-		int idxCost = costXD.getIndex(x0,0);
++		int idxCost = costXD.getIndex(0,x0);   // C(0,0)
+ 
+ 		for (int d = 0; d < lengthD; d++) {
+-			pathWork[d] = costXD.data[idxCost+d];
++			workCostLr[d] = costXD.data[idxCost+d]; // Lr(0,d) = C(0,d)
+ 		}
+ 
+ 		// Compute the cost of rest of the path recursively
+@@ -14,30 +14,28 @@ void score( int x0 , int y0 , int dx , int dy ) {
+ 
+ 		final int lengthD = this.lengthD;
+ 
+-		for (int i = 1; i < lengthPath; i++) {
+-			costXD = costYXD.getBand(y);
+-			idxCost = costXD.getIndex(x,0);
+-
++		for (int i = 1; i < lengthPath; i++, x += dx, y += dy) {
+ 			// Read results from the previous location along the path
+-			int idxWork = (i-1)*lengthD;
++			int idxLr = (i-1)*lengthD;
+ 
+-			// find the minimum cost for all D in the previous
+-			int minCostPrev = Integer.MAX_VALUE;
++			// find the minimum path cost for all D in the previous point in path
++			int minLrPrev = Integer.MAX_VALUE;
+ 			for (int d = 0; d < lengthD; d++) {
+-				int cost = costXD.data[idxCost+d] & 0xFFFF;
+-				if( cost < minCostPrev )
+-					minCostPrev = cost;
++				int cost = workCostLr[idxLr+d] & 0xFFFF; // Lr(i,d)
++				if( cost < minLrPrev )
++					minLrPrev = cost;
+ 			}
+ 
+-			// Add penalty
+-			int minCostPrevTotal = minCostPrev + penalty2;
++			// Index of cost for C(y,p0+i,0)
++			costXD = costYXD.getBand(y);
++			idxCost = costXD.getIndex(0,x);
+ 
+ 			// Score the inner portion of disparity first to avoid bounds checks
+-			computeCostInnerD(costXD, idxCost, idxWork, minCostPrev, minCostPrevTotal);
++			computeCostInnerD(costXD, idxCost, idxLr, minLrPrev);
+ 
+ 			// Now handle the borders
+-			computeCostBorderD(idxCost,idxWork,0,costXD,minCostPrev);
+-			computeCostBorderD(idxCost,idxWork,lengthD-1,costXD,minCostPrev);
++			computeCostBorderD(idxCost,idxLr,0,costXD,minLrPrev);
++			computeCostBorderD(idxCost,idxLr,lengthD-1,costXD,minLrPrev);
+ 		}
+ 
+ 		saveWorkToAggregated(x0,y0,dx,dy,lengthPath);

@@ -1,0 +1,1 @@
+public abstract List<Job> getAllJobs() throws Exception;

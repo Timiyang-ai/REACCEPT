@@ -1,0 +1,1 @@
+V edgeValue(@CompatibleWith("N") Object nodeU, @CompatibleWith("N") Object nodeV);

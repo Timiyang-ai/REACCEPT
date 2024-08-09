@@ -1,0 +1,1 @@
+public void updateGlobalProperty(String propertyName, String propertyValue) throws IllegalStateException;

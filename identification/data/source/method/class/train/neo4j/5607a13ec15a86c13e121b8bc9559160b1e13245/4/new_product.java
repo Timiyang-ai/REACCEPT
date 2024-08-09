@@ -1,0 +1,1 @@
+KernelTransaction beginTransaction( KernelTransaction.Type type, LoginContext loginContext, long timeout );

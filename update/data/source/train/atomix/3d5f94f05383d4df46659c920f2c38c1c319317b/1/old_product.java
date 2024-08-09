@@ -1,0 +1,1 @@
+CompletableFuture<Versioned<QueueStatus>> queueStatus();

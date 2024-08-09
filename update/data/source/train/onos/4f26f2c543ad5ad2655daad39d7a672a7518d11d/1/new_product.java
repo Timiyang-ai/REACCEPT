@@ -1,0 +1,1 @@
+void addTelemetryService(TelemetryAdminService telemetryService);

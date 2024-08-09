@@ -1,0 +1,1 @@
+public ConceptStateConversion getConceptStateConversionByUuid(String uuid);

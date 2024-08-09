@@ -1,0 +1,1 @@
+List<VersionDto> getProfileSchemaVersionsByApplicationId(String applicationId) throws ControlServiceException;

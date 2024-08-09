@@ -1,0 +1,1 @@
+public FileInfo getStatus(String path) throws alluxio.thrift.AlluxioTException, org.apache.thrift.TException;

@@ -1,0 +1,37 @@
+diff --git a/old_product.java b/new_product.java
+index 721cb34..94783ea 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,20 +1,23 @@
+ private void shouldCloseSpanUponException(ResponseEntityProvider provider)
+ 			throws IOException, InterruptedException {
+-		Span span = this.tracer.createSpan("new trace");
++		Span span = this.tracer.nextSpan().name("new trace");
+ 
+-		try {
++		try (Tracer.SpanInScope ws = this.tracer.withSpanInScope(span.start())) {
+ 			provider.get(this);
+ 			Assertions.fail("should throw an exception");
+ 		}
+ 		catch (RuntimeException e) {
+ 		}
++		finally {
++			span.finish();
++		}
+ 
+-		assertThat(ExceptionUtils.getLastException()).isNull();
+-
+-		then(this.tracer.getCurrentSpan()).isEqualTo(span);
+-		this.tracer.close(span);
+-		then(ExceptionUtils.getLastException()).isNull();
+ 		// hystrix commands should finish at this point
+ 		Thread.sleep(200);
+-		then(this.outputCapture.toString()).doesNotContain("Tried to detach trace span but it is not the current span");
++		List<zipkin2.Span> spans = this.reporter.getSpans();
++		then(spans).hasSize(2);
++		then(spans.stream()
++				.filter(span1 -> span1.kind() == zipkin2.Span.Kind.CLIENT)
++				.findFirst()
++				.get().tags()).containsKey("error");
+ 	}
+\ No newline at end of file

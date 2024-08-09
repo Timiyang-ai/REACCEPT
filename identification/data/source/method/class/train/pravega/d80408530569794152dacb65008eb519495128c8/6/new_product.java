@@ -1,0 +1,1 @@
+SegmentOutputStream createOutputStreamForTransaction(Segment segment, UUID txId, EventWriterConfig config, String delegationToken);

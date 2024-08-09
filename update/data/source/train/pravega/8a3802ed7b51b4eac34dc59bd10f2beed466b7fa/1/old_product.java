@@ -1,0 +1,1 @@
+CompletableFuture<LogAddress> append(InputStream data, Duration timeout);

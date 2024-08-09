@@ -1,0 +1,1 @@
+PageResult<PushApplication, Count> findAllForDeveloper(String loginName, Integer page, Integer pageSize);

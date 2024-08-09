@@ -1,0 +1,1 @@
+GetTeamDetailResponse getTeamDetail(@WebParam(name = "id") Long id);

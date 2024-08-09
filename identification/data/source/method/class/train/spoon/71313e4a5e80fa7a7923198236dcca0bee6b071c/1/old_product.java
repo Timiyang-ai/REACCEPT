@@ -1,0 +1,1 @@
+CtConstructor<T> getConstructor(CtTypeReference<?>... parameterTypes);

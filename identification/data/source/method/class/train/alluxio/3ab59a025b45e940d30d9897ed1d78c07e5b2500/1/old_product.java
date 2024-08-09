@@ -1,0 +1,1 @@
+UfsInfo getUfsInfo(long ufsId);

@@ -1,0 +1,1 @@
+public boolean allowAddSubmissionCheckGroups(Assignment assignment);

@@ -1,0 +1,96 @@
+diff --git a/old_product.java b/new_product.java
+index b8e0f01..6c7adbf 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,50 +1,49 @@
+-public void onTopicCreated(TopicName topicName, Handler<AsyncResult<Void>> resultHandler) {
++void onTopicCreated(TopicName topicName, Handler<AsyncResult<Void>> resultHandler) {
+         // XXX currently runs on the ZK thread, requiring a synchronized inFlight
+         // is it better to put this check in the topic deleted event?
+-        if (inFlight.shouldProcessTopicCreate(topicName)) {
+-            Handler<AsyncResult<TopicMetadata>> handler = new Handler<AsyncResult<TopicMetadata>>() {
+-                BackOff backOff = new BackOff();
++        Handler<Future<Void>> futureHandler = new Reconciliation("onTopicCreated") {
++            @Override
++            public void handle(Future<Void> fut) {
++                Handler<AsyncResult<TopicMetadata>> handler = new Handler<AsyncResult<TopicMetadata>>() {
++                    private final BackOff backOff = new BackOff();
+ 
+-                @Override
+-                public void handle(AsyncResult<TopicMetadata> metadataResult) {
+-                    if (metadataResult.failed()) {
+-                        if (metadataResult.cause() instanceof UnknownTopicOrPartitionException) {
+-                            // In this case it is most likely that we've been notified by ZK
+-                            // before Kafka has finished creating the topic, so we retry
+-                            // with exponential backoff.
+-                            long delay;
+-                            try {
+-                                delay = backOff.delayMs();
+-                            } catch (MaxAttemptsExceededException e) {
+-                                resultHandler.handle(Future.failedFuture(e));
+-                                return;
+-                            }
+-                            if (delay < 1) {
+-                                // vertx won't tolerate a zero delay
+-                                vertx.runOnContext(timerId -> kafka.topicMetadata(topicName, this));
++                    @Override
++                    public void handle(AsyncResult<TopicMetadata> metadataResult) {
++                        if (metadataResult.succeeded()) {
++                            if (metadataResult.result() == null) {
++                                // In this case it is most likely that we've been notified by ZK
++                                // before Kafka has finished creating the topic, so we retry
++                                // with exponential backoff.
++                                long delay;
++                                try {
++                                    delay = backOff.delayMs();
++                                    logger.debug("Topic {} created in ZK, but no metadata available from Kafka yet: Backing off for {}ms", topicName, delay);
++                                } catch (MaxAttemptsExceededException e) {
++                                    logger.info("Topic {} created in ZK, and no metadata available from Kafka after {}ms, giving up for now", topicName, backOff.totalDelayMs());
++                                    fut.fail(e);
++                                    return;
++                                }
++
++                                if (delay < 1) {
++                                    // vertx won't tolerate a zero delay
++                                    vertx.runOnContext(timerId -> kafka.topicMetadata(topicName, this));
++                                } else {
++                                    vertx.setTimer(TimeUnit.MILLISECONDS.convert(delay, TimeUnit.MILLISECONDS),
++                                            timerId -> kafka.topicMetadata(topicName, this));
++                                }
+                             } else {
+-                                vertx.setTimer(TimeUnit.MILLISECONDS.convert(delay, TimeUnit.MILLISECONDS),
+-                                        timerId -> kafka.topicMetadata(topicName, this));
++                                // We now have the metadata we need to create the
++                                // ConfigMap...
++                                Topic kafkaTopic = TopicSerialization.fromTopicMetadata(metadataResult.result());
++                                reconcileOnTopicChange(topicName, kafkaTopic, fut);
+                             }
+                         } else {
+-                            resultHandler.handle(Future.failedFuture(metadataResult.cause()));
++                            fut.handle(metadataResult.map((Void) null));
+                         }
+-                    } else {
+-                        // We now have the metadata we need to create the
+-                        // ConfigMap...
+-                        Topic topic = TopicSerialization.fromTopicMetadata(metadataResult.result());
+-                        enqueue(new CreateConfigMap(topic, kubeResult -> {
+-                            if (kubeResult.succeeded()) {
+-                                enqueue(new CreateInTopicStore(topic, null, resultHandler));
+-                            } else {
+-                                resultHandler.handle(kubeResult);
+-                            }
+-                        }));
+                     }
+-                }
+-            };
+-            kafka.topicMetadata(topicName, handler);
+-        } else {
+-            resultHandler.handle(Future.succeededFuture());
+-        }
++                };
++                kafka.topicMetadata(topicName, handler);
++            }
++        };
++        inFlight.enqueue(topicName, resultHandler, futureHandler);
+     }
+\ No newline at end of file

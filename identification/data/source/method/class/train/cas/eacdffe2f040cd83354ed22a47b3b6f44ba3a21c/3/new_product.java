@@ -1,0 +1,1 @@
+HandlerResult authenticate(Credential credential) throws GeneralSecurityException, PreventedException;

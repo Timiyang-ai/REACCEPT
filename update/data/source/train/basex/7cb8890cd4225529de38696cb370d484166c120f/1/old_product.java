@@ -1,0 +1,1 @@
+abstract boolean instanceOf(final SeqType vt);

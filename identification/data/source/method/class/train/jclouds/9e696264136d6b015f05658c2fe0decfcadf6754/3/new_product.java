@@ -1,0 +1,1 @@
+MetadataValue getValue(URI uri, String key);

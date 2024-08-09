@@ -1,0 +1,49 @@
+diff --git a/old_test.java b/new_test.java
+index b4095dc..659f4fb 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -4,25 +4,35 @@
+ 			// Cancel with savepoint (no target directory)
+ 			JobID jid = new JobID();
+ 
++			OneShotLatch cancelWithSavepointLatch = new OneShotLatch();
++
+ 			String[] parameters = { "-s", jid.toString() };
+-			final ClusterClient<String> clusterClient = createClusterClient();
++			TestingClusterClient<String> clusterClient = new TestingClusterClient<>();
++			clusterClient.setCancelWithSavepointFunction((jobID, savepointDirectory) -> {
++				assertNull(savepointDirectory);
++				cancelWithSavepointLatch.trigger();
++				return CompletableFuture.completedFuture(savepointDirectory);
++			});
+ 			MockedCliFrontend testFrontend = new MockedCliFrontend(clusterClient);
+ 			testFrontend.cancel(parameters);
+-
+-			Mockito.verify(clusterClient, times(1))
+-				.cancelWithSavepoint(any(JobID.class), isNull(String.class));
++			cancelWithSavepointLatch.await();
+ 		}
+ 
+ 		{
+ 			// Cancel with savepoint (with target directory)
+ 			JobID jid = new JobID();
+ 
++			OneShotLatch cancelWithSavepointLatch = new OneShotLatch();
++
+ 			String[] parameters = { "-s", "targetDirectory", jid.toString() };
+-			final ClusterClient<String> clusterClient = createClusterClient();
++			TestingClusterClient<String> clusterClient = new TestingClusterClient<>();
++			clusterClient.setCancelWithSavepointFunction((jobID, savepointDirectory) -> {
++				assertNotNull(savepointDirectory);
++				cancelWithSavepointLatch.trigger();
++				return CompletableFuture.completedFuture(savepointDirectory);
++			});
+ 			MockedCliFrontend testFrontend = new MockedCliFrontend(clusterClient);
+ 			testFrontend.cancel(parameters);
+-
+-			Mockito.verify(clusterClient, times(1))
+-				.cancelWithSavepoint(any(JobID.class), notNull(String.class));
++			cancelWithSavepointLatch.await();
+ 		}
+ 	}
+\ No newline at end of file

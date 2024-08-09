@@ -1,0 +1,37 @@
+diff --git a/old_product.java b/new_product.java
+index e648181..50e7ed4 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -6,19 +6,25 @@
+         StreamConfiguration streamConfiguration = ModelHelper.getCreateStreamConfig(createStreamRequest, scopeName);
+         controllerService.createStream(streamConfiguration, System.currentTimeMillis())
+                 .thenApply(streamStatus -> {
+-                    if (streamStatus == CreateStreamStatus.SUCCESS) {
++                    Response resp = null;
++                    if (streamStatus.getStatus() == CreateStreamStatus.Status.SUCCESS) {
+                         log.info("Successfully created stream: {}/{}", scopeName, streamConfiguration.getStreamName());
+-                        return Response.status(Status.CREATED).
++                        resp = Response.status(Status.CREATED).
+                                 entity(ModelHelper.encodeStreamResponse(streamConfiguration)).build();
+-                    } else if (streamStatus == CreateStreamStatus.STREAM_EXISTS) {
++                    } else if (streamStatus.getStatus() == CreateStreamStatus.Status.STREAM_EXISTS) {
+                         log.warn("Stream already exists: {}/{}", scopeName, streamConfiguration.getStreamName());
+-                        return Response.status(Status.CONFLICT).build();
+-                    } else if (streamStatus == CreateStreamStatus.SCOPE_NOT_FOUND) {
+-                        return Response.status(Status.NOT_FOUND).build();
++                        resp = Response.status(Status.CONFLICT).build();
++                    } else if (streamStatus.getStatus() == CreateStreamStatus.Status.SCOPE_NOT_FOUND) {
++                        log.warn("Scope not found: {}", scopeName);
++                        resp = Response.status(Status.NOT_FOUND).build();
++                    } else if (streamStatus.getStatus() == CreateStreamStatus.Status.INVALID_STREAM_NAME) {
++                        log.warn("Invalid stream name: {}", streamConfiguration.getStreamName());
++                        resp = Response.status(Status.BAD_REQUEST).build();
+                     } else {
+                         log.warn("createStream failed for : {}/{}", scopeName, streamConfiguration.getStreamName());
+-                        return Response.status(Status.INTERNAL_SERVER_ERROR).build();
++                        resp = Response.status(Status.INTERNAL_SERVER_ERROR).build();
+                     }
++                    return resp;
+                 }).exceptionally(exception -> {
+                     log.warn("createStream for {}/{} failed {}: ", scopeName, streamConfiguration.getStreamName(),
+                              exception);

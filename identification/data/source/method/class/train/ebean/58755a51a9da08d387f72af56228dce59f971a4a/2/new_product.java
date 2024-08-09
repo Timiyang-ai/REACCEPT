@@ -1,0 +1,1 @@
+Object toObject(Type genericType, JsonParser jsonParser) throws JsonIOException;

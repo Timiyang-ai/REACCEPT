@@ -1,0 +1,1 @@
+CompletableFuture<SegmentProperties> seal(String streamSegmentName, Duration timeout);

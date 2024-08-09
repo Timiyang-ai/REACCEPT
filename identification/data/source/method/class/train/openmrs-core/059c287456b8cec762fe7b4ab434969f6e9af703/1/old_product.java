@@ -1,0 +1,1 @@
+public Long getCountOfProviders(String name);

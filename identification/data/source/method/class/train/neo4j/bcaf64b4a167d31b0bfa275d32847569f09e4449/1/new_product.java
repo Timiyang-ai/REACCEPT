@@ -1,0 +1,4 @@
+public void blockNewTransactions()
+    {
+        doBlockNewTransactions();
+    }

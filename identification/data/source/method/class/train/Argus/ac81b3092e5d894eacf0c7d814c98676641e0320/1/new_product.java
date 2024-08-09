@@ -1,0 +1,1 @@
+List<Alert> findAllAlerts(boolean metadataOnly);

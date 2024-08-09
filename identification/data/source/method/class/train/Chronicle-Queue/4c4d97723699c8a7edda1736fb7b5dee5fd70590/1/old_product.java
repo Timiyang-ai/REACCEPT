@@ -1,0 +1,1 @@
+LongValue acquireValueFor(CharSequence key);

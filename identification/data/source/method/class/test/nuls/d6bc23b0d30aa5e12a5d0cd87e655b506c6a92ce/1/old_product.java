@@ -1,0 +1,1 @@
+Result commitTx(Transaction tx);

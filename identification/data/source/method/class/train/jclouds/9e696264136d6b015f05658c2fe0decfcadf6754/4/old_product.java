@@ -1,0 +1,1 @@
+Task setMetadata(URI uri, String key, MetadataValue metadataValue);

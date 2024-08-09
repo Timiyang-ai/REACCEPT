@@ -1,0 +1,1 @@
+public EncounterVisitHandler getActiveEncounterVisitHandler() throws APIException;

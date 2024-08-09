@@ -1,0 +1,1 @@
+List<VersionDto> getUserNotificationSchemasByAppId(String applicationId) throws ControlServiceException;

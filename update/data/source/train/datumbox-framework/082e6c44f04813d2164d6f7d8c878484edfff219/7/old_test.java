@@ -1,0 +1,9 @@
+@Test
+    public void testGeometricCdf() {
+        logger.info("GeometricCdf");
+        int k = 3;
+        double p = 0.5;
+        double expResult = 0.875;
+        double result = DiscreteDistributions.GeometricCdf(k, p);
+        assertEquals(expResult, result, TestConfiguration.DOUBLE_ACCURACY_HIGH);
+    }

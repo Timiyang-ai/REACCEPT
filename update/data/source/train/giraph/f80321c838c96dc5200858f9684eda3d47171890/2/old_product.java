@@ -1,0 +1,1 @@
+BasicVertex<I, V, E, M> instantiateVertex();

@@ -1,0 +1,1 @@
+Map<TunnelId, ResourceConsumer> getTunnelInfos();

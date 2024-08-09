@@ -1,0 +1,1 @@
+JsonBeanReader<T> forJson(JsonParser moreJson);

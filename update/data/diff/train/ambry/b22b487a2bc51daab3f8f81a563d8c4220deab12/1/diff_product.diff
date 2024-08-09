@@ -1,0 +1,46 @@
+diff --git a/old_product.java b/new_product.java
+index 66fdd27..7ff5fa4 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,20 +1,23 @@
+ boolean removeBlobStore(PartitionId id) {
+-    BlobStore store = stores.get(id);
+-    if (store == null) {
+-      logger.info("Store {} is not found in disk manager", id);
+-      return true;
++    rwLock.writeLock().lock();
++    boolean succeed = false;
++    try {
++      BlobStore store = stores.get(id);
++      if (store == null) {
++        logger.error("Store {} is not found in disk manager", id);
++      } else if (!running || store.isStarted()) {
++        logger.error("Removing store {} failed. Disk running = {}, store running = {}", id, running, store.isStarted());
++      } else if (!compactionManager.removeBlobStore(store)) {
++        logger.error("Fail to remove store {} from compaction manager.", id);
++      } else {
++        stores.remove(id);
++        stoppedReplicas.remove(id.toPathString());
++        partitionToReplicaMap.remove(id);
++        logger.info("Store {} is successfully removed from disk manager", id);
++        succeed = true;
++      }
++    } finally {
++      rwLock.writeLock().unlock();
+     }
+-    if (!running || store.isStarted()) {
+-      logger.error("Removing store {} failed. Disk running = {}, store running = {}", id, running, store.isStarted());
+-      return false;
+-    }
+-    if (!compactionManager.removeBlobStore(store)) {
+-      logger.error("Fail to remove store {} from compaction manager.", id);
+-      return false;
+-    }
+-    stores.remove(id);
+-    stoppedReplicas.remove(id.toPathString());
+-    partitionToReplicaMap.remove(id);
+-    logger.info("Store {} is successfully removed from disk manager", id);
+-    return true;
++    return succeed;
+   }
+\ No newline at end of file

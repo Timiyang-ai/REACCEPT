@@ -1,0 +1,1 @@
+byte[] getScreenImage(URI vmHref);

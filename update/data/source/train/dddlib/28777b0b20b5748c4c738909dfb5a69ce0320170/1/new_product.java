@@ -1,0 +1,1 @@
+public List<StoredEvent> findStoredEventsBetween(Date occurredFrom, Date occurredTo);

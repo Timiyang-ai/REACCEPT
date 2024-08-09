@@ -1,0 +1,1 @@
+public Long getCountOfEncounters(String query, boolean includeVoided);

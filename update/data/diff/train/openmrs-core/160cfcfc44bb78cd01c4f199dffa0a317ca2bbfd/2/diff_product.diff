@@ -1,0 +1,77 @@
+diff --git a/old_product.java b/new_product.java
+index 24abc5f..fe85b39 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,4 +1,9 @@
+-public Collection<Object> findPatients(String searchValue, boolean includeVoided) {
++@SuppressWarnings("unchecked")
++	public Collection<Object> findPatients(String searchValue, boolean includeVoided, Integer start, Integer length) {
++		if (maximumResults == null)
++			maximumResults = getMaximumSearchResults();
++		if (length != null && length > maximumResults)
++			length = maximumResults;
+ 		
+ 		// the list to return
+ 		List<Object> patientList = new Vector<Object>();
+@@ -7,21 +12,21 @@ public Collection<Object> findPatients(String searchValue, boolean includeVoided
+ 		Collection<Patient> patients;
+ 		
+ 		try {
+-			patients = ps.getPatients(searchValue);
++			patients = ps.getPatients(searchValue, start, length);
+ 		}
+ 		catch (APIAuthenticationException e) {
+-			patientList.add("Error while attempting to find patients - " + e.getMessage());
++			patientList.add(Context.getMessageSourceService().getMessage("Patient.search.error") + " - " + e.getMessage());
+ 			return patientList;
+ 		}
+ 		
+ 		patientList = new Vector<Object>(patients.size());
+ 		for (Patient p : patients)
+ 			patientList.add(new PatientListItem(p));
+-		
+-		// if only 2 results found and a number was not in the
++		// if the length wasn't limited to less than 3 or this is the second ajax call
++		// and only 2 results found and a number was not in the
+ 		// search, then do a decapitated search: trim each word
+ 		// down to the first three characters and search again
+-		if (patientList.size() < 3 && !searchValue.matches(".*\\d+.*")) {
++		if ((length == null || length > 2) && patients.size() < 3 && !searchValue.matches(".*\\d+.*")) {
+ 			String[] names = searchValue.split(" ");
+ 			String newSearch = "";
+ 			for (String name : names) {
+@@ -29,21 +34,25 @@ public Collection<Object> findPatients(String searchValue, boolean includeVoided
+ 					name = name.substring(0, 4);
+ 				newSearch += " " + name;
+ 			}
+-			
+ 			newSearch = newSearch.trim();
+-			Collection<Patient> newPatients = ps.getPatients(newSearch);
+-			newPatients.removeAll(patients); // remove the potential first two patients from these hits
+-			if (newPatients.size() > 0) {
+-				patientList.add("Minimal patients returned. Results for <b>" + newSearch + "</b>");
+-				for (Patient p : newPatients) {
+-					PatientListItem pi = new PatientListItem(p);
+-					patientList.add(pi);
++			
++			if (!newSearch.equals(searchValue)) {
++				Collection<Patient> newPatients = ps.getPatients(newSearch, start, length);
++				patients = CollectionUtils.union(newPatients, patients); // get unique hits
++				//reconstruct the results list
++				if (newPatients.size() > 0) {
++					patientList = new Vector<Object>(patients.size());
++					//patientList.add("Minimal patients returned. Results for <b>" + newSearch + "</b>");
++					for (Patient p : newPatients) {
++						PatientListItem pi = new PatientListItem(p);
++						patientList.add(pi);
++					}
+ 				}
+ 			}
+ 		}
+ 		//no results found and a number was in the search --
+ 		//should check whether the check digit is correct.
+-		else if (patientList.size() == 0 && searchValue.matches(".*\\d+.*")) {
++		else if (patients.size() == 0 && searchValue.matches(".*\\d+.*")) {
+ 			
+ 			//Looks through all the patient identifier validators to see if this type of identifier
+ 			//is supported for any of them.  If it isn't, then no need to warn about a bad check

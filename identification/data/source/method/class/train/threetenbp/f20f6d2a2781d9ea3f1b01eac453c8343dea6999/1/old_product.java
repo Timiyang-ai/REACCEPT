@@ -1,0 +1,18 @@
+public LocalDate minus(PeriodProvider periodProvider) {
+        Period period = Period.ofDateFields(periodProvider);
+        long periodMonths = period.totalMonths();
+        long periodDays = period.getDays();
+        if (periodMonths == 0) {
+            return minusDays(periodDays);  // optimization that also returns this for zero
+        }
+        long monthCount = ((long) year) * 12 + (month.getValue() - 1);
+        long calcMonths = monthCount - periodMonths;  // safe overflow
+        int newYear = YEAR.checkValidIntValue(DateTimes.floorDiv(calcMonths, 12));
+        MonthOfYear newMonth = MonthOfYear.of(DateTimes.floorMod(calcMonths, 12) + 1);
+        int newMonthLen = newMonth.lengthInDays(isLeapYear(newYear));
+        int newDay = Math.min(day, newMonthLen);
+        if (periodDays > 0 && day > newMonthLen) {
+            periodDays = Math.max(periodDays - (day - newMonthLen), 0);  // adjust for invalid days
+        }
+        return LocalDate.of(newYear, newMonth, newDay).minusDays(periodDays);
+    }

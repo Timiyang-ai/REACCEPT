@@ -1,0 +1,2 @@
+@Authorized( { OpenmrsConstants.PRIV_ADD_PATIENT_IDENTIFIERS, OpenmrsConstants.PRIV_EDIT_PATIENT_IDENTIFIERS })
+	public PatientIdentifier savePatientIdentifier(PatientIdentifier patientIdentifier) throws APIException;

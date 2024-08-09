@@ -1,0 +1,1 @@
+public abstract int getValue(long timestamp);

@@ -1,0 +1,1 @@
+URI uploadPackage() throws UploaderException;

@@ -1,0 +1,26 @@
+@Test
+  public void testEncode() throws IOException
+  {
+    assertRoundTrip("arrays.AnonArray");
+    assertRoundTrip("arrays.WithPrimitivesArray");
+    assertRoundTrip("denormalized.WithNamespacedDeclarations");
+    assertRoundTrip("denormalized.WithIncludeDeclaration");
+    assertRoundTrip("deprecated.DeprecatedRecord");
+    assertRoundTrip("enums.Fruits");
+    assertRoundTrip("enums.EnumProperties");
+    assertRoundTrip("enums.DeprecatedSymbols");
+    assertRoundTrip("escaping.PdlKeywordEscaping");
+    assertRoundTrip("fixed.Fixed8");
+    assertRoundTrip("maps.WithPrimitivesMap");
+    assertRoundTrip("records.Note");
+    assertRoundTrip("records.WithInclude");
+    assertRoundTrip("records.WithInlineRecord");
+    assertRoundTrip("records.WithPrimitives");
+    assertRoundTrip("records.WithOptionalPrimitives");
+    assertRoundTrip("records.NumericDefaults");
+    assertRoundTrip("records.WithComplexTypeDefaults");
+    assertRoundTrip("typerefs.UnionWithInlineRecord");
+    assertRoundTrip("typerefs.MapTyperef");
+    assertRoundTrip("typerefs.IntTyperef");
+    assertRoundTrip("unions.WithPrimitivesUnion");
+  }

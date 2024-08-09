@@ -1,0 +1,6 @@
+private static void create(final int... db) {
+    for(final int d : db) {
+      final String[] doc = DOCS[d - 1];
+      execute(new CreateDB(doc[0], doc[1]));
+    }
+  }

@@ -1,0 +1,42 @@
+diff --git a/old_test.java b/new_test.java
+index 7edd916..101eb26 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,18 +1,26 @@
+ @Test
+   public void testConfigure() throws Exception {
+-    final ServiceRegistry registry = new OffHeapIdentifierRegistry();
++    OffHeapIdentifierRegistry registry = new OffHeapIdentifierRegistry(32, MemoryUnit.MEGABYTES);
++
+     final EhcacheActiveEntity activeEntity = new EhcacheActiveEntity(registry, ENTITY_ID);
++    ClientDescriptor client = new TestClientDescriptor();
++    activeEntity.connected(client);
++    assertThat(activeEntity.getConnectedClients().keySet(), contains(client));
+ 
+-    final Map<String, Pool> resourcePools = new HashMap<String, Pool>();
+-    resourcePools.put("primary", new Pool("serverResource1", MemoryUnit.MEGABYTES.toBytes(4L)));
+-    resourcePools.put("secondary", new Pool("serverResource2", MemoryUnit.MEGABYTES.toBytes(8L)));
++    assertSuccess(activeEntity.invoke(client,
++        EhcacheEntityMessage.configure(new ServerSideConfigBuilder()
++            .defaultResource("defaultServerResource")
++            .sharedPool("primary", "serverResource1", 4, MemoryUnit.MEGABYTES)
++            .sharedPool("secondary", "serverResource2", 8, MemoryUnit.MEGABYTES)
++            .build())));
+ 
+-    final ConfigureCacheManager configureMessage =
+-        (ConfigureCacheManager)EhcacheEntityMessage.configure(new ServerSideConfiguration("defaultServerResource", resourcePools));
++    assertThat(activeEntity.getSharedResourcePoolIds(), containsInAnyOrder("primary", "secondary"));
+ 
+-    ClientDescriptor client = new TestClientDescriptor();
+-    assertSuccess(activeEntity.invoke(client, configureMessage));
++    assertThat(registry.getResource("serverResource1").getUsed(), is(MemoryUnit.MEGABYTES.toBytes(4L)));
++    assertThat(registry.getResource("serverResource2").getUsed(), is(MemoryUnit.MEGABYTES.toBytes(8L)));
++    assertThat(registry.getResource("defaultServerResource").getUsed(), is(0L));
+ 
+-    final Set<String> poolIds = activeEntity.getSharedResourcePoolIds();
+-    assertThat(poolIds, containsInAnyOrder("primary", "secondary"));
++    assertThat(activeEntity.getConnectedClients().get(client), is(Matchers.<String>empty()));
++    assertThat(activeEntity.getInUseStores().keySet(), is(Matchers.<String>empty()));
++    assertThat(activeEntity.getStores(), is(Matchers.<String>empty()));
+   }
+\ No newline at end of file

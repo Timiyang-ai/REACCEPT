@@ -1,0 +1,1 @@
+public void clearStorage() throws StorageException;

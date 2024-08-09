@@ -1,0 +1,1 @@
+@Nullable E peek();

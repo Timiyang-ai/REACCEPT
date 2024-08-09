@@ -1,0 +1,1 @@
+Map<String, String> validateProperties(String uri) throws URISyntaxException;

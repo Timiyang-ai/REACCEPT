@@ -1,0 +1,76 @@
+diff --git a/old_product.java b/new_product.java
+index 42dbecc..4dc3323 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -4,21 +4,21 @@ public String coordinateJob(
+         final JobRequest jobRequest,
+         @NotNull
+         @Valid
+-        final JobRequestMetadata jobRequestMetadata
++        final JobMetadata jobMetadata
+     ) throws GenieException {
+-        if (StringUtils.isBlank(jobRequest.getId())) {
+-            throw new GenieServerException("Id of the jobRequest cannot be null");
+-        }
+-        log.info("Called to schedule job launch for job {}", jobRequest.getId());
++        final String jobId = jobRequest
++            .getId()
++            .orElseThrow(() -> new GenieServerException("Id of the jobRequest cannot be null"));
++        log.info("Called to schedule job launch for job {}", jobId);
+ 
+         // Log the job request and optionally the client host
+-        this.jobPersistenceService.createJobRequest(jobRequest, jobRequestMetadata);
++        this.jobPersistenceService.createJobRequest(jobRequest, jobMetadata);
+ 
+         String archiveLocation = null;
+         if (!jobRequest.isDisableLogArchival()) {
+             archiveLocation = this.baseArchiveLocation
+                 + JobConstants.FILE_PATH_DELIMITER
+-                + jobRequest.getId()
++                + jobId
+                 + ".tar.gz";
+         }
+ 
+@@ -29,18 +29,16 @@ public String coordinateJob(
+             jobRequest.getVersion(),
+             jobRequest.getCommandArgs()
+         )
++            .withId(jobId)
+             .withArchiveLocation(archiveLocation)
+-            .withDescription(jobRequest.getDescription())
+-            .withId(jobRequest.getId())
+             .withTags(jobRequest.getTags());
+ 
++        jobRequest.getDescription().ifPresent(jobBuilder::withDescription);
++
+         final JobExecution jobExecution = new JobExecution.Builder(
+-            this.hostName,
+-            JobExecution.DEFAULT_PROCESS_ID,
+-            JobExecution.DEFAULT_CHECK_DELAY,
+-            JobExecution.DEFAULT_TIMEOUT
++            this.hostName
+         )
+-            .withId(jobRequest.getId())
++            .withId(jobId)
+             .build();
+ 
+         synchronized (this) {
+@@ -65,14 +63,14 @@ public String coordinateJob(
+                     );
+ 
+                     // Tell the system a new job has been scheduled so any actions can be taken
+-                    log.info("Publishing job scheduled event for job {}", jobRequest.getId());
+-                    this.eventPublisher.publishEvent(new JobScheduledEvent(jobRequest.getId(), task, this));
++                    log.info("Publishing job scheduled event for job {}", jobId);
++                    this.eventPublisher.publishEvent(new JobScheduledEvent(jobId, task, this));
+                 } catch (final TaskRejectedException e) {
+                     final String errorMsg = "Unable to launch job due to exception: " + e.getMessage();
+-                    this.jobPersistenceService.updateJobStatus(jobRequest.getId(), JobStatus.FAILED, errorMsg);
++                    this.jobPersistenceService.updateJobStatus(jobId, JobStatus.FAILED, errorMsg);
+                     throw new GenieServerException(errorMsg, e);
+                 }
+-                return jobRequest.getId();
++                return jobId;
+             } else {
+                 jobBuilder
+                     .withStatus(JobStatus.FAILED)

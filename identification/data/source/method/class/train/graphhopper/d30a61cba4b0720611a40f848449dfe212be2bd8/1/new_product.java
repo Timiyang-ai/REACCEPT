@@ -1,0 +1,1 @@
+Path calcPath( QueryResult from, QueryResult to );

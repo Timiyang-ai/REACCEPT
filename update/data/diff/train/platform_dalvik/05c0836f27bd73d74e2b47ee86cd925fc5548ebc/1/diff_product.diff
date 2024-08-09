@@ -1,0 +1,80 @@
+diff --git a/old_product.java b/new_product.java
+index cdce356..5413124 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -13,8 +13,24 @@ public void closeEntry() throws IOException {
+                 return;
+             }
+         }
++
++        /*
++         * The following code is careful to leave the ZipInputStream in a
++         * consistent state, even when close() results in an exception. It does
++         * so by:
++         *  - pushing bytes back into the source stream
++         *  - reading a data descriptor footer from the source stream
++         *  - resetting fields that manage the entry being closed
++         */
++
+         // Ensure all entry bytes are read
+-        skip(Long.MAX_VALUE);
++        Exception failure = null;
++        try {
++            skip(Long.MAX_VALUE);
++        } catch (Exception e) {
++            failure = e;
++        }
++
+         int inB, out;
+         if (currentEntry.compressionMethod == DEFLATED) {
+             inB = inf.getTotalIn();
+@@ -23,30 +39,33 @@ public void closeEntry() throws IOException {
+             inB = inRead;
+             out = inRead;
+         }
+-        int diff = 0;
++        int diff = entryIn - inB;
+         // Pushback any required bytes
+-        if ((diff = entryIn - inB) != 0) {
++        if (diff != 0) {
+             ((PushbackInputStream) in).unread(buf, len - diff, diff);
+         }
+ 
+-        if (hasDD) {
+-            in.read(hdrBuf, 0, EXTHDR);
+-            if (getLong(hdrBuf, 0) != EXTSIG) {
+-                throw new ZipException(Messages.getString("archive.1F")); //$NON-NLS-1$
++        try {
++            readAndVerifyDataDescriptor(inB, out);
++        } catch (Exception e) {
++            if (failure == null) { // otherwise we're already going to throw
++                failure = e;
+             }
+-            currentEntry.crc = getLong(hdrBuf, EXTCRC);
+-            currentEntry.compressedSize = getLong(hdrBuf, EXTSIZ);
+-            currentEntry.size = getLong(hdrBuf, EXTLEN);
+-        }
+-        if (currentEntry.crc != crc.getValue()) {
+-            throw new ZipException(Messages.getString("archive.20")); //$NON-NLS-1$
+-        }
+-        if (currentEntry.compressedSize != inB || currentEntry.size != out) {
+-            throw new ZipException(Messages.getString("archive.21")); //$NON-NLS-1$
+         }
+ 
+         inf.reset();
+         lastRead = inRead = entryIn = len = 0;
+         crc.reset();
+         currentEntry = null;
++
++        if (failure != null) {
++            if (failure instanceof IOException) {
++                throw (IOException) failure;
++            } else if (failure instanceof RuntimeException) {
++                throw (RuntimeException) failure;
++            }
++            AssertionError error = new AssertionError();
++            error.initCause(failure);
++            throw error;
++        }
+     }
+\ No newline at end of file

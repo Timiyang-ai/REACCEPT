@@ -1,0 +1,1 @@
+List<MetadataChange> batch(List<? extends MetadataMutation> mutations, MutationOptions options) throws IOException;

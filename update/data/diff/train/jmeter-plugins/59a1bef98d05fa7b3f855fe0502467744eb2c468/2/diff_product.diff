@@ -1,0 +1,58 @@
+diff --git a/old_product.java b/new_product.java
+index ded3b84..fac90f6 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,26 +1,31 @@
+-public void scheduleThread(JMeterThread thread)
+-   {
+-      int additionalRampUp = 0;
+-      String rampupProperty = JMeterUtils.getProperty("steppingthreadgroup.additionalrampup");
+-      if (rampupProperty != null)
+-      {
+-         additionalRampUp = Integer.parseInt(rampupProperty);
+-      }
++@Override
++    public void scheduleThread(JMeterThread thread) {
++        int threadGroupDelay = 1000 * getThreadGroupDelayAsInt();
++        long ascentPoint = testStartTime + threadGroupDelay;
+ 
+-      int threadGroupDelay = getThreadGroupDelay();
++        int inUserPeriod = 1000 * getInUserPeriodAsInt();
++        int inUserCount = getInUserCountAsInt();
++        int additionalRampUp = 1000 * getRampUpAsInt() / inUserCount;
+ 
+-      int inUserPeriod = getInUserPeriod();
+-      int inUserCount = getInUserCount();
++        int flightTime = 1000 * getFlightTimeAsInt();
+ 
+-      int flightTime = getFlightTime();
++        int outUserPeriod = 1000 * getOutUserPeriodAsInt();
++        int outUserCount = getOutUserCountAsInt();
+ 
+-      int outUserPeriod = getOutUserPeriod();
+-      int outUserCount = getOutUserCount();
++        long rampUpDuration = 1000 * getRampUpAsInt();
++        long iterationDuration = inUserPeriod + rampUpDuration;
++        int iterationCountTotal = (int) Math.ceil((double) getNumThreads() / inUserCount);
++        int iterationCountBeforeMe = (int) Math.floor((double) thread.getThreadNum() / inUserCount);
+ 
+-      long ascentPoint = System.currentTimeMillis() + 1000 * threadGroupDelay;
+-      long descentPoint = ascentPoint + 1000 * inUserPeriod * (int) Math.floor((double) getNumThreads() / inUserCount) + 1000 * flightTime;
++        long descentPoint = ascentPoint + iterationCountTotal * iterationDuration + flightTime;
+ 
+-      thread.setStartTime(ascentPoint + 1000 * inUserPeriod * (int) Math.floor((double) thread.getThreadNum() / inUserCount) + additionalRampUp * thread.getThreadNum());
+-      thread.setEndTime(descentPoint + 1000 * outUserPeriod * (int) Math.floor((double) thread.getThreadNum() / outUserCount));
+-      thread.setScheduled(true);
+-   }
+\ No newline at end of file
++        long startTime = ascentPoint + iterationCountBeforeMe * iterationDuration + (thread.getThreadNum() % inUserCount) * additionalRampUp;
++        long endTime = descentPoint + outUserPeriod * (int) Math.floor((double) thread.getThreadNum() / outUserCount);
++
++        log.debug(String.format("threadNum=%d, rampUpDuration=%d, iterationDuration=%d, iterationCountTotal=%d, iterationCountBeforeMe=%d, ascentPoint=%d, descentPoint=%d, startTime=%d, endTime=%d",
++                thread.getThreadNum(), rampUpDuration, iterationDuration, iterationCountTotal, iterationCountBeforeMe, ascentPoint, descentPoint, startTime, endTime));
++
++        thread.setStartTime(startTime);
++        thread.setEndTime(endTime);
++        thread.setScheduled(true);
++    }
+\ No newline at end of file

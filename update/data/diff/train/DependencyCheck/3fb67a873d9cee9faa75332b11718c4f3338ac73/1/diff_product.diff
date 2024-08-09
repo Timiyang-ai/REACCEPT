@@ -1,0 +1,51 @@
+diff --git a/old_product.java b/new_product.java
+index c9b0798..596edad 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,16 +1,30 @@
+ public static Model readPom(String path, JarFile jar) throws AnalysisException {
+         final ZipEntry entry = jar.getEntry(path);
++        final PomParser parser = new PomParser();
+         Model model = null;
+         if (entry != null) { //should never be null
+             //noinspection CaughtExceptionImmediatelyRethrown
+             try {
+-                final PomParser parser = new PomParser();
+                 model = parser.parse(jar.getInputStream(entry));
+-                if (model == null) {
+-                    throw new AnalysisException(String.format("Unable to parse pom '%s/%s'", jar.getName(), path));
++            } catch (PomParseException ex) {
++                if (ex.getCause() instanceof SAXParseException) {
++                    try {
++                        model = parser.parseWithoutDocTypeCleanup(jar.getInputStream(entry));
++                    } catch (PomParseException ex1) {
++                        LOGGER.warn("Unable to parse pom '{}' in jar '{}'", path, jar.getName());
++                        LOGGER.debug("", ex1);
++                        throw new AnalysisException(ex1);
++                    } catch (IOException ex1) {
++                        LOGGER.warn("Unable to parse pom '{}' in jar '{}' (IO Exception)", path, jar.getName());
++                        LOGGER.debug("", ex);
++                        throw new AnalysisException(ex);
++                    }
++                }
++                if (model != null) {
++                    LOGGER.warn("Unable to parse pom '{}' in jar '{}'", path, jar.getName());
++                    LOGGER.debug("", ex);
++                    throw new AnalysisException(ex);
+                 }
+-            } catch (AnalysisException ex) {
+-                throw ex;
+             } catch (SecurityException ex) {
+                 LOGGER.warn("Unable to parse pom '{}' in jar '{}'; invalid signature", path, jar.getName());
+                 LOGGER.debug("", ex);
+@@ -24,6 +38,9 @@ public static Model readPom(String path, JarFile jar) throws AnalysisException {
+                 LOGGER.debug("", ex);
+                 throw new AnalysisException(ex);
+             }
++            if (model == null) {
++                throw new AnalysisException(String.format("Unable to parse pom '%s/%s'", jar.getName(), path));
++            }
+         }
+         return model;
+     }
+\ No newline at end of file

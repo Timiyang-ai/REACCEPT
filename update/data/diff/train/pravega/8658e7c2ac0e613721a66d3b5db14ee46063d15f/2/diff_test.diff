@@ -1,0 +1,57 @@
+diff --git a/old_test.java b/new_test.java
+index 8dd13f1..c12dabb 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,5 +1,5 @@
+ @Test
+-    public void testWrite() throws Exception {
++    public void testWrite() {
+         final byte[] toWrite = new byte[LAYOUT.bufferSize() + 3 * LAYOUT.blockSize()];
+         rnd.nextBytes(toWrite);
+         final int sizeIncrement = 2 * LAYOUT.blockSize() + LAYOUT.blockSize() / 2;
+@@ -11,11 +11,11 @@
+         val b = newBuffer();
+         for (int size1 = 0; size1 < toWrite.length; size1 += sizeIncrement) {
+             Assert.assertEquals("Expected buffer to be clean.", 1, b.getUsedBlockCount());
+-            val w1 = b.write(new ByteArrayInputStream(toWrite, 0, size1), size1, CacheLayout.NO_ADDRESS);
++            val w1 = b.write(new ByteArraySegment(toWrite, 0, size1), CacheLayout.NO_ADDRESS);
+             Assert.assertEquals("Unexpected value for w1.firstBlockId.", 1, w1.getFirstBlockId());
+-            int expectedRemaining1 = size1 > maxUsableSize ? size1 - maxUsableSize : 0;
+-            Assert.assertEquals("Unexpected w1.remainingLength", expectedRemaining1, w1.getRemainingLength());
+-            if (expectedRemaining1 > 0) {
++            int expectedWritten1 = Math.min(size1, maxUsableSize);
++            Assert.assertEquals("Unexpected w1.writtenLength", expectedWritten1, w1.getWrittenLength());
++            if (expectedWritten1 == maxUsableSize) {
+                 Assert.assertFalse("Unexpected result from hasCapacity() when filling up.", b.hasCapacity());
+             }
+ 
+@@ -24,22 +24,22 @@
+             int remainingCapacity = (LAYOUT.blocksPerBuffer() - b.getUsedBlockCount()) * LAYOUT.blockSize();
+ 
+             int size2 = Math.max(0, size1 - secondWriteOffset);
+-            val w2 = b.write(new ByteArrayInputStream(toWrite, secondWriteOffset, size2), size2, CacheLayout.NO_ADDRESS);
+-            int expectedRemaining2 = 0;
+-            if (expectedRemaining1 == 0 && hasCapacityBeforeSecondWrite) {
++            val w2 = b.write(new ByteArraySegment(toWrite, secondWriteOffset, size2), CacheLayout.NO_ADDRESS);
++            int expectedWritten2 = 0;
++            if (expectedWritten1 < maxUsableSize && hasCapacityBeforeSecondWrite) {
+                 // We have nothing remaining and still have capacity to write more.
+                 Assert.assertEquals("Unexpected value for w2.firstBlockId.",
+                         LAYOUT.getBlockId(w1.getLastBlockAddress()) + 1, w2.getFirstBlockId());
+-                expectedRemaining2 = size2 > remainingCapacity ? size2 - remainingCapacity : 0;
+-                Assert.assertEquals("Unexpected w2.remainingLength", expectedRemaining2, w2.getRemainingLength());
++                expectedWritten2 = Math.min(size2, remainingCapacity);
++                Assert.assertEquals("Unexpected w2.writtenLength", expectedWritten2, w2.getWrittenLength());
+             } else {
+                 Assert.assertNull("Unexpected result when trying to write to a full buffer.", w2);
+             }
+ 
+             // Verify we can retrieve the data, then delete it. We will reuse the buffer in the next iteration.
+-            checkData(b, LAYOUT.getBlockId(w1.getLastBlockAddress()), new ByteArraySegment(toWrite, 0, size1 - expectedRemaining1));
++            checkData(b, LAYOUT.getBlockId(w1.getLastBlockAddress()), new ByteArraySegment(toWrite, 0, expectedWritten1));
+             if (w2 != null) {
+-                checkData(b, LAYOUT.getBlockId(w2.getLastBlockAddress()), new ByteArraySegment(toWrite, secondWriteOffset, size2 - expectedRemaining2));
++                checkData(b, LAYOUT.getBlockId(w2.getLastBlockAddress()), new ByteArraySegment(toWrite, secondWriteOffset, expectedWritten2));
+                 b.delete(LAYOUT.getBlockId(w2.getLastBlockAddress()));
+             }
+             b.delete(LAYOUT.getBlockId(w1.getLastBlockAddress()));

@@ -1,0 +1,1 @@
+public CareSetting getCareSettingByUuid(String uuid);

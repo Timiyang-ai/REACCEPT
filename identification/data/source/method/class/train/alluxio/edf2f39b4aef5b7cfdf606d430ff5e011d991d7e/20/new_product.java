@@ -1,0 +1,1 @@
+boolean unlockBlock(long sessionId, long blockId);

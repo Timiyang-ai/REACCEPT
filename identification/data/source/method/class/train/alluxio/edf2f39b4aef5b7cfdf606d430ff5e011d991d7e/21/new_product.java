@@ -1,0 +1,1 @@
+long lockBlock(long sessionId, long blockId) throws BlockDoesNotExistException;

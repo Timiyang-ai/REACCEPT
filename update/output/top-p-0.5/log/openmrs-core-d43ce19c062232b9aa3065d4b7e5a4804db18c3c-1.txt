@@ -1,0 +1,586 @@
+--------------------------------------------------------------------------------------------------------------------------------
+new state: 3
+----------------------------------------------------------------
+new description: 测试通过，覆盖率：0.6545454545454545
+----------------------------------------------------------------
+new message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old state: 3
+----------------------------------------------------------------
+old description: 测试通过，覆盖率：0.6545454545454545
+----------------------------------------------------------------
+old message
+
+--------------------------------------------------------------------------------------------------------------------------------
+old product
+@Override
+	@Transactional(readOnly = true)
+	public void checkPatientIdentifiers(Patient patient) throws PatientIdentifierException {
+		// check patient has at least one identifier
+		if (!patient.isVoided() && patient.getActiveIdentifiers().isEmpty()) {
+			throw new InsufficientIdentifiersException("At least one nonvoided Patient Identifier is required");
+		}
+		
+		List<PatientIdentifier> identifiers = new Vector<PatientIdentifier>();
+		identifiers.addAll(patient.getIdentifiers());
+		List<String> identifiersUsed = new Vector<String>();
+		List<PatientIdentifierType> requiredTypes = Context.getPatientService().getPatientIdentifierTypes(null, null, true,
+		    null);
+		if (requiredTypes == null) {
+			requiredTypes = new ArrayList<PatientIdentifierType>();
+		}
+		List<PatientIdentifierType> foundRequiredTypes = new ArrayList<PatientIdentifierType>();
+		
+		for (PatientIdentifier pi : identifiers) {
+			if (pi.isVoided()) {
+				continue;
+			}
+			
+			try {
+				PatientIdentifierValidator.validateIdentifier(pi);
+			}
+			catch (BlankIdentifierException bie) {
+				patient.removeIdentifier(pi);
+				throw bie;
+			}
+			
+			// check if this is a required identifier
+			for (PatientIdentifierType requiredType : requiredTypes) {
+				if (pi.getIdentifierType().equals(requiredType)) {
+					foundRequiredTypes.add(requiredType);
+					requiredTypes.remove(requiredType);
+					break;
+				}
+			}
+			
+			// check this patient for duplicate identifiers+identifierType
+			if (identifiersUsed.contains(pi.getIdentifier() + " id type #: "
+			        + pi.getIdentifierType().getPatientIdentifierTypeId())) {
+				throw new DuplicateIdentifierException("This patient has two identical identifiers of type "
+				        + pi.getIdentifierType().getName() + ": " + pi.getIdentifier(), pi);
+			} else {
+				identifiersUsed.add(pi.getIdentifier() + " id type #: "
+				        + pi.getIdentifierType().getPatientIdentifierTypeId());
+			}
+		}
+		
+		if (!requiredTypes.isEmpty()) {
+			String missingNames = "";
+			for (PatientIdentifierType pit : requiredTypes) {
+				missingNames += (missingNames.length() > 0) ? ", " + pit.getName() : pit.getName();
+			}
+			throw new MissingRequiredIdentifierException("Patient is missing the following required identifier(s): "
+			        + missingNames);
+		}
+	}
+----------------------------------------------------------------
+old test
+@Test
+	@Verifies(value = "should ignore voided patient identifier", method = "checkPatientIdentifiers(Patient)")
+	public void checkPatientIdentifiers_shouldIgnoreVoidedPatientIdentifier() throws Exception {
+		
+		Patient patient = new Patient();
+		PatientIdentifier patientIdentifier = new PatientIdentifier();
+		patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+		patientIdentifier.setLocation(new Location(1));
+		patientIdentifier.setVoided(true);
+		patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+		patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+		patient.addIdentifier(patientIdentifier);
+		
+		// add a non-voided identifier so that the initial
+		// "at least one nonvoided identifier" check passes
+		patientIdentifier = new PatientIdentifier();
+		patientIdentifier.setIdentifier("a non empty string");
+		patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+		patientIdentifier.setLocation(new Location(1));
+		patientIdentifier.setVoided(false);
+		patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+		patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+		patient.addIdentifier(patientIdentifier);
+		
+		// If the identifier is ignored, it won't throw a
+		// BlankIdentifierException as it should
+		Context.getPatientService().checkPatientIdentifiers(patient);
+		
+	}
+----------------------------------------------------------------
+new product
+@Override
+	@Transactional(readOnly = true)
+	public void checkPatientIdentifiers(Patient patient) throws PatientIdentifierException {
+		// check patient has at least one identifier
+		if (!patient.getVoided() && patient.getActiveIdentifiers().isEmpty()) {
+			throw new InsufficientIdentifiersException("At least one nonvoided Patient Identifier is required");
+		}
+		
+		List<PatientIdentifier> identifiers = new Vector<PatientIdentifier>();
+		identifiers.addAll(patient.getIdentifiers());
+		List<String> identifiersUsed = new Vector<String>();
+		List<PatientIdentifierType> requiredTypes = Context.getPatientService().getPatientIdentifierTypes(null, null, true,
+		    null);
+		if (requiredTypes == null) {
+			requiredTypes = new ArrayList<PatientIdentifierType>();
+		}
+		List<PatientIdentifierType> foundRequiredTypes = new ArrayList<PatientIdentifierType>();
+		
+		for (PatientIdentifier pi : identifiers) {
+			if (pi.getVoided()) {
+				continue;
+			}
+			
+			try {
+				PatientIdentifierValidator.validateIdentifier(pi);
+			}
+			catch (BlankIdentifierException bie) {
+				patient.removeIdentifier(pi);
+				throw bie;
+			}
+			
+			// check if this is a required identifier
+			for (PatientIdentifierType requiredType : requiredTypes) {
+				if (pi.getIdentifierType().equals(requiredType)) {
+					foundRequiredTypes.add(requiredType);
+					requiredTypes.remove(requiredType);
+					break;
+				}
+			}
+			
+			// check this patient for duplicate identifiers+identifierType
+			if (identifiersUsed.contains(pi.getIdentifier() + " id type #: "
+			        + pi.getIdentifierType().getPatientIdentifierTypeId())) {
+				throw new DuplicateIdentifierException("This patient has two identical identifiers of type "
+				        + pi.getIdentifierType().getName() + ": " + pi.getIdentifier(), pi);
+			} else {
+				identifiersUsed.add(pi.getIdentifier() + " id type #: "
+				        + pi.getIdentifierType().getPatientIdentifierTypeId());
+			}
+		}
+		
+		if (!requiredTypes.isEmpty()) {
+			String missingNames = "";
+			for (PatientIdentifierType pit : requiredTypes) {
+				missingNames += (missingNames.length() > 0) ? ", " + pit.getName() : pit.getName();
+			}
+			throw new MissingRequiredIdentifierException("Patient is missing the following required identifier(s): "
+			        + missingNames);
+		}
+	}
+----------------------------------------------------------------
+new test
+@Test
+	@Verifies(value = "should ignore voided patient identifier", method = "checkPatientIdentifiers(Patient)")
+	public void checkPatientIdentifiers_shouldIgnoreVoidedPatientIdentifier() throws Exception {
+		
+		Patient patient = new Patient();
+		PatientIdentifier patientIdentifier = new PatientIdentifier();
+		patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+		patientIdentifier.setLocation(new Location(1));
+		patientIdentifier.setVoided(true);
+		patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+		patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+		patient.addIdentifier(patientIdentifier);
+		
+		// add a non-voided identifier so that the initial
+		// "at least one nonvoided identifier" check passes
+		patientIdentifier = new PatientIdentifier();
+		patientIdentifier.setIdentifier("a non empty string");
+		patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+		patientIdentifier.setLocation(new Location(1));
+		patientIdentifier.setVoided(false);
+		patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+		patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+		patient.addIdentifier(patientIdentifier);
+		
+		// If the identifier is ignored, it won't throw a
+		// BlankIdentifierException as it should
+		Context.getPatientService().checkPatientIdentifiers(patient);
+		
+	}
+----------------------------------------------------------------
+diff product
+diff --git a/old_product.java b/new_product.java
+index b4743da..35eca19 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -2,7 +2,7 @@
+ 	@Transactional(readOnly = true)
+ 	public void checkPatientIdentifiers(Patient patient) throws PatientIdentifierException {
+ 		// check patient has at least one identifier
+-		if (!patient.isVoided() && patient.getActiveIdentifiers().isEmpty()) {
++		if (!patient.getVoided() && patient.getActiveIdentifiers().isEmpty()) {
+ 			throw new InsufficientIdentifiersException("At least one nonvoided Patient Identifier is required");
+ 		}
+ 		
+@@ -17,7 +17,7 @@
+ 		List<PatientIdentifierType> foundRequiredTypes = new ArrayList<PatientIdentifierType>();
+ 		
+ 		for (PatientIdentifier pi : identifiers) {
+-			if (pi.isVoided()) {
++			if (pi.getVoided()) {
+ 				continue;
+ 			}
+ 			
+
+----------------------------------------------------------------
+diff test
+
+--------------------------------------------------------------------------------------------------------------------------------
+sample diff product
+diff --git a/old_product.java b/new_product.java
+index 35eca19..f23fcdc 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -6,17 +6,16 @@
+ 			throw new InsufficientIdentifiersException("At least one nonvoided Patient Identifier is required");
+ 		}
+ 		
+-		List<PatientIdentifier> identifiers = new Vector<PatientIdentifier>();
+-		identifiers.addAll(patient.getIdentifiers());
+-		List<String> identifiersUsed = new Vector<String>();
+-		List<PatientIdentifierType> requiredTypes = Context.getPatientService().getPatientIdentifierTypes(null, null, true,
+-		    null);
++		List<PatientIdentifier> patientIdentifiers = new ArrayList<>();
++		patientIdentifiers.addAll(patient.getIdentifiers());
++		List<PatientIdentifierType> requiredTypes = this.getPatientIdentifierTypes(null, null, true, null);
+ 		if (requiredTypes == null) {
+ 			requiredTypes = new ArrayList<PatientIdentifierType>();
+ 		}
+-		List<PatientIdentifierType> foundRequiredTypes = new ArrayList<PatientIdentifierType>();
+-		
+-		for (PatientIdentifier pi : identifiers) {
++
++		List<String> identifiersUsed = new ArrayList<>();
++
++		for (PatientIdentifier pi : patientIdentifiers) {
+ 			if (pi.getVoided()) {
+ 				continue;
+ 			}
+@@ -32,7 +31,6 @@
+ 			// check if this is a required identifier
+ 			for (PatientIdentifierType requiredType : requiredTypes) {
+ 				if (pi.getIdentifierType().equals(requiredType)) {
+-					foundRequiredTypes.add(requiredType);
+ 					requiredTypes.remove(requiredType);
+ 					break;
+ 				}
+
+----------------------------------------------------------------
+sample diff test
+
+----------------------------------------------------------------
+coverage: 0.6545454545454545
+--------------------------------------------------------------------------------------------------------------------------------
+now time: 1
+----------------------------------------------------------------
+llm output
+<new_test>
+```java
+@Test
+@Verifies(value = "should ignore voided patient identifier", method = "checkPatientIdentifiers(Patient)")
+public void checkPatientIdentifiers_shouldIgnoreVoidedPatientIdentifier() throws Exception {
+    
+    Patient patient = new Patient();
+    PatientIdentifier patientIdentifier = new PatientIdentifier();
+    patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+    patientIdentifier.setLocation(new Location(1));
+    patientIdentifier.setVoided(true); // Using setVoided to match the new production code
+    patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+    patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+    patient.addIdentifier(patientIdentifier);
+    
+    // add a non-voided identifier so that the initial
+    // "at least one nonvoided identifier" check passes
+    patientIdentifier = new PatientIdentifier();
+    patientIdentifier.setIdentifier("a non empty string");
+    patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+    patientIdentifier.setLocation(new Location(1));
+    patientIdentifier.setVoided(false); // Using setVoided to match the new production code
+    patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+    patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+    patient.addIdentifier(patientIdentifier);
+    
+    // If the identifier is ignored, it won't throw a
+    // BlankIdentifierException as it should
+    Context.getPatientService().checkPatientIdentifiers(patient);
+    
+}
+```
+</new_test>
+
+This updated test method reflects the changes in the production method, specifically the transition from using `isVoided()` to `getVoided()` for checking if a patient or patient identifier is voided. The test method's logic remains the same, as it's designed to verify that voided patient identifiers are ignored by the `checkPatientIdentifiers` method. The test ensures that a `Patient` object with both voided and non-voided identifiers does not throw an exception, thereby meeting the requirement that at least one non-voided identifier must be present for the patient.
+----------------------------------------------------------------
+generated test
+@Test
+@Verifies(value = "should ignore voided patient identifier", method = "checkPatientIdentifiers(Patient)")
+public void checkPatientIdentifiers_shouldIgnoreVoidedPatientIdentifier() throws Exception {
+    
+    Patient patient = new Patient();
+    PatientIdentifier patientIdentifier = new PatientIdentifier();
+    patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+    patientIdentifier.setLocation(new Location(1));
+    patientIdentifier.setVoided(true); // Using setVoided to match the new production code
+    patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+    patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+    patient.addIdentifier(patientIdentifier);
+    
+    // add a non-voided identifier so that the initial
+    // "at least one nonvoided identifier" check passes
+    patientIdentifier = new PatientIdentifier();
+    patientIdentifier.setIdentifier("a non empty string");
+    patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+    patientIdentifier.setLocation(new Location(1));
+    patientIdentifier.setVoided(false); // Using setVoided to match the new production code
+    patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+    patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+    patient.addIdentifier(patientIdentifier);
+    
+    // If the identifier is ignored, it won't throw a
+    // BlankIdentifierException as it should
+    Context.getPatientService().checkPatientIdentifiers(patient);
+    
+}
+----------------------------------------------------------------
+last generated diff test
+--- 
+
++++ 
+
+@@ -1,29 +1,29 @@
+
+ @Test
+-	@Verifies(value = "should ignore voided patient identifier", method = "checkPatientIdentifiers(Patient)")
+-	public void checkPatientIdentifiers_shouldIgnoreVoidedPatientIdentifier() throws Exception {
+-		
+-		Patient patient = new Patient();
+-		PatientIdentifier patientIdentifier = new PatientIdentifier();
+-		patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+-		patientIdentifier.setLocation(new Location(1));
+-		patientIdentifier.setVoided(true);
+-		patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+-		patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+-		patient.addIdentifier(patientIdentifier);
+-		
+-		// add a non-voided identifier so that the initial
+-		// "at least one nonvoided identifier" check passes
+-		patientIdentifier = new PatientIdentifier();
+-		patientIdentifier.setIdentifier("a non empty string");
+-		patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+-		patientIdentifier.setLocation(new Location(1));
+-		patientIdentifier.setVoided(false);
+-		patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+-		patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+-		patient.addIdentifier(patientIdentifier);
+-		
+-		// If the identifier is ignored, it won't throw a
+-		// BlankIdentifierException as it should
+-		Context.getPatientService().checkPatientIdentifiers(patient);
+-		
+-	}
++@Verifies(value = "should ignore voided patient identifier", method = "checkPatientIdentifiers(Patient)")
++public void checkPatientIdentifiers_shouldIgnoreVoidedPatientIdentifier() throws Exception {
++    
++    Patient patient = new Patient();
++    PatientIdentifier patientIdentifier = new PatientIdentifier();
++    patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
++    patientIdentifier.setLocation(new Location(1));
++    patientIdentifier.setVoided(true); // Using setVoided to match the new production code
++    patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
++    patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
++    patient.addIdentifier(patientIdentifier);
++    
++    // add a non-voided identifier so that the initial
++    // "at least one nonvoided identifier" check passes
++    patientIdentifier = new PatientIdentifier();
++    patientIdentifier.setIdentifier("a non empty string");
++    patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
++    patientIdentifier.setLocation(new Location(1));
++    patientIdentifier.setVoided(false); // Using setVoided to match the new production code
++    patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
++    patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
++    patient.addIdentifier(patientIdentifier);
++    
++    // If the identifier is ignored, it won't throw a
++    // BlankIdentifierException as it should
++    Context.getPatientService().checkPatientIdentifiers(patient);
++    
++}
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.6545454545454545
+----------------------------------------------------------------
+message
+
+--------------------------------------------------------------------------------------------------------------------------------
+total times: 1
+----------------------------------------------------------------
+generated test
+@Test
+@Verifies(value = "should ignore voided patient identifier", method = "checkPatientIdentifiers(Patient)")
+public void checkPatientIdentifiers_shouldIgnoreVoidedPatientIdentifier() throws Exception {
+    
+    Patient patient = new Patient();
+    PatientIdentifier patientIdentifier = new PatientIdentifier();
+    patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+    patientIdentifier.setLocation(new Location(1));
+    patientIdentifier.setVoided(true); // Using setVoided to match the new production code
+    patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+    patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+    patient.addIdentifier(patientIdentifier);
+    
+    // add a non-voided identifier so that the initial
+    // "at least one nonvoided identifier" check passes
+    patientIdentifier = new PatientIdentifier();
+    patientIdentifier.setIdentifier("a non empty string");
+    patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+    patientIdentifier.setLocation(new Location(1));
+    patientIdentifier.setVoided(false); // Using setVoided to match the new production code
+    patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+    patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+    patient.addIdentifier(patientIdentifier);
+    
+    // If the identifier is ignored, it won't throw a
+    // BlankIdentifierException as it should
+    Context.getPatientService().checkPatientIdentifiers(patient);
+    
+}
+----------------------------------------------------------------
+old generated diff test
+--- 
+
++++ 
+
+@@ -1,29 +1,29 @@
+
+ @Test
+-	@Verifies(value = "should ignore voided patient identifier", method = "checkPatientIdentifiers(Patient)")
+-	public void checkPatientIdentifiers_shouldIgnoreVoidedPatientIdentifier() throws Exception {
+-		
+-		Patient patient = new Patient();
+-		PatientIdentifier patientIdentifier = new PatientIdentifier();
+-		patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+-		patientIdentifier.setLocation(new Location(1));
+-		patientIdentifier.setVoided(true);
+-		patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+-		patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+-		patient.addIdentifier(patientIdentifier);
+-		
+-		// add a non-voided identifier so that the initial
+-		// "at least one nonvoided identifier" check passes
+-		patientIdentifier = new PatientIdentifier();
+-		patientIdentifier.setIdentifier("a non empty string");
+-		patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+-		patientIdentifier.setLocation(new Location(1));
+-		patientIdentifier.setVoided(false);
+-		patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+-		patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+-		patient.addIdentifier(patientIdentifier);
+-		
+-		// If the identifier is ignored, it won't throw a
+-		// BlankIdentifierException as it should
+-		Context.getPatientService().checkPatientIdentifiers(patient);
+-		
+-	}
++@Verifies(value = "should ignore voided patient identifier", method = "checkPatientIdentifiers(Patient)")
++public void checkPatientIdentifiers_shouldIgnoreVoidedPatientIdentifier() throws Exception {
++    
++    Patient patient = new Patient();
++    PatientIdentifier patientIdentifier = new PatientIdentifier();
++    patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
++    patientIdentifier.setLocation(new Location(1));
++    patientIdentifier.setVoided(true); // Using setVoided to match the new production code
++    patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
++    patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
++    patient.addIdentifier(patientIdentifier);
++    
++    // add a non-voided identifier so that the initial
++    // "at least one nonvoided identifier" check passes
++    patientIdentifier = new PatientIdentifier();
++    patientIdentifier.setIdentifier("a non empty string");
++    patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
++    patientIdentifier.setLocation(new Location(1));
++    patientIdentifier.setVoided(false); // Using setVoided to match the new production code
++    patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
++    patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
++    patient.addIdentifier(patientIdentifier);
++    
++    // If the identifier is ignored, it won't throw a
++    // BlankIdentifierException as it should
++    Context.getPatientService().checkPatientIdentifiers(patient);
++    
++}
+
+----------------------------------------------------------------
+generated new diff test
+--- 
+
++++ 
+
+@@ -1,29 +1,29 @@
+
+ @Test
+-@Verifies(value = "should ignore voided patient identifier", method = "checkPatientIdentifiers(Patient)")
+-public void checkPatientIdentifiers_shouldIgnoreVoidedPatientIdentifier() throws Exception {
+-    
+-    Patient patient = new Patient();
+-    PatientIdentifier patientIdentifier = new PatientIdentifier();
+-    patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+-    patientIdentifier.setLocation(new Location(1));
+-    patientIdentifier.setVoided(true); // Using setVoided to match the new production code
+-    patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+-    patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+-    patient.addIdentifier(patientIdentifier);
+-    
+-    // add a non-voided identifier so that the initial
+-    // "at least one nonvoided identifier" check passes
+-    patientIdentifier = new PatientIdentifier();
+-    patientIdentifier.setIdentifier("a non empty string");
+-    patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
+-    patientIdentifier.setLocation(new Location(1));
+-    patientIdentifier.setVoided(false); // Using setVoided to match the new production code
+-    patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
+-    patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
+-    patient.addIdentifier(patientIdentifier);
+-    
+-    // If the identifier is ignored, it won't throw a
+-    // BlankIdentifierException as it should
+-    Context.getPatientService().checkPatientIdentifiers(patient);
+-    
+-}
++	@Verifies(value = "should ignore voided patient identifier", method = "checkPatientIdentifiers(Patient)")
++	public void checkPatientIdentifiers_shouldIgnoreVoidedPatientIdentifier() throws Exception {
++		
++		Patient patient = new Patient();
++		PatientIdentifier patientIdentifier = new PatientIdentifier();
++		patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
++		patientIdentifier.setLocation(new Location(1));
++		patientIdentifier.setVoided(true);
++		patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
++		patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
++		patient.addIdentifier(patientIdentifier);
++		
++		// add a non-voided identifier so that the initial
++		// "at least one nonvoided identifier" check passes
++		patientIdentifier = new PatientIdentifier();
++		patientIdentifier.setIdentifier("a non empty string");
++		patientIdentifier.setIdentifierType(Context.getPatientService().getAllPatientIdentifierTypes(false).get(0));
++		patientIdentifier.setLocation(new Location(1));
++		patientIdentifier.setVoided(false);
++		patientIdentifier.setVoidedBy(Context.getAuthenticatedUser());
++		patientIdentifier.setVoidReason("Testing whether voided identifiers are ignored");
++		patient.addIdentifier(patientIdentifier);
++		
++		// If the identifier is ignored, it won't throw a
++		// BlankIdentifierException as it should
++		Context.getPatientService().checkPatientIdentifiers(patient);
++		
++	}
+
+----------------------------------------------------------------
+state: 3
+----------------------------------------------------------------
+description: 测试通过，覆盖率：0.6545454545454545
+--------------------------------------------------------------------------------------------------------------------------------

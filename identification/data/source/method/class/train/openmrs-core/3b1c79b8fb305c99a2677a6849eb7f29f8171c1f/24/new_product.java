@@ -1,0 +1,1 @@
+public String getMessage(String s);

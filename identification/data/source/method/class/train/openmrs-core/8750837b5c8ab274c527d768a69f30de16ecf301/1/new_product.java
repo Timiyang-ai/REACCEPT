@@ -1,0 +1,1 @@
+public Integer resolveUserId(XCN xcn) throws HL7Exception;

@@ -1,0 +1,1 @@
+public List<Privilege> getAllPrivileges() throws APIException;

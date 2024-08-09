@@ -1,0 +1,1 @@
+public OrderType getOrderType(Integer orderTypeId) throws DAOException;

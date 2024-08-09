@@ -1,0 +1,1 @@
+void notifyAdd( Triple [] ts );

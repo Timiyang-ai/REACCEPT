@@ -1,0 +1,1 @@
+EndpointValidationResult validateEndpointProperties(String uri);

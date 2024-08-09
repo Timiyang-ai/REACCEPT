@@ -1,0 +1,1 @@
+public List<Order> getOrderHistoryByConcept(Patient patient, Concept concept);

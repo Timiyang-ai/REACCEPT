@@ -1,0 +1,1 @@
+Set<String> availableResources(Type resourceType);

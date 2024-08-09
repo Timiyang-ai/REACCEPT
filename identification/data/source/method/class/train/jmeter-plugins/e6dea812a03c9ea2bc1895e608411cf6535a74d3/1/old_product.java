@@ -1,0 +1,1 @@
+protected abstract JSettingsPanel getSettingsPanel();

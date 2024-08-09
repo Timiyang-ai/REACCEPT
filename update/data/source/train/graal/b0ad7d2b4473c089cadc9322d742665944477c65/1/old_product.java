@@ -1,0 +1,1 @@
+ComponentInfo loadComponentMetadata(String id) throws IOException;

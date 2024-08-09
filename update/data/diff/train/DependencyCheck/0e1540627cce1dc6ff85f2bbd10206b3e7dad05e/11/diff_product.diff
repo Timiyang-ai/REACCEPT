@@ -1,0 +1,49 @@
+diff --git a/old_product.java b/new_product.java
+index e4353ca..2053a03 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -11,21 +11,32 @@ public void addAsEvidence(String source, MavenArtifact mavenArtifact, Confidence
+         boolean found = false;
+         if (mavenArtifact.getArtifactUrl() != null && !mavenArtifact.getArtifactUrl().isEmpty()) {
+             synchronized (this) {
+-                for (Identifier i : this.identifiers) {
+-                    if ("maven".equals(i.getType()) && i.getValue().equals(mavenArtifact.toString())) {
+-                        found = true;
+-                        i.setConfidence(Confidence.HIGHEST);
+-                        final String url = "http://search.maven.org/#search|ga|1|1%3A%22" + this.getSha1sum() + "%22";
+-                        i.setUrl(url);
+-                        //i.setUrl(mavenArtifact.getArtifactUrl());
+-                        LOGGER.debug("Already found identifier {}. Confidence set to highest", i.getValue());
+-                        break;
++                for (Identifier i : this.softwareIdentifiers) {
++                    if (i instanceof PurlIdentifier) {
++                        final PurlIdentifier id = (PurlIdentifier) i;
++                        if (mavenArtifact.getArtifactId().equals(id.getName())
++                                && mavenArtifact.getGroupId().equals(id.getNamespace())) {
++                            found = true;
++                            i.setConfidence(Confidence.HIGHEST);
++                            final String url = "http://search.maven.org/#search|ga|1|1%3A%22" + this.getSha1sum() + "%22";
++                            i.setUrl(url);
++                            //i.setUrl(mavenArtifact.getArtifactUrl());
++                            LOGGER.debug("Already found identifier {}. Confidence set to highest", i.getValue());
++                            break;
++                        }
+                     }
+                 }
+             }
+         }
+         if (!found && mavenArtifact.getGroupId() != null && mavenArtifact.getArtifactId() != null && mavenArtifact.getVersion() != null) {
+-            LOGGER.debug("Adding new maven identifier {}", mavenArtifact);
+-            this.addIdentifier("maven", mavenArtifact.toString(), mavenArtifact.getArtifactUrl(), Confidence.HIGHEST);
++            try {
++                LOGGER.debug("Adding new maven identifier {}", mavenArtifact);
++                final PackageURL p = new PackageURL("maven", mavenArtifact.getGroupId(),
++                        mavenArtifact.getArtifactId(), mavenArtifact.getVersion(), null, null);
++                final PurlIdentifier id = new PurlIdentifier(p, Confidence.HIGHEST);
++                this.addSoftwareIdentifier(id);
++            } catch (MalformedPackageURLException ex) {
++                throw new UnexpectedAnalysisException(ex);
++            }
+         }
+     }
+\ No newline at end of file

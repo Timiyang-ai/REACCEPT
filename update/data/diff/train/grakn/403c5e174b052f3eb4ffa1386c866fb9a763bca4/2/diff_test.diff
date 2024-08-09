@@ -1,0 +1,155 @@
+diff --git a/old_test.java b/new_test.java
+index 9bcfd28..17a004a 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,7 +1,19 @@
+-@Ignore
+-    @Test
++@Test
+     public void testDegreesAndPersist() throws Exception {
+-        instantiateSimpleConcepts();
++        // create instances
++        EntityType thing = graph.putEntityType("thing");
++        EntityType anotherThing = graph.putEntityType("another");
++
++        Entity entity1 = graph.putEntity("1", thing);
++        Entity entity2 = graph.putEntity("2", thing);
++        Entity entity3 = graph.putEntity("3", thing);
++        Entity entity4 = graph.putEntity("4", anotherThing);
++
++        RoleType relation1 = graph.putRoleType("relation1");
++        RoleType relation2 = graph.putRoleType("relation2");
++        thing.playsRole(relation1).playsRole(relation2);
++        anotherThing.playsRole(relation1).playsRole(relation2);
++        RelationType related = graph.putRelationType("related").hasRole(relation1).hasRole(relation2);
+ 
+         // relate them
+         String id1 = UUID.randomUUID().toString();
+@@ -22,6 +34,18 @@
+         graph.commit();
+ 
+         Map<Instance, Long> correctDegrees = new HashMap<>();
++
++        // compute degrees on subgraph
++        Analytics computer = new Analytics(keyspace,Sets.newHashSet(thing, related));
++        computer.degreesAndPersist();
++
++        // fetch instances
++        graph = MindmapsClient.getGraph(keyspace);
++        entity1 = graph.getEntity("1");
++        entity2 = graph.getEntity("2");
++        entity3 = graph.getEntity("3");
++
++        correctDegrees.clear();
+         correctDegrees.put(entity1, 1l);
+         correctDegrees.put(entity2, 3l);
+         correctDegrees.put(entity3, 1l);
+@@ -29,43 +53,32 @@
+         correctDegrees.put(graph.getRelation(id2), 2l);
+         correctDegrees.put(graph.getRelation(id3), 1l);
+ 
+-        // compute degrees on subgraph
+-        Analytics computer = new Analytics(keyspace,Sets.newHashSet(thing, related));
+-        computer.degreesAndPersist();
+-
+         // assert persisted degrees are correct
+-        instantiateSimpleConcepts();
+-        correctDegrees.entrySet().forEach(degree -> {
+-            Instance instance = degree.getKey();
+-            Collection<Resource<?>> resources = null;
+-            if (instance.isEntity()) {
+-                resources = instance.asEntity().resources();
+-            } else if (instance.isRelation()) {
+-                resources = instance.asRelation().resources();
+-            }
+-            assert resources != null;
+-            assertTrue(resources.iterator().next().getValue().equals(degree.getValue()));
+-        });
++        checkDegrees(graph,correctDegrees);
+ 
+         long numVertices = 0;
+ 
+         // compute again and again ...
+         for (int i = 0; i < 2; i++) {
+-            System.out.println();
+-            System.out.println("i = " + i);
++            graph.close();
+             computer.degreesAndPersist();
+ 
+-            correctDegrees.entrySet().forEach(degree -> {
+-                Instance instance = degree.getKey();
+-                Collection<Resource<?>> resources = null;
+-                if (instance.isEntity()) {
+-                    resources = instance.asEntity().resources();
+-                } else if (instance.isRelation()) {
+-                    resources = instance.asRelation().resources();
+-                }
+-                assert resources != null;
+-                assertTrue(resources.iterator().next().getValue().equals(degree.getValue()));
+-            });
++            // refresh everything after commit
++            graph = MindmapsClient.getGraph(keyspace);
++            // fetch instances
++            entity1 = graph.getEntity("1");
++            entity2 = graph.getEntity("2");
++            entity3 = graph.getEntity("3");
++
++            correctDegrees.clear();
++            correctDegrees.put(entity1, 1l);
++            correctDegrees.put(entity2, 3l);
++            correctDegrees.put(entity3, 1l);
++            correctDegrees.put(graph.getRelation(id1), 2l);
++            correctDegrees.put(graph.getRelation(id2), 2l);
++            correctDegrees.put(graph.getRelation(id3), 1l);
++
++            checkDegrees(graph, correctDegrees);
+ 
+             // assert the number of vertices remain the same
+             if (i == 0) {
+@@ -75,26 +88,33 @@
+             }
+         }
+ 
++
+         // compute degrees on all types, again and again ...
+-        for (int i = 0; i < 3; i++) {
++        for (int i = 0; i < 2; i++) {
++
++            graph.close();
+             computer = new Analytics(keyspace);
+             computer.degreesAndPersist();
+ 
++            // after computation refresh concepts
++            graph = MindmapsClient.getGraph(keyspace);
++
++            // fetch instances
++            entity1 = graph.getEntity("1");
++            entity2 = graph.getEntity("2");
++            entity3 = graph.getEntity("3");
++            entity4 = graph.getEntity("4");
++
++            correctDegrees.clear();
++            correctDegrees.put(entity1, 1l);
++            correctDegrees.put(entity2, 3l);
++            correctDegrees.put(entity3, 1l);
++            correctDegrees.put(graph.getRelation(id1), 2l);
++            correctDegrees.put(graph.getRelation(id2), 2l);
+             correctDegrees.put(entity4, 1l);
+             correctDegrees.put(graph.getRelation(id3), 2l);
+ 
+-            correctDegrees.entrySet().forEach(degree -> {
+-                Instance instance = degree.getKey();
+-                Collection<Resource<?>> resources = null;
+-                if (instance.isEntity()) {
+-                    resources = instance.asEntity().resources();
+-                } else if (instance.isRelation()) {
+-                    resources = instance.asRelation().resources();
+-                }
+-                assert resources != null;
+-                assert !resources.isEmpty();
+-                assertEquals(resources.iterator().next().getValue(), degree.getValue());
+-            });
++            checkDegrees(graph,correctDegrees);
+ 
+             // assert the number of vertices remain the same
+             if (i == 0) {

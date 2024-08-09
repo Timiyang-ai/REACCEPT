@@ -1,0 +1,1 @@
+public abstract boolean isFile(String path) throws IOException;

@@ -1,0 +1,1 @@
+ClassesShouldConjunction haveSimpleName(String name);

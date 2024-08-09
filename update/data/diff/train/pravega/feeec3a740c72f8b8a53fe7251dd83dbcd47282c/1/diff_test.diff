@@ -1,0 +1,46 @@
+diff --git a/old_test.java b/new_test.java
+index 5a64996..ffccd33 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -8,30 +8,29 @@
+         val b = newBuffer();
+         int expectedUsedBlockCount = 1;
+ 
+-        val empty = b.write(new ByteArrayInputStream(toWrite), 0, true);
++        val empty = b.write(new ByteArrayInputStream(toWrite), 0, CacheLayout.NO_ADDRESS);
+         expectedUsedBlockCount += 1;
+-        val multiBlock = b.write(new ByteArrayInputStream(toWrite), multiBlockLength, true);
++        val multiBlock = b.write(new ByteArrayInputStream(toWrite), multiBlockLength, CacheLayout.NO_ADDRESS);
+         expectedUsedBlockCount += 2;
+-        val multiBuf = b.write(new ByteArrayInputStream(toWrite), 2 * LAYOUT.blockSize(), true);
++        val predecessorAddress = LAYOUT.calculateAddress(BUFFER_ID + 1, 2);
++        val multiBuf = b.write(new ByteArrayInputStream(toWrite), 2 * LAYOUT.blockSize(), predecessorAddress);
+         expectedUsedBlockCount += 2;
+-        val successorAddress = LAYOUT.calculateAddress(BUFFER_ID + 1, 2);
+-        b.setSuccessor(multiBuf.getLastBlockAddress(), successorAddress);
+ 
+-        val emptyDelete = b.delete(LAYOUT.getBlockId(empty.getFirstBlockAddress()));
++        val emptyDelete = b.delete(LAYOUT.getBlockId(empty.getLastBlockAddress()));
+         Assert.assertEquals(0, emptyDelete.getDeletedLength());
+-        Assert.assertEquals(CacheLayout.NO_ADDRESS, emptyDelete.getSuccessorAddress());
++        Assert.assertEquals(CacheLayout.NO_ADDRESS, emptyDelete.getPredecessorAddress());
+         expectedUsedBlockCount -= 1;
+         Assert.assertEquals(expectedUsedBlockCount, b.getUsedBlockCount());
+ 
+-        val multiBlockDelete = b.delete(LAYOUT.getBlockId(multiBlock.getFirstBlockAddress()));
++        val multiBlockDelete = b.delete(LAYOUT.getBlockId(multiBlock.getLastBlockAddress()));
+         Assert.assertEquals(multiBlockLength, multiBlockDelete.getDeletedLength());
+-        Assert.assertEquals(CacheLayout.NO_ADDRESS, multiBlockDelete.getSuccessorAddress());
++        Assert.assertEquals(CacheLayout.NO_ADDRESS, multiBlockDelete.getPredecessorAddress());
+         expectedUsedBlockCount -= 2;
+         Assert.assertEquals(expectedUsedBlockCount, b.getUsedBlockCount());
+ 
+-        val multiBufDelete = b.delete(LAYOUT.getBlockId(multiBuf.getFirstBlockAddress()));
++        val multiBufDelete = b.delete(LAYOUT.getBlockId(multiBuf.getLastBlockAddress()));
+         Assert.assertEquals(2 * LAYOUT.blockSize(), multiBufDelete.getDeletedLength());
+-        Assert.assertEquals(successorAddress, multiBufDelete.getSuccessorAddress());
++        Assert.assertEquals(predecessorAddress, multiBufDelete.getPredecessorAddress());
+         expectedUsedBlockCount -= 2;
+         Assert.assertEquals(expectedUsedBlockCount, b.getUsedBlockCount());
+     }
+\ No newline at end of file

@@ -1,0 +1,65 @@
+CompletableFuture<Void> initialize(Duration timeout) {
+        Exceptions.checkNotClosed(isClosed(), this);
+        Preconditions.checkState(this.state.get() == AggregatorState.NotInitialized, "SegmentAggregator has already been initialized.");
+        assert this.handle.get() == null : "non-null handle but state == " + this.state.get();
+        long traceId = LoggerHelpers.traceEnterWithContext(log, this.traceObjectId, "initialize");
+
+        return openWrite(this.metadata.getName(), this.handle, timeout)
+                .thenAcceptAsync(segmentInfo -> {
+                    // Check & Update StorageLength in metadata.
+                    if (this.metadata.getStorageLength() != segmentInfo.getLength()) {
+                        if (this.metadata.getStorageLength() >= 0) {
+                            // Only log warning if the StorageLength has actually been initialized, but is different.
+                            log.info("{}: SegmentMetadata has a StorageLength ({}) that is different than the actual one ({}) - updating metadata.",
+                                    this.traceObjectId, this.metadata.getStorageLength(), segmentInfo.getLength());
+                        }
+
+                        // It is very important to keep this value up-to-date and correct.
+                        this.metadata.setStorageLength(segmentInfo.getLength());
+                    }
+
+                    // Check if the Storage segment is sealed, but it's not in metadata (this is 100% indicative of some data corruption happening).
+                    if (segmentInfo.isSealed()) {
+                        if (!this.metadata.isSealed()) {
+                            throw new CompletionException(new DataCorruptionException(String.format(
+                                    "Segment '%s' is sealed in Storage but not in the metadata.", this.metadata.getName())));
+                        }
+
+                        if (!this.metadata.isSealedInStorage()) {
+                            this.metadata.markSealedInStorage();
+                            log.info("{}: Segment is sealed in Storage but metadata does not reflect that - updating metadata.", this.traceObjectId);
+                        }
+                    }
+
+                    log.info("{}: Initialized. StorageLength = {}, Sealed = {}.", this.traceObjectId, segmentInfo.getLength(), segmentInfo.isSealed());
+                    LoggerHelpers.traceLeave(log, this.traceObjectId, "initialize", traceId);
+                    setState(AggregatorState.Writing);
+                }, this.executor)
+                .exceptionally(ex -> {
+                    ex = Exceptions.unwrap(ex);
+                    if (ex instanceof StreamSegmentNotExistsException) {
+                        // Segment does not exist in Storage. There are two possibilities here:
+                        if (this.metadata.getStorageLength() == 0 && !this.metadata.isDeletedInStorage()) {
+                            // Segment has never been created because there was nothing to write to it. As long as we know
+                            // its expected length is zero, this is a valid case.
+                            this.handle.set(null);
+                            log.info("{}: Initialized. Segment does not exist in Storage but Metadata indicates it should be empty.");
+                        } else {
+                            // Segment does not exist anymore. This is a real possibility during recovery, in the following cases:
+                            // * We already processed a Segment Deletion but did not have a chance to checkpoint metadata
+                            // * We processed a MergeSegmentOperation but did not have a chance to ack/truncate the DataSource
+                            // Update metadata, just in case it is not already updated.
+                            updateMetadataPostDeletion(this.metadata);
+                            log.info("{}: Segment '{}' does not exist in Storage. Ignoring all further operations on it.",
+                                    this.traceObjectId, this.metadata.getName());
+                        }
+                        setState(AggregatorState.Writing);
+                        LoggerHelpers.traceLeave(log, this.traceObjectId, "initialize", traceId);
+                    } else {
+                        // Other kind of error - re-throw.
+                        throw new CompletionException(ex);
+                    }
+
+                    return null;
+                });
+    }

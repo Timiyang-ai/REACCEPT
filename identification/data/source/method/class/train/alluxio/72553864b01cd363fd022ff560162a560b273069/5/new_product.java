@@ -1,0 +1,1 @@
+PersistenceState getPersistenceState(long fileId) throws FileDoesNotExistException;

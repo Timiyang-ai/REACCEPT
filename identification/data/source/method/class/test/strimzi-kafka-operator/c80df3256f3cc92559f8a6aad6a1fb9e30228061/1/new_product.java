@@ -1,0 +1,1 @@
+Future<Void> changeReplicationFactor(Topic topic);

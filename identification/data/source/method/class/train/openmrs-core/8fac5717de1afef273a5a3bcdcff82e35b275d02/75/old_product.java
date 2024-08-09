@@ -1,0 +1,1 @@
+public List<PatientIdentifier> getPatientIdentifiers(String identifier, PatientIdentifierType p) throws DAOException;

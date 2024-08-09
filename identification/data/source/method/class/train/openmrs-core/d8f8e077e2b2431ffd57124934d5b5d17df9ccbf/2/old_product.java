@@ -1,0 +1,1 @@
+public List<Obs> getObservationsByPersonAndConcept(Person who, Concept question) throws APIException;

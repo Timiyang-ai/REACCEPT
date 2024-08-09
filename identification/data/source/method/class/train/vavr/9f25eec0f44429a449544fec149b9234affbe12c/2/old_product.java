@@ -1,0 +1,1 @@
+void accept(T value) throws Throwable;

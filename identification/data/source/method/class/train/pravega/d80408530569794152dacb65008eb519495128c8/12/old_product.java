@@ -1,0 +1,1 @@
+SegmentOutputStream createOutputStreamForTransaction(SegmentId segment, UUID txId);

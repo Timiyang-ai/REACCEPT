@@ -1,0 +1,72 @@
+    public static List<InetAddressAndPort> calculateNaturalEndpoints(Token searchToken, TokenMetadata tokenMetadata, Map<String, Integer> datacenters, IEndpointSnitch snitch)
+    {
+        // we want to preserve insertion order so that the first added endpoint becomes primary
+        Set<InetAddressAndPort> replicas = new LinkedHashSet<>();
+        // replicas we have found in each DC
+        Map<String, Set<InetAddressAndPort>> dcReplicas = new HashMap<>(datacenters.size());
+        for (Map.Entry<String, Integer> dc : datacenters.entrySet())
+            dcReplicas.put(dc.getKey(), new HashSet<InetAddressAndPort>(dc.getValue()));
+
+        Topology topology = tokenMetadata.getTopology();
+        // all endpoints in each DC, so we can check when we have exhausted all the members of a DC
+        Multimap<String, InetAddressAndPort> allEndpoints = topology.getDatacenterEndpoints();
+        // all racks in a DC so we can check when we have exhausted all racks in a DC
+        Map<String, ImmutableMultimap<String, InetAddressAndPort>> racks = topology.getDatacenterRacks();
+        assert !allEndpoints.isEmpty() && !racks.isEmpty() : "not aware of any cluster members";
+
+        // tracks the racks we have already placed replicas in
+        Map<String, Set<String>> seenRacks = new HashMap<>(datacenters.size());
+        for (Map.Entry<String, Integer> dc : datacenters.entrySet())
+            seenRacks.put(dc.getKey(), new HashSet<String>());
+
+        // tracks the endpoints that we skipped over while looking for unique racks
+        // when we relax the rack uniqueness we can append this to the current result so we don't have to wind back the iterator
+        Map<String, Set<InetAddressAndPort>> skippedDcEndpoints = new HashMap<>(datacenters.size());
+        for (Map.Entry<String, Integer> dc : datacenters.entrySet())
+            skippedDcEndpoints.put(dc.getKey(), new LinkedHashSet<InetAddressAndPort>());
+
+        Iterator<Token> tokenIter = TokenMetadata.ringIterator(tokenMetadata.sortedTokens(), searchToken, false);
+        while (tokenIter.hasNext() && !hasSufficientReplicas(dcReplicas, allEndpoints, datacenters))
+        {
+            Token next = tokenIter.next();
+            InetAddressAndPort ep = tokenMetadata.getEndpoint(next);
+            String dc = snitch.getDatacenter(ep);
+            // have we already found all replicas for this dc?
+            if (!datacenters.containsKey(dc) || hasSufficientReplicas(dc, dcReplicas, allEndpoints, datacenters))
+                continue;
+            // can we skip checking the rack?
+            if (seenRacks.get(dc).size() == racks.get(dc).keySet().size())
+            {
+                dcReplicas.get(dc).add(ep);
+                replicas.add(ep);
+            }
+            else
+            {
+                String rack = snitch.getRack(ep);
+                // is this a new rack?
+                if (seenRacks.get(dc).contains(rack))
+                {
+                    skippedDcEndpoints.get(dc).add(ep);
+                }
+                else
+                {
+                    dcReplicas.get(dc).add(ep);
+                    replicas.add(ep);
+                    seenRacks.get(dc).add(rack);
+                    // if we've run out of distinct racks, add the hosts we skipped past already (up to RF)
+                    if (seenRacks.get(dc).size() == racks.get(dc).keySet().size())
+                    {
+                        Iterator<InetAddressAndPort> skippedIt = skippedDcEndpoints.get(dc).iterator();
+                        while (skippedIt.hasNext() && !hasSufficientReplicas(dc, dcReplicas, allEndpoints, datacenters))
+                        {
+                            InetAddressAndPort nextSkipped = skippedIt.next();
+                            dcReplicas.get(dc).add(nextSkipped);
+                            replicas.add(nextSkipped);
+                        }
+                    }
+                }
+            }
+        }
+
+        return new ArrayList<InetAddressAndPort>(replicas);
+    }

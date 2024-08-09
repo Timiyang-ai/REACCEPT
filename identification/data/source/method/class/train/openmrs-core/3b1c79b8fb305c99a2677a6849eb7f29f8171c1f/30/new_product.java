@@ -1,0 +1,1 @@
+public Role getRoleByUuid(String uuid) throws APIException;

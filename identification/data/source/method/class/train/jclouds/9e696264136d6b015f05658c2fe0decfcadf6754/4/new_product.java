@@ -1,0 +1,1 @@
+Task putEntry(URI uri, String key, MetadataValue metadataValue);

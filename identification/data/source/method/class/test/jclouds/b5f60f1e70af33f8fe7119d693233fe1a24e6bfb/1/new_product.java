@@ -1,0 +1,1 @@
+PagedIterable<? extends Resource> list();

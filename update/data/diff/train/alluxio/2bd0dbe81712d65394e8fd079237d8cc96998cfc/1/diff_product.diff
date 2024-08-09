@@ -1,0 +1,90 @@
+diff --git a/old_product.java b/new_product.java
+index fa122d9..74bf37c 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -1,43 +1,62 @@
+-public synchronized void persistFile(long fileId, List<Long> blockIds) throws IOException {
++public void persistFile(long fileId, List<Long> blockIds) throws IOException {
++    synchronized (mLock) {
++      mPersistingInProgressFiles.add(fileId);
++    }
++
+     String dstPath = prepareUfsFilePath(fileId);
+     OutputStream outputStream = mUfs.create(dstPath);
+     final WritableByteChannel outputChannel = Channels.newChannel(outputStream);
+ 
+-    for (long blockId : blockIds) {
+-      long lockId;
+-      try {
+-        lockId = mBlockDataManager.lockBlock(Sessions.CHECKPOINT_SESSION_ID, blockId);
+-      } catch (BlockDoesNotExistException e) {
+-        throw new IOException(e);
++    Map<Long, Long> blockIdToLockId = Maps.newHashMap();
++    List<Throwable> errors = new ArrayList<Throwable>();
++    try {
++      // lock all the blocks to prevent any eviction
++      for (long blockId : blockIds) {
++        long lockId = mBlockDataManager.lockBlock(Sessions.CHECKPOINT_SESSION_ID, blockId);
++        blockIdToLockId.put(blockId, lockId);
+       }
+ 
+-      // obtain block reader
+-      try {
+-        BlockReader reader;
+-        try {
+-          reader =
+-              mBlockDataManager.readBlockRemote(Sessions.CHECKPOINT_SESSION_ID, blockId, lockId);
+-        } catch (BlockDoesNotExistException e) {
+-          throw new IOException(e);
+-        } catch (InvalidWorkerStateException e) {
+-          throw new IOException(e);
+-        }
++      for (long blockId : blockIds) {
++        long lockId = blockIdToLockId.get(blockId);
++
++        // obtain block reader
++        BlockReader reader =
++            mBlockDataManager.readBlockRemote(Sessions.CHECKPOINT_SESSION_ID, blockId, lockId);
+ 
+         // write content out
+         ReadableByteChannel inputChannel = reader.getChannel();
+         BufferUtils.fastCopy(inputChannel, outputChannel);
+         reader.close();
+-      } finally {
++      }
++    } catch (BlockDoesNotExistException e) {
++      errors.add(e);
++    } catch (InvalidWorkerStateException e) {
++      errors.add(e);
++    } finally {
++      // make sure all the locks are released
++      for (long lockId : blockIdToLockId.values()) {
+         try {
+           mBlockDataManager.unlockBlock(lockId);
+-        } catch (BlockDoesNotExistException e) {
+-          throw new IOException(e);
++        } catch (BlockDoesNotExistException bdnee) {
++          errors.add(bdnee);
+         }
+       }
++
++      if (!errors.isEmpty()) {
++        StringBuilder errorStr = new StringBuilder();
++        errorStr.append("the blocks of file").append(fileId).append(" are failed to persist\n");
++        for (Throwable e : errors) {
++          errorStr.append(e).append('\n');
++        }
++        throw new IOException(errorStr.toString());
++      }
+     }
+ 
+     outputStream.flush();
+     outputChannel.close();
+     outputStream.close();
+-    mPersistedFiles.add(fileId);
++    synchronized (mLock) {
++      mPersistingInProgressFiles.remove(fileId);
++      mPersistedFiles.add(fileId);
++    }
+   }
+\ No newline at end of file

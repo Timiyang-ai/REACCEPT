@@ -1,0 +1,1 @@
+public abstract StatsContext record(MeasureMap measurements);

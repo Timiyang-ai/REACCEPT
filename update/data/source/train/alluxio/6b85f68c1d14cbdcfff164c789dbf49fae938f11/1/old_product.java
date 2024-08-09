@@ -1,0 +1,1 @@
+URIStatus getStatus(AlluxioURI path);

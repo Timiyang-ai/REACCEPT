@@ -1,0 +1,47 @@
+diff --git a/old_test.java b/new_test.java
+index 79e6142..0712a47 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -7,12 +7,19 @@
+         SequencedItemList<Operation> opLog = new SequencedItemList<>();
+         ArrayList<TestReadIndex.MethodInvocation> methodInvocations = new ArrayList<>();
+         TestReadIndex readIndex = new TestReadIndex(methodInvocations::add);
+-        MemoryStateUpdater updater = new MemoryStateUpdater(opLog, readIndex);
++        AtomicInteger flushCallbackCallCount = new AtomicInteger();
++        MemoryStateUpdater updater = new MemoryStateUpdater(opLog, readIndex, flushCallbackCallCount::incrementAndGet);
+         ArrayList<Operation> operations = populate(updater, segmentCount, operationCountPerType);
+ 
+         // Verify they were properly processed.
+-        Assert.assertEquals("Unexpected number of items added to ReadIndex.", operations.size() - segmentCount * operationCountPerType, methodInvocations.size());
++        int triggerFutureCount = (int) methodInvocations.stream().filter(mi -> mi.methodName.equals(TestReadIndex.TRIGGER_FUTURE_READS)).count();
++        int addCount = methodInvocations.size() - triggerFutureCount;
++        Assert.assertEquals("Unexpected number of items added to ReadIndex.",
++                operations.size() - segmentCount * operationCountPerType, addCount);
++        Assert.assertEquals("Unexpected number of calls to the ReadIndex triggerFutureReads method.", 1, triggerFutureCount);
++        Assert.assertEquals("Unexpected number of calls to the flushCallback provided in the constructor.", 1, flushCallbackCallCount.get());
+ 
++        // Verify add calls.
+         Iterator<Operation> logIterator = opLog.read(-1, operations.size());
+         int currentIndex = -1;
+         int currentReadIndex = -1;
+@@ -40,6 +47,20 @@
+             }
+         }
+ 
++        // Verify triggerFutureReads args.
++        @SuppressWarnings("unchecked")
++        Collection<Long> triggerSegmentIds = (Collection<Long>) methodInvocations
++                .stream()
++                .filter(mi -> mi.methodName.equals(TestReadIndex.TRIGGER_FUTURE_READS))
++                .findFirst().get()
++                .args.get("streamSegmentIds");
++        val expectedSegmentIds = operations.stream()
++                .filter(op -> op instanceof SegmentOperation)
++                .map(op -> ((SegmentOperation) op).getStreamSegmentId())
++                .collect(Collectors.toSet());
++
++        AssertExtensions.assertContainsSameElements("ReadIndex.triggerFutureReads() was called with the wrong set of StreamSegmentIds.", expectedSegmentIds, triggerSegmentIds);
++
+         // Test DataCorruptionException.
+         AssertExtensions.assertThrows(
+                 "MemoryStateUpdater accepted an operation that was out of order.",

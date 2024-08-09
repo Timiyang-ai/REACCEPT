@@ -1,0 +1,1 @@
+public abstract void invalidateNewerThan(long timestamp);

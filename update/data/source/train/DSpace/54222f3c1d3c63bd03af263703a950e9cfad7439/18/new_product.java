@@ -1,0 +1,1 @@
+public Choices getMatches(String field, String text, Collection collection, int start, int limit, String locale);

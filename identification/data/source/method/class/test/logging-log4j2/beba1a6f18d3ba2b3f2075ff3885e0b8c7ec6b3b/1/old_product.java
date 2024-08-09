@@ -1,0 +1,1 @@
+void throwing(Level level, Throwable t);

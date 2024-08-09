@@ -1,0 +1,1 @@
+public Iterator<Relevance> search(RelevanceRanker ranker, String term);

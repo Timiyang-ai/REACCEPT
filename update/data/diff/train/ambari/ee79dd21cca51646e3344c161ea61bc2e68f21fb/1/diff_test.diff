@@ -1,0 +1,64 @@
+diff --git a/old_test.java b/new_test.java
+index fcf7b7e..202a338 100644
+--- a/old_test.java
++++ b/new_test.java
+@@ -1,14 +1,50 @@
+ @Test
+   public void testUpdateResources() throws Exception {
+     Resource.Type type = Resource.Type.ClusterStackVersion;
++    String clusterName = "Cluster100";
+ 
+     AmbariManagementController managementController = createMock(AmbariManagementController.class);
+     Clusters clusters = createNiceMock(Clusters.class);
+     Cluster cluster = createNiceMock(Cluster.class);
++    cluster.setClusterName(clusterName);
+     StackId stackId = new StackId("HDP", "2.0.1");
++    StackEntity stackEntity = stackDAO.find(stackId.getStackName(), stackId.getStackVersion());
++    Assert.assertNotNull(stackEntity);
++
++    ResourceTypeEntity resourceTypeEntity = resourceTypeDAO.findById(ResourceTypeEntity.CLUSTER_RESOURCE_TYPE);
++    if (resourceTypeEntity == null) {
++      resourceTypeEntity = new ResourceTypeEntity();
++      resourceTypeEntity.setId(ResourceTypeEntity.CLUSTER_RESOURCE_TYPE);
++      resourceTypeEntity.setName(ResourceTypeEntity.CLUSTER_RESOURCE_TYPE_NAME);
++      resourceTypeEntity = resourceTypeDAO.merge(resourceTypeEntity);
++    }
++    ResourceEntity resourceEntity = new ResourceEntity();
++    resourceEntity.setResourceType(resourceTypeEntity);
++
++    ClusterEntity clusterEntity = new ClusterEntity();
++    clusterEntity.setClusterName(clusterName);
++    clusterEntity.setResource(resourceEntity);
++    clusterEntity.setDesiredStack(stackEntity);
++    clusterDAO.create(clusterEntity);
+ 
+     final Host host1 = createNiceMock("host1", Host.class);
+     final Host host2 = createNiceMock("host2", Host.class);
++
++    List<HostEntity> hostEntities = new ArrayList<HostEntity>();
++    HostEntity hostEntity1 = new HostEntity();
++    HostEntity hostEntity2 = new HostEntity();
++    hostEntity1.setHostName("host1");
++    hostEntity2.setHostName("host2");
++    hostEntities.add(hostEntity1);
++    hostEntities.add(hostEntity2);
++    hostEntity1.setClusterEntities(Arrays.asList(clusterEntity));
++    hostEntity2.setClusterEntities(Arrays.asList(clusterEntity));
++    hostDAO.create(hostEntity1);
++    hostDAO.create(hostEntity2);
++
++    clusterEntity.setHostEntities(hostEntities);
++    clusterDAO.merge(clusterEntity);
++
+     expect(host1.getHostName()).andReturn("host1").anyTimes();
+     expect(host1.getOsFamily()).andReturn("redhat6").anyTimes();
+     expect(host2.getHostName()).andReturn("host2").anyTimes();
+@@ -93,7 +129,7 @@
+     Map<String, Object> properties = new LinkedHashMap<String, Object>();
+ 
+     // add properties to the request map
+-    properties.put(ClusterStackVersionResourceProvider.CLUSTER_STACK_VERSION_CLUSTER_NAME_PROPERTY_ID, "Cluster100");
++    properties.put(ClusterStackVersionResourceProvider.CLUSTER_STACK_VERSION_CLUSTER_NAME_PROPERTY_ID, clusterName);
+     properties.put(ClusterStackVersionResourceProvider.CLUSTER_STACK_VERSION_STATE_PROPERTY_ID, "CURRENT");
+     properties.put(ClusterStackVersionResourceProvider.CLUSTER_STACK_VERSION_REPOSITORY_VERSION_PROPERTY_ID, "HDP-2.2.2.0-2561");
+ 

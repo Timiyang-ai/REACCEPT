@@ -1,0 +1,1 @@
+IDocument getDocAction(Object document);

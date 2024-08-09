@@ -1,0 +1,25 @@
+diff --git a/old_product.java b/new_product.java
+index 6a12e19..f0d3069 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -5,5 +5,18 @@
+         @RequestBody final JsonPatch patch
+     ) throws GenieException {
+         log.debug("Called to patch command {} with patch {}", id, patch);
+-        this.commandService.patchCommand(id, patch);
++
++        final Command currentCommand = DtoAdapters.toV3Command(this.commandService.getCommand(id));
++
++        try {
++            log.debug("Will patch cluster {}. Original state: {}", id, currentCommand);
++            final JsonNode commandNode = GenieObjectMapper.getMapper().valueToTree(currentCommand);
++            final JsonNode postPatchNode = patch.apply(commandNode);
++            final Command patchedCommand = GenieObjectMapper.getMapper().treeToValue(postPatchNode, Command.class);
++            log.debug("Finished patching command {}. New state: {}", id, patchedCommand);
++            this.commandService.updateCommand(id, DtoAdapters.toV4Command(patchedCommand));
++        } catch (final JsonPatchException | IOException e) {
++            log.error("Unable to patch command {} with patch {} due to exception.", id, patch, e);
++            throw new GenieServerException(e.getLocalizedMessage(), e);
++        }
+     }
+\ No newline at end of file

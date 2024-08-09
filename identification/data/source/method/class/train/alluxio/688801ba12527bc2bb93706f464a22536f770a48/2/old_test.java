@@ -1,0 +1,17 @@
+  private List<Map.Entry<Long, Double>> getSortedCRF(Map<Long, Double> crfMap) {
+    List<Map.Entry<Long, Double>> sortedCRF = new ArrayList<>(crfMap.entrySet());
+    Collections.sort(sortedCRF, new Comparator<Map.Entry<Long, Double>>() {
+      @Override
+      public int compare(Entry<Long, Double> o1, Entry<Long, Double> o2) {
+        double res = o1.getValue() - o2.getValue();
+        if (res < 0) {
+          return -1;
+        } else if (res > 0) {
+          return 1;
+        } else {
+          return 0;
+        }
+      }
+    });
+    return sortedCRF;
+  }

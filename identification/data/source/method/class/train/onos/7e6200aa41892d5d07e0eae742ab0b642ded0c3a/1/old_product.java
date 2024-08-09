@@ -1,0 +1,1 @@
+void removeDevice(NetconfDeviceInfo deviceInfo);

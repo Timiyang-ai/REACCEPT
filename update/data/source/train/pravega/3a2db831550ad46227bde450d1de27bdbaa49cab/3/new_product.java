@@ -1,0 +1,1 @@
+CompletableFuture<Boolean> createStream(final String scope, final String streamName, final StreamConfiguration streamConfig);

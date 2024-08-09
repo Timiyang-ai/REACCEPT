@@ -1,0 +1,41 @@
+diff --git a/old_product.java b/new_product.java
+index 3123612..4a2ad06 100644
+--- a/old_product.java
++++ b/new_product.java
+@@ -26,14 +26,14 @@ public Order saveOrder(Order order, OrderContext orderContext) throws APIExcepti
+ 			if (previousOrder == null) {
+ 				throw new APIException("Previous Order is required for a revised order");
+ 			}
+-			stopOrder(previousOrder, null);
++			stopOrder(previousOrder, order.getStartDate());
+ 		} else if (Order.Action.DISCONTINUE.equals(order.getAction())) {
+ 			discontinueExistingOrdersIfNecessary(order);
+ 		}
+ 		
+-		//Check that patient, careSetting, concept and drug if is drug order have not changed
+ 		if (order.getPreviousOrder() != null) {
+ 			Order previousOrder = order.getPreviousOrder();
++			//Check that patient, careSetting, concept and drug if is drug order have not changed
+ 			//we need to use a SQL query to by pass the hibernate cache
+ 			String query = "SELECT patient_id, care_setting, concept_id FROM orders WHERE order_id = ";
+ 			boolean isDrugOrder = DrugOrder.class.isAssignableFrom(previousOrder.getClass());
+@@ -53,6 +53,19 @@ public Order saveOrder(Order order, OrderContext orderContext) throws APIExcepti
+ 			} else if (isDrugOrder && !rowData.get(3).equals(((DrugOrder) previousOrder).getDrug().getDrugId())) {
+ 				throw new APIException("Cannot change the drug of a drug order");
+ 			}
++			
++			//concept should be the same as on previous order, same applies to drug for drug orders
++			boolean isDrugOrderAndHasADrug = DrugOrder.class.isAssignableFrom(order.getClass())
++			        && ((DrugOrder) order).getDrug() != null;
++			if (!order.getConcept().equals(previousOrder.getConcept())) {
++				throw new APIException("The concept of the previous order and the new revised order don't match");
++			} else if (isDrugOrderAndHasADrug) {
++				DrugOrder drugOrder1 = (DrugOrder) order;
++				DrugOrder drugOrder2 = (DrugOrder) previousOrder;
++				if (!OpenmrsUtil.nullSafeEquals(drugOrder1.getDrug(), drugOrder2.getDrug())) {
++					throw new APIException("The drug of the previous order and the new revised order don't match");
++				}
++			}
+ 		}
+ 		
+ 		return saveOrderInternal(order, orderContext);

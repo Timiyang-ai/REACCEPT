@@ -1,0 +1,1 @@
+public abstract void scrutinize(Snak snak, EntityIdValue entityId, boolean added);

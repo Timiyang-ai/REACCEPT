@@ -1,0 +1,1 @@
+public abstract Builder maxDuration(@Nullable Long maxDuration);

@@ -1,0 +1,1 @@
+public void register(String name, BooleanSupplier supplier, @Nullable String description);

@@ -1,0 +1,3 @@
+void shutdown() {
+        timeout.cancel();
+    }

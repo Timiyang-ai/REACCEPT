@@ -1,0 +1,26 @@
+@Test
+    public void testGetJob() throws GenieException {
+        final Job job1 = this.service.getJob(JOB_1_ID);
+        Assert.assertEquals(JOB_1_ID, job1.getId());
+        Assert.assertEquals("testPigJob", job1.getName());
+        Assert.assertEquals("tgianos", job1.getUser());
+        Assert.assertEquals("2.4", job1.getVersion());
+        Assert.assertEquals("-f -j", job1.getCommandArgs());
+        Assert.assertEquals(JobStatus.INIT, job1.getStatus());
+        Assert.assertNotNull(job1.getTags());
+        Assert.assertEquals(3, job1.getTags().size());
+        Assert.assertEquals(2, job1.getCommandCriteria().size());
+        Assert.assertEquals(3, job1.getClusterCriterias().size());
+
+        final Job job2 = this.service.getJob(JOB_2_ID);
+        Assert.assertEquals(JOB_2_ID, job2.getId());
+        Assert.assertEquals("testSparkJob", job2.getName());
+        Assert.assertEquals("amsharma", job2.getUser());
+        Assert.assertEquals("2.4.3", job2.getVersion());
+        Assert.assertEquals("-f -j -a", job2.getCommandArgs());
+        Assert.assertEquals(JobStatus.FAILED, job2.getStatus());
+        Assert.assertNotNull(job2.getTags());
+        Assert.assertEquals(4, job2.getTags().size());
+        Assert.assertEquals(2, job2.getCommandCriteria().size());
+        Assert.assertEquals(2, job2.getClusterCriterias().size());
+    }

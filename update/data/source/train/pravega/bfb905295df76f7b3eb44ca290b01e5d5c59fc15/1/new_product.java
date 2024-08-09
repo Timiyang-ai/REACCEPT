@@ -1,0 +1,1 @@
+InputStream readDirect(long streamSegmentId, long startOffset, int length) throws StreamSegmentNotExistsException;

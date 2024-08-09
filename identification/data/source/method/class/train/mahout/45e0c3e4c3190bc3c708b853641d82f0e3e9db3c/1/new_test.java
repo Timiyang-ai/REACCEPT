@@ -1,0 +1,3 @@
+  Vector getTestVector() {
+    return test;
+  }

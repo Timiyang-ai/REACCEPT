@@ -1,0 +1,1 @@
+public void registerHandler(String key, String handlerClass) throws APIException;
