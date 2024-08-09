@@ -2,7 +2,7 @@
 
 This repository provides the code and data for the paper "REACCEPT: Automated Co-evolution of Production and Test Code Based on Dynamic Validation and Large Language Models", which has been submitted to ICSE 2025. Our work leverages large language models and dynamic validation to fully automate PT co-evolution (i.e., capable of identifying and updating obsolete test code).
 
-Our proposed methodology REACCEPT(REasoning-Action mechanism and Code dynamic validation assisted Co-Evolution of Production and Test code) is divided into two phases, identification and update. 
+Our proposed methodology REACCEPT (REasoning-Action mechanism and Code dynamic validation assisted Co-Evolution of Production and Test code) is divided into two phases, identification and update. 
 
 ## Identification
 
