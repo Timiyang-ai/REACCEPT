@@ -25,7 +25,7 @@ lxml~=5.2.1
 langchain~=0.1.17
 ```
 
-You can use `pip install -r requirements.txt` to install these packages. To run LLM you need to install openai packages by running `pip install openai==1.23.6` in shell. 
+To run LLM you need to install openai packages by running `pip install openai==1.23.6` in shell. 
 
 ### Getting Experience
 
@@ -52,7 +52,7 @@ Run `python get_experience.py` to extract the experience for better identificati
 
 ### Environment
 
-The following are the required Python dependencies and versions  for REACCEPT update.
+The following are the required Python dependencies and versions for REACCEPT update.
 
 ```
 requests~=2.31.0
@@ -61,7 +61,7 @@ langchain~=0.1.17
 codebleu~=0.7.0
 ```
 
-And you can use `pip install -r requirements.txt` to install these packages. To run LLM you need to install openai packages by running `pip install openai==1.23.6` in shell. And you need to install chromadb for storing and retrievaling the knowledge by use `pip install chromadb~=0.5.0`.
+And you can use `pip install -r requirements.txt` to install these packages. To run LLM you need to install openai packages by running `pip install openai==1.23.6` in shell. And you need to install chromadb for storing and retrievaling the knowledge by use `pip install chromadb==0.5.0`.
 
 To perform dynamic validation, you need to install Git, Maven, and JDK. The projects in our test set require JDK 6, 7, and 8. We recommend using Maven 3.2.5.
 
