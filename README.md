@@ -1,8 +1,10 @@
 # REACCEPT
 
-This repository provides the code and data for the paper "REACCEPT: Automated Co-evolution of Production and Test Code Based on Dynamic Validation and Large Language Models", which has been submitted to ICSE 2025. Our work leverages large language models and dynamic validation to fully automate PT co-evolution (i.e., capable of identifying and updating obsolete test code).
+This repository provides the code and data for the paper "REACCEPT: Automated Co-evolution of Production and Test Code Based on Dynamic Validation and Large Language Models". Our work leverages large language models and dynamic validation to fully automate PT co-evolution (i.e., capable of identifying and updating obsolete test code).
 
-Our proposed methodology REACCEPT (REasoning-Action mechanism and Code dynamic validation assisted Co-Evolution of Production and Test code) is divided into two phases, identification and update. 
+Our proposed methodology REACCEPT(REasoning-Action mechanism and Code dynamic validation assisted Co-Evolution of Production and Test code) is divided into two phases, identification and update. 
+
+
 
 ## Identification
 
@@ -12,7 +14,8 @@ Our proposed methodology REACCEPT (REasoning-Action mechanism and Code dynamic v
 - `result`: The results of REACCEPT identification.
 - `run_identification.py`: Running REACCEPT identification for the test set.
 - `evaluate_code_bleu.py`:  Extracting experience from the training set.
-- `requirement.txt`: Providing the PyPI requirement for REACCEPT Identification.
+- `README.md`: This file.
+- `requirement.txt`: Providing the PyPI requirement for REACCEPT update.
 
 ### Environment
 
@@ -35,6 +38,8 @@ Run `python get_experience.py` to extract the experience for better identificati
 1. During the identification phase, you can run with `python run_identification.py` on the test set. 
 2. The identification results will be written into a table file. The headers of the table are: Project Name, Commit ID, Sample ID, Label, Update Flag, Predict Label, LLM Output.
 
+
+
 ## Update
 
 ### Contents
@@ -45,6 +50,7 @@ Run `python get_experience.py` to extract the experience for better identificati
 - `run_updates.py`: Running REACCEPT update for the test set.
 - `run_update.py`: Running REACCEPT update for a single sample in the test set.
 - `evaluate_code_bleu.py`: Evaluation REACCEPT update by CodeBLEU.
+- `README.md`: This file.
 - `requirement.txt`: Providing the PyPI requirement for REACCEPT update.
 
 ### Environment
@@ -58,7 +64,7 @@ langchain~=0.1.17
 codebleu~=0.7.0
 ```
 
-And you can use `pip install -r requirements.txt`to install these packages. To run LLM you need to install openai packages by running `pip install openai==1.23.6` in shell. And you need to install chromadb for storing and retrievaling the knowledge by use `pip install chromadb==0.5.0`.
+And you can use `pip install -r requirements.txt`to install these packages. To run LLM you need to install openai packages by running `pip install openai==1.23.6` in shell. And you need to install chromadb for storing and retrievaling the knowledge by use `pip install chromadb~=0.5.0`.
 
 To perform dynamic validation, you need to install Git, Maven, and JDK. The projects in our test set require JDK 6, 7, and 8. We recommend using Maven 3.2.5.
 
