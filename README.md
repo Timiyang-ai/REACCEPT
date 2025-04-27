@@ -8,33 +8,93 @@ Our proposed methodology REACCEPT (REasoning-Action mechanism and Code dynamic v
 
 ## Identification
 
-### Contents
+### Workflow
 
-- `data`: includes training set for extracting experience and test set for the final identification experiments, both utilizing method-level samples.
-- `result`: The results of REACCEPT identification.
-- `run_identification.py`: Running REACCEPT identification for the test set.
-- `evaluate_code_bleu.py`:  Extracting experience from the training set.
+1\.  **Experience Extraction**: Extract initial "experience" descriptions from labeled code samples. 
 
-### Environment
+2\.  **Experience Clustering & Summarization**: Cluster and summarize the initial experience to distill core principles.  
 
-The following are the main required Python dependencies and versions for REACCEPT identification.
+3\. **Experience-Based Identification**: Use the summarized principles to guide the LLM in predicting update needs for new samples.
+
+### Prerequisites
+
+- **Python**: >= 3.8
+- **Dependencies**: `openai`, `langchain`, `langchain-openai`, `pandas`, `numpy`, `scikit-learn`, `sentence-transformers`, `tiktoken`, `tqdm`
+
+  ```bash
+  pip install openai langchain langchain-openai pandas numpy scikit-learn sentence-transformers tiktoken tqdm
+  ```
+
+- **Environment Variables**: Set `OPENAI_API_KEY` (required) and `OPENAI_API_BASE` (optional).
+
+  ```bash
+  # Linux/macOS
+  export OPENAI_API_KEY="YOUR_API_KEY"
+  # Windows (CMD)
+  set OPENAI_API_KEY=YOUR_API_KEY
+  # Windows (PowerShell)
+  $env:OPENAI_API_KEY="YOUR_API_KEY"
+  ```
+
+### Data Structure
+
+Input data should follow this structure:
 
 ```
-requests~=2.31.0
-lxml~=5.2.1
-langchain~=0.1.17
+<data_root_directory>/
+├── train/ # Training data (for extraction/summarization)
+│   └── <project_name>/<commit_id>/<sample_id>/
+│       ├── old_product.java
+│       ├── new_product.java
+│       ├── old_test.java
+│       └── label.txt # Contains '0' or '1'
+└── test/ # Test data (for prediction)
+    └── <project_name>/<commit_id>/<sample_id>/
+        ├── old_product.java
+        ├── new_product.java
+        └── old_test.java
 ```
 
-To run LLM you need to install openai packages by running `pip install openai==1.23.6` in shell. 
+### Running the Pipeline
 
-### Getting Experience
+Assume the refactored scripts are saved as `extract_raw_experiences.py`, `cluster_summarize_experiences.py`, and `run_identification.py`.
 
-Run `python get_experience.py` to extract the experience for better identification. 
+#### Step 1: Extract Initial Experiences
 
-### Identification
+```bash
+python extract_raw_experiences.py <path_to_train_data> <output_csv_path> [--max-samples N] [--model MODEL_NAME]
+# Example:
+python extract_experiences.py ./data/train ./results/step1_initial_experiences.csv
+```
 
-1. During the identification phase, you can run with `python run_identification.py` on the test set. 
-2. The identification results will be written into a table file. The headers of the table are: Project Name, Commit ID, Sample ID, Label, Update Flag, Predict Label, LLM Output.
+**Output**: A CSV file containing initial experiences (column: Experience).
+
+#### Step 2: Cluster and Summarize Experiences
+
+```bash
+python cluster_summarize_experiences.py <step1_output_csv> <output_directory> [--embed-model EMBED_MODEL] [--max-clusters-pos N] [--max-clusters-neg N]
+# Example:
+python cluster_summarize_experiences.py ./results/step1_initial_experiences.csv ./results/step2_summarized
+```
+
+**Output**: Generates `final_positive_experiences.csv` and `final_negative_experiences.csv` in the specified output directory.
+
+#### Step 3: Experience-Based Identification
+
+```bash
+python run_identification.py <path_to_test_data> <output_csv_path> [--pos-exp-csv <positive_exp_csv>] [--neg-exp-csv <negative_exp_csv>] [--llm-model MODEL_NAME]
+# Example:
+python identify_update_needs.py ./data/test ./results/step3_predictions.csv --pos-exp-csv ./results/step2_summarized/final_positive_experiences.csv --neg-exp-csv ./results/step2_summarized/final_negative_experiences.csv
+```
+
+**Output**: A CSV file containing prediction results (columns: Prediction, Correct).
+
+### Notes
+
+- **Model Selection**: Use `--model`, `--llm-model`, `--embed-model` arguments to specify different models.
+- **Parameter Tuning**: Steps 2 and 3 offer various arguments to adjust clustering, summarization, and prediction behavior.
+- **Resuming Execution**: Scripts 1 and 3 support resuming from interruption. They will read the existing output CSV and skip already processed samples.
+- **Prompt Engineering**: Modify the `SYSTEM_MESSAGE` constants within the scripts to adjust LLM behavior.
 
 
 
